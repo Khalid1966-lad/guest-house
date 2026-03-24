@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         { name: "Balcon", icon: "DoorOpen", sortOrder: 7 },
         { name: "Vue mer", icon: "Waves", sortOrder: 8 },
         { name: "Téléphone", icon: "Phone", sortOrder: 9 },
-        { name: "Bureau", icon: "Desk", sortOrder: 10 },
+        { name: "Bureau", icon: "LampDesk", sortOrder: 10 },
         { name: "Sèche-cheveux", icon: "Wind", sortOrder: 11 },
         { name: "Chauffage", icon: "Flame", sortOrder: 12 },
       ]

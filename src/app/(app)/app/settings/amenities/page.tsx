@@ -43,7 +43,7 @@ const availableIcons = [
   { value: "DoorOpen", label: "Porte/Balcon" },
   { value: "Waves", label: "Vue mer" },
   { value: "Phone", label: "Téléphone" },
-  { value: "Desk", label: "Bureau" },
+  { value: "LampDesk", label: "Bureau" },
   { value: "Sun", label: "Soleil" },
   { value: "Car", label: "Parking" },
   { value: "Utensils", label: "Cuisine" },

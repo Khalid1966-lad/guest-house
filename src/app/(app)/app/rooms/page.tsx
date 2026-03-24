@@ -135,7 +135,7 @@ const defaultAmenities = [
   { id: "balcony", name: "Balcon", icon: "DoorOpen" },
   { id: "seaview", name: "Vue mer", icon: "Waves" },
   { id: "phone", name: "Téléphone", icon: "Phone" },
-  { id: "desk", name: "Bureau", icon: "Desk" },
+  { id: "desk", name: "Bureau", icon: "LampDesk" },
 ]
 
 export default function RoomsPage() {
