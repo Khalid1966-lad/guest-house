@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,10 +24,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   CalendarDays,
   Plus,
@@ -36,15 +38,16 @@ import {
   Search,
   Users,
   BedDouble,
+  MoreVertical,
   Check,
   X,
-  Clock,
-  Phone,
-  Mail,
+  LogIn,
+  LogOut,
   Calendar as CalendarIcon,
+  AlertCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, startOfDay, endOfDay } from "date-fns"
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, startOfDay } from "date-fns"
 import { fr } from "date-fns/locale"
 
 // Types
@@ -113,7 +116,6 @@ const roomTypes: Record<string, string> = {
 
 const defaultFormData = {
   guestId: "",
-  guestSearch: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -130,18 +132,19 @@ const defaultFormData = {
 
 export default function BookingsPage() {
   const { data: session, status } = useSession()
+  const router = useRouter()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isGuestDialogOpen, setIsGuestDialogOpen] = useState(false)
   const [formData, setFormData] = useState(defaultFormData)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState("")
+  const [formError, setFormError] = useState("")
   const [searchGuest, setSearchGuest] = useState("")
 
   // Calendar days
@@ -162,7 +165,13 @@ export default function BookingsPage() {
 
   // Fetch data
   const fetchData = async () => {
+    if (!session?.user?.guestHouseId) {
+      setIsLoading(false)
+      return
+    }
+
     try {
+      setError(null)
       const [bookingsRes, roomsRes, guestsRes] = await Promise.all([
         fetch("/api/bookings"),
         fetch("/api/rooms"),
@@ -185,26 +194,22 @@ export default function BookingsPage() {
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
+      setError("Erreur lors du chargement des données")
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    // Si la session est en cours de chargement, on attend
-    if (status === "loading") {
+    if (status === "loading") return
+    
+    if (status === "unauthenticated") {
+      router.push("/login")
       return
     }
-    
-    // Si l'utilisateur n'est pas connecté, on arrête le chargement
-    if (!session?.user) {
-      setIsLoading(false)
-      return
-    }
-    
-    // On charge les données
+
     fetchData()
-  }, [session, status])
+  }, [session, status, router])
 
   // Navigate months
   const goToPreviousMonth = () => setCurrentDate(subMonths(currentDate, 1))
@@ -214,7 +219,7 @@ export default function BookingsPage() {
   // Open new booking dialog
   const handleNewBooking = () => {
     setFormData(defaultFormData)
-    setError("")
+    setFormError("")
     setIsDialogOpen(true)
   }
 
@@ -251,24 +256,26 @@ export default function BookingsPage() {
 
   // Save booking
   const handleSaveBooking = async () => {
-    setError("")
+    setFormError("")
+
+    if (!formData.firstName || !formData.lastName) {
+      setFormError("Le prénom et le nom du client sont requis")
+      return
+    }
 
     if (!formData.roomId || !formData.checkIn || !formData.checkOut) {
-      setError("Veuillez remplir tous les champs obligatoires")
+      setFormError("Veuillez remplir tous les champs obligatoires")
       return
     }
 
     if (new Date(formData.checkIn) >= new Date(formData.checkOut)) {
-      setError("La date de départ doit être après la date d'arrivée")
+      setFormError("La date de départ doit être après la date d'arrivée")
       return
     }
 
     setIsSaving(true)
 
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000)
-
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -276,20 +283,11 @@ export default function BookingsPage() {
           ...formData,
           totalPrice: calculateTotal(),
         }),
-        signal: controller.signal,
       })
 
-      clearTimeout(timeoutId)
-
       if (!response.ok) {
-        let errorMsg = "Erreur lors de la sauvegarde"
-        try {
-          const errorData = await response.json()
-          errorMsg = errorData.error || errorMsg
-        } catch (e) {
-          // Ignore
-        }
-        setError(errorMsg)
+        const errorData = await response.json()
+        setFormError(errorData.error || "Erreur lors de la sauvegarde")
         setIsSaving(false)
         return
       }
@@ -297,13 +295,26 @@ export default function BookingsPage() {
       setIsDialogOpen(false)
       setIsSaving(false)
       fetchData()
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        setError("La requête a pris trop de temps")
-      } else {
-        setError("Une erreur inattendue s'est produite")
-      }
+    } catch (err) {
+      setFormError("Une erreur inattendue s'est produite")
       setIsSaving(false)
+    }
+  }
+
+  // Update booking status (check-in, check-out, cancel)
+  const handleUpdateStatus = async (bookingId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (response.ok) {
+        fetchData()
+      }
+    } catch (err) {
+      console.error("Erreur mise à jour:", err)
     }
   }
 
@@ -330,7 +341,6 @@ export default function BookingsPage() {
     setFormData((prev) => ({
       ...prev,
       guestId: guest.id,
-      guestSearch: `${guest.firstName} ${guest.lastName}`,
       firstName: guest.firstName,
       lastName: guest.lastName,
       email: guest.email || "",
@@ -339,13 +349,28 @@ export default function BookingsPage() {
     setSearchGuest("")
   }
 
-  // New guest
-  const handleNewGuest = () => {
-    setFormData((prev) => ({
-      ...prev,
-      guestId: "",
-    }))
-    setIsGuestDialogOpen(true)
+  // Check if user needs onboarding
+  if (status === "loading" || (status === "authenticated" && isLoading)) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+      </div>
+    )
+  }
+
+  if (status === "authenticated" && !session?.user?.guestHouseId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <AlertCircle className="w-12 h-12 text-yellow-500 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Configuration requise</h2>
+        <p className="text-gray-500 mb-4 text-center">
+          Vous devez créer votre maison d'hôtes avant de gérer les réservations.
+        </p>
+        <Button onClick={() => router.push("/onboarding")}>
+          Créer ma maison d'hôtes
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -363,6 +388,18 @@ export default function BookingsPage() {
           Nouvelle réservation
         </Button>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="pt-4">
+            <p className="text-red-600">{error}</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={fetchData}>
+              Réessayer
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -384,6 +421,7 @@ export default function BookingsPage() {
             variant={viewMode === "calendar" ? "default" : "outline"}
             size="icon"
             onClick={() => setViewMode("calendar")}
+            className={viewMode === "calendar" ? "bg-sky-600 hover:bg-sky-700" : ""}
           >
             <CalendarDays className="w-4 h-4" />
           </Button>
@@ -391,6 +429,7 @@ export default function BookingsPage() {
             variant={viewMode === "list" ? "default" : "outline"}
             size="icon"
             onClick={() => setViewMode("list")}
+            className={viewMode === "list" ? "bg-sky-600 hover:bg-sky-700" : ""}
           >
             <Search className="w-4 h-4" />
           </Button>
@@ -406,7 +445,7 @@ export default function BookingsPage() {
                 <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-xl font-semibold capitalize">
                   {format(currentDate, "MMMM yyyy", { locale: fr })}
                 </h2>
                 <Button variant="outline" size="icon" onClick={goToNextMonth}>
@@ -419,71 +458,65 @@ export default function BookingsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
-                {/* Week days header */}
-                {["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"].map((day) => (
+            <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
+              {/* Week days header */}
+              {["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"].map((day) => (
+                <div
+                  key={day}
+                  className="bg-gray-50 dark:bg-gray-800 p-2 text-center text-sm font-medium text-gray-600 dark:text-gray-400"
+                >
+                  {day}
+                </div>
+              ))}
+
+              {/* Calendar days */}
+              {calendarDays.map((day) => {
+                const dayBookings = getBookingsForDay(day)
+                const isCurrentDay = isToday(day)
+
+                return (
                   <div
-                    key={day}
-                    className="bg-gray-50 dark:bg-gray-800 p-2 text-center text-sm font-medium text-gray-600 dark:text-gray-400"
+                    key={day.toISOString()}
+                    className={cn(
+                      "bg-white dark:bg-gray-900 min-h-24 p-1",
+                      !isSameMonth(day, currentDate) && "bg-gray-50 dark:bg-gray-800"
+                    )}
                   >
-                    {day}
-                  </div>
-                ))}
-
-                {/* Calendar days */}
-                {calendarDays.map((day) => {
-                  const dayBookings = getBookingsForDay(day)
-                  const isCurrentDay = isToday(day)
-
-                  return (
                     <div
-                      key={day.toISOString()}
                       className={cn(
-                        "bg-white dark:bg-gray-900 min-h-24 p-1",
-                        !isSameMonth(day, currentDate) && "bg-gray-50 dark:bg-gray-800"
+                        "text-sm p-1 rounded-full w-7 h-7 flex items-center justify-center",
+                        isCurrentDay && "bg-sky-600 text-white font-bold"
                       )}
                     >
-                      <div
-                        className={cn(
-                          "text-sm p-1 rounded-full w-7 h-7 flex items-center justify-center",
-                          isCurrentDay && "bg-sky-600 text-white font-bold"
-                        )}
-                      >
-                        {format(day, "d")}
-                      </div>
-                      <div className="space-y-1 mt-1">
-                        {dayBookings.slice(0, 3).map((booking) => {
-                          const status = bookingStatuses[booking.status] || bookingStatuses.pending
-                          return (
-                            <div
-                              key={booking.id}
-                              className={cn(
-                                "text-xs px-1 py-0.5 rounded truncate cursor-pointer",
-                                status.bg,
-                                status.color
-                              )}
-                              title={`${booking.guest.firstName} ${booking.guest.lastName} - ${booking.room.number}`}
-                            >
-                              {booking.room.number}: {booking.guest.firstName.charAt(0)}. {booking.guest.lastName}
-                            </div>
-                          )
-                        })}
-                        {dayBookings.length > 3 && (
-                          <div className="text-xs text-gray-500 px-1">
-                            +{dayBookings.length - 3} autres
-                          </div>
-                        )}
-                      </div>
+                      {format(day, "d")}
                     </div>
-                  )
-                })}
-              </div>
-            )}
+                    <div className="space-y-1 mt-1">
+                      {dayBookings.slice(0, 3).map((booking) => {
+                        const statusInfo = bookingStatuses[booking.status] || bookingStatuses.pending
+                        return (
+                          <div
+                            key={booking.id}
+                            className={cn(
+                              "text-xs px-1 py-0.5 rounded truncate cursor-pointer",
+                              statusInfo.bg,
+                              statusInfo.color
+                            )}
+                            title={`${booking.guest.firstName} ${booking.guest.lastName} - ${booking.room.number}`}
+                          >
+                            {booking.room.number}: {booking.guest.firstName.charAt(0)}. {booking.guest.lastName}
+                          </div>
+                        )
+                      })}
+                      {dayBookings.length > 3 && (
+                        <div className="text-xs text-gray-500 px-1">
+                          +{dayBookings.length - 3} autres
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -496,11 +529,7 @@ export default function BookingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
-              </div>
-            ) : filteredBookings.length === 0 ? (
+            {filteredBookings.length === 0 ? (
               <div className="text-center py-12">
                 <CalendarDays className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium">Aucune réservation</h3>
@@ -515,14 +544,17 @@ export default function BookingsPage() {
             ) : (
               <div className="space-y-3">
                 {filteredBookings.map((booking) => {
-                  const status = bookingStatuses[booking.status] || bookingStatuses.pending
+                  const statusInfo = bookingStatuses[booking.status] || bookingStatuses.pending
+                  const canCheckIn = booking.status === "confirmed" && isSameDay(parseISO(booking.checkIn), new Date())
+                  const canCheckOut = booking.status === "checked_in"
+                  
                   return (
                     <div
                       key={booking.id}
                       className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
                       <div className="flex items-center gap-4">
-                        <div className={cn("w-3 h-3 rounded-full", status.bg)} />
+                        <div className={cn("w-3 h-3 rounded-full", statusInfo.bg)} />
                         <div>
                           <p className="font-medium">
                             {booking.guest.firstName} {booking.guest.lastName}
@@ -532,13 +564,49 @@ export default function BookingsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
+                      <div className="flex items-center gap-3">
+                        <div className="text-right hidden sm:block">
                           <p className="font-semibold">{booking.totalPrice} €</p>
-                          <Badge className={cn(status.bg, status.color, "border-0")}>
-                            {status.label}
+                          <Badge className={cn(statusInfo.bg, statusInfo.color, "border-0")}>
+                            {statusInfo.label}
                           </Badge>
                         </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {canCheckIn && (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "checked_in")}>
+                                <LogIn className="w-4 h-4 mr-2" />
+                                Check-in
+                              </DropdownMenuItem>
+                            )}
+                            {canCheckOut && (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "checked_out")}>
+                                <LogOut className="w-4 h-4 mr-2" />
+                                Check-out
+                              </DropdownMenuItem>
+                            )}
+                            {booking.status === "pending" && (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "confirmed")}>
+                                <Check className="w-4 h-4 mr-2" />
+                                Confirmer
+                              </DropdownMenuItem>
+                            )}
+                            {booking.status !== "cancelled" && booking.status !== "checked_out" && (
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => handleUpdateStatus(booking.id, "cancelled")}
+                              >
+                                <X className="w-4 h-4 mr-2" />
+                                Annuler
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   )
@@ -560,9 +628,9 @@ export default function BookingsPage() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {error && (
+            {formError && (
               <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
-                {error}
+                {formError}
               </div>
             )}
 
@@ -582,27 +650,26 @@ export default function BookingsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setFormData((prev) => ({ ...prev, guestId: "", guestSearch: "" }))}
+                    onClick={() => setFormData((prev) => ({ ...prev, guestId: "" }))}
                   >
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input
-                        placeholder="Rechercher un client..."
-                        value={searchGuest}
-                        onChange={(e) => setSearchGuest(e.target.value)}
-                        className="pl-10"
-                      />
+                  {guests.length > 0 && (
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Rechercher un client existant..."
+                          value={searchGuest}
+                          onChange={(e) => setSearchGuest(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
                     </div>
-                    <Button variant="outline" onClick={handleNewGuest}>
-                      Nouveau
-                    </Button>
-                  </div>
+                  )}
 
                   {searchGuest && filteredGuests.length > 0 && (
                     <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
@@ -620,43 +687,41 @@ export default function BookingsPage() {
                   )}
 
                   {/* New guest form */}
-                  {!formData.guestId && (
-                    <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">Prénom *</Label>
-                        <Input
-                          id="firstName"
-                          value={formData.firstName}
-                          onChange={(e) => handleFormChange("firstName", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Nom *</Label>
-                        <Input
-                          id="lastName"
-                          value={formData.lastName}
-                          onChange={(e) => handleFormChange("lastName", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => handleFormChange("email", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Téléphone</Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => handleFormChange("phone", e.target.value)}
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Prénom *</Label>
+                      <Input
+                        id="firstName"
+                        value={formData.firstName}
+                        onChange={(e) => handleFormChange("firstName", e.target.value)}
+                      />
                     </div>
-                  )}
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Nom *</Label>
+                      <Input
+                        id="lastName"
+                        value={formData.lastName}
+                        onChange={(e) => handleFormChange("lastName", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleFormChange("email", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Téléphone</Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => handleFormChange("phone", e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -672,7 +737,7 @@ export default function BookingsPage() {
                   <SelectValue placeholder="Sélectionner une chambre" />
                 </SelectTrigger>
                 <SelectContent>
-                  {rooms.filter((r) => r.status === "available" || r.status === "occupied").map((room) => (
+                  {rooms.map((room) => (
                     <SelectItem key={room.id} value={room.id}>
                       Chambre {room.number} - {roomTypes[room.type] || room.type} ({room.capacity} pers.) - {room.basePrice}€/nuit
                     </SelectItem>
