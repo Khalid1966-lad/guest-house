@@ -38,7 +38,148 @@ export async function GET(
   }
 }
 
-// PATCH - Update booking (status, check-in, check-out)
+// PUT - Full update of a booking
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    const { id } = await params
+
+    if (!session?.user?.guestHouseId || !session?.user?.id) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const {
+      guestId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      roomId,
+      checkIn,
+      checkOut,
+      adults,
+      children,
+      nightlyRate,
+      totalPrice,
+      source,
+      guestNotes,
+    } = body
+
+    // Verify booking exists
+    const existingBooking = await db.booking.findFirst({
+      where: {
+        id,
+        guestHouseId: session.user.guestHouseId,
+      },
+    })
+
+    if (!existingBooking) {
+      return NextResponse.json({ error: "Réservation non trouvée" }, { status: 404 })
+    }
+
+    // Validate dates
+    if (new Date(checkIn) >= new Date(checkOut)) {
+      return NextResponse.json(
+        { error: "La date de départ doit être après la date d'arrivée" },
+        { status: 400 }
+      )
+    }
+
+    // Check for conflicts with other bookings (excluding current one)
+    const conflictingBooking = await db.booking.findFirst({
+      where: {
+        id: { not: id },
+        roomId,
+        status: { notIn: ["cancelled", "no_show"] },
+        OR: [
+          {
+            checkIn: { lt: new Date(checkOut) },
+            checkOut: { gt: new Date(checkIn) },
+          },
+        ],
+      },
+    })
+
+    if (conflictingBooking) {
+      return NextResponse.json(
+        { error: "Cette chambre n'est pas disponible pour ces dates" },
+        { status: 400 }
+      )
+    }
+
+    // Handle guest
+    let finalGuestId = guestId
+
+    if (!finalGuestId && firstName && lastName) {
+      // Check if guest with same email exists
+      if (email) {
+        const existingGuest = await db.guest.findFirst({
+          where: {
+            guestHouseId: session.user.guestHouseId,
+            email,
+          },
+        })
+        if (existingGuest) {
+          finalGuestId = existingGuest.id
+        }
+      }
+
+      // Create new guest if needed
+      if (!finalGuestId) {
+        const newGuest = await db.guest.create({
+          data: {
+            guestHouseId: session.user.guestHouseId,
+            firstName,
+            lastName,
+            email: email || null,
+            phone: phone || null,
+          },
+        })
+        finalGuestId = newGuest.id
+      }
+    }
+
+    if (!finalGuestId) {
+      return NextResponse.json(
+        { error: "Informations client requises" },
+        { status: 400 }
+      )
+    }
+
+    // Update booking
+    const booking = await db.booking.update({
+      where: { id },
+      data: {
+        guestId: finalGuestId,
+        roomId,
+        checkIn: new Date(checkIn),
+        checkOut: new Date(checkOut),
+        adults: parseInt(adults) || 1,
+        children: parseInt(children) || 0,
+        nightlyRate: parseFloat(nightlyRate) || 0,
+        totalPrice: parseFloat(totalPrice) || 0,
+        grandTotal: parseFloat(totalPrice) || 0,
+        source: source || "direct",
+        guestNotes: guestNotes || null,
+      },
+      include: {
+        guest: true,
+        room: true,
+      },
+    })
+
+    return NextResponse.json({ booking })
+  } catch (error) {
+    console.error("Erreur mise à jour réservation:", error)
+    return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
+  }
+}
+
+// PATCH - Update booking status (check-in, check-out, cancel)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -52,9 +193,9 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { status, actualCheckIn, actualCheckOut } = body
+    const { status } = body
 
-    // Verify booking exists and belongs to user's guest house
+    // Verify booking exists
     const existingBooking = await db.booking.findFirst({
       where: {
         id,
@@ -80,38 +221,32 @@ export async function PATCH(
     if (status) {
       updateData.status = status
 
-      // Handle check-in
       if (status === "checked_in") {
-        updateData.actualCheckIn = actualCheckIn ? new Date(actualCheckIn) : new Date()
+        updateData.actualCheckIn = new Date()
         updateData.checkedInBy = session.user.id
 
-        // Update room status
         await db.room.update({
           where: { id: existingBooking.roomId },
           data: { status: "occupied" },
         })
       }
 
-      // Handle check-out
       if (status === "checked_out") {
-        updateData.actualCheckOut = actualCheckOut ? new Date(actualCheckOut) : new Date()
+        updateData.actualCheckOut = new Date()
         updateData.checkedOutBy = session.user.id
 
-        // Update room status
         await db.room.update({
           where: { id: existingBooking.roomId },
           data: { status: "available" },
         })
       }
 
-      // Handle cancellation
       if (status === "cancelled") {
         updateData.cancelledAt = new Date()
         updateData.cancelledBy = session.user.id
       }
     }
 
-    // Update booking
     const booking = await db.booking.update({
       where: { id },
       data: updateData,
@@ -128,7 +263,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - Cancel a booking
+// DELETE - Delete a booking
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -153,17 +288,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Réservation non trouvée" }, { status: 404 })
     }
 
-    // Cancel instead of delete (keep for records)
-    const booking = await db.booking.update({
+    // Actually delete the booking
+    await db.booking.delete({
       where: { id },
-      data: {
-        status: "cancelled",
-        cancelledAt: new Date(),
-        cancelledBy: session.user.id,
-      },
     })
 
-    return NextResponse.json({ booking })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Erreur suppression réservation:", error)
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })

@@ -27,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -45,6 +46,9 @@ import {
   LogOut,
   Calendar as CalendarIcon,
   AlertCircle,
+  Edit,
+  Trash2,
+  Eye,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, startOfDay } from "date-fns"
@@ -142,6 +146,9 @@ export default function BookingsPage() {
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [formData, setFormData] = useState(defaultFormData)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState("")
@@ -154,9 +161,15 @@ export default function BookingsPage() {
     return eachDayOfInterval({ start, end })
   }, [currentDate])
 
-  // Get bookings for a specific day
+  // Filter bookings by status
+  const filteredBookings = useMemo(() => {
+    if (statusFilter === "all") return bookings
+    return bookings.filter((b) => b.status === statusFilter)
+  }, [bookings, statusFilter])
+
+  // Get bookings for a specific day (with status filter)
   const getBookingsForDay = (day: Date) => {
-    return bookings.filter((booking) => {
+    return filteredBookings.filter((booking) => {
       const checkIn = parseISO(booking.checkIn)
       const checkOut = parseISO(booking.checkOut)
       return day >= startOfDay(checkIn) && day < startOfDay(checkOut)
@@ -218,9 +231,39 @@ export default function BookingsPage() {
 
   // Open new booking dialog
   const handleNewBooking = () => {
+    setEditingBooking(null)
     setFormData(defaultFormData)
     setFormError("")
     setIsDialogOpen(true)
+  }
+
+  // Open edit booking dialog
+  const handleEditBooking = (booking: Booking) => {
+    setEditingBooking(booking)
+    setFormData({
+      guestId: booking.guest.id,
+      firstName: booking.guest.firstName,
+      lastName: booking.guest.lastName,
+      email: booking.guest.email || "",
+      phone: booking.guest.phone || "",
+      roomId: booking.room.id,
+      checkIn: format(parseISO(booking.checkIn), "yyyy-MM-dd"),
+      checkOut: format(parseISO(booking.checkOut), "yyyy-MM-dd"),
+      adults: booking.adults.toString(),
+      children: booking.children.toString(),
+      nightlyRate: booking.nightlyRate.toString(),
+      source: booking.source,
+      guestNotes: booking.guestNotes || "",
+    })
+    setFormError("")
+    setIsDetailOpen(false)
+    setIsDialogOpen(true)
+  }
+
+  // View booking details
+  const handleViewBooking = (booking: Booking) => {
+    setSelectedBooking(booking)
+    setIsDetailOpen(true)
   }
 
   // Handle form change
@@ -254,7 +297,7 @@ export default function BookingsPage() {
     return nights * rate
   }
 
-  // Save booking
+  // Save booking (create or update)
   const handleSaveBooking = async () => {
     setFormError("")
 
@@ -276,8 +319,11 @@ export default function BookingsPage() {
     setIsSaving(true)
 
     try {
-      const response = await fetch("/api/bookings", {
-        method: "POST",
+      const url = editingBooking ? `/api/bookings/${editingBooking.id}` : "/api/bookings"
+      const method = editingBooking ? "PUT" : "POST"
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
@@ -311,6 +357,7 @@ export default function BookingsPage() {
       })
 
       if (response.ok) {
+        setIsDetailOpen(false)
         fetchData()
       }
     } catch (err) {
@@ -318,11 +365,23 @@ export default function BookingsPage() {
     }
   }
 
-  // Filter bookings by status
-  const filteredBookings = useMemo(() => {
-    if (statusFilter === "all") return bookings
-    return bookings.filter((b) => b.status === statusFilter)
-  }, [bookings, statusFilter])
+  // Delete booking
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette réservation ?")) return
+
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        setIsDetailOpen(false)
+        fetchData()
+      }
+    } catch (err) {
+      console.error("Erreur suppression:", err)
+    }
+  }
 
   // Filtered guests for search
   const filteredGuests = useMemo(() => {
@@ -405,7 +464,7 @@ export default function BookingsPage() {
       <div className="flex flex-col sm:flex-row gap-4">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Statut" />
+            <SelectValue placeholder="Filtrer par statut" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
@@ -436,6 +495,24 @@ export default function BookingsPage() {
         </div>
       </div>
 
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {Object.entries(bookingStatuses).map(([key, value]) => {
+          const count = bookings.filter((b) => b.status === key).length
+          return (
+            <Card key={key} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div className={cn("w-3 h-3 rounded-full", value.bg)} />
+                  <span className="text-2xl font-bold">{count}</span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{value.label}</p>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
       {/* Calendar View */}
       {viewMode === "calendar" ? (
         <Card>
@@ -452,9 +529,16 @@ export default function BookingsPage() {
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={goToToday}>
-                Aujourd'hui
-              </Button>
+              <div className="flex items-center gap-2">
+                {statusFilter !== "all" && (
+                  <Badge className={cn(bookingStatuses[statusFilter]?.bg, bookingStatuses[statusFilter]?.color)}>
+                    Filtre: {bookingStatuses[statusFilter]?.label}
+                  </Badge>
+                )}
+                <Button variant="outline" size="sm" onClick={goToToday}>
+                  Aujourd'hui
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -494,17 +578,18 @@ export default function BookingsPage() {
                       {dayBookings.slice(0, 3).map((booking) => {
                         const statusInfo = bookingStatuses[booking.status] || bookingStatuses.pending
                         return (
-                          <div
+                          <button
                             key={booking.id}
+                            onClick={() => handleViewBooking(booking)}
                             className={cn(
-                              "text-xs px-1 py-0.5 rounded truncate cursor-pointer",
+                              "w-full text-xs px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity text-left",
                               statusInfo.bg,
                               statusInfo.color
                             )}
                             title={`${booking.guest.firstName} ${booking.guest.lastName} - ${booking.room.number}`}
                           >
                             {booking.room.number}: {booking.guest.firstName.charAt(0)}. {booking.guest.lastName}
-                          </div>
+                          </button>
                         )
                       })}
                       {dayBookings.length > 3 && (
@@ -526,6 +611,7 @@ export default function BookingsPage() {
             <CardTitle>Liste des réservations</CardTitle>
             <CardDescription>
               {filteredBookings.length} réservation{filteredBookings.length > 1 ? "s" : ""}
+              {statusFilter !== "all" && ` (${bookingStatuses[statusFilter]?.label})`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -534,7 +620,9 @@ export default function BookingsPage() {
                 <CalendarDays className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium">Aucune réservation</h3>
                 <p className="text-gray-500 mb-4">
-                  Commencez par créer votre première réservation
+                  {statusFilter !== "all" 
+                    ? "Aucune réservation avec ce statut"
+                    : "Commencez par créer votre première réservation"}
                 </p>
                 <Button className="bg-sky-600 hover:bg-sky-700" onClick={handleNewBooking}>
                   <Plus className="w-4 h-4 mr-2" />
@@ -553,7 +641,10 @@ export default function BookingsPage() {
                       key={booking.id}
                       className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
-                      <div className="flex items-center gap-4">
+                      <div 
+                        className="flex items-center gap-4 flex-1 cursor-pointer"
+                        onClick={() => handleViewBooking(booking)}
+                      >
                         <div className={cn("w-3 h-3 rounded-full", statusInfo.bg)} />
                         <div>
                           <p className="font-medium">
@@ -573,11 +664,20 @@ export default function BookingsPage() {
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewBooking(booking)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Voir détails
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditBooking(booking)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             {canCheckIn && (
                               <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "checked_in")}>
                                 <LogIn className="w-4 h-4 mr-2" />
@@ -605,6 +705,14 @@ export default function BookingsPage() {
                                 Annuler
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={() => handleDeleteBooking(booking.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Supprimer
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -617,13 +725,117 @@ export default function BookingsPage() {
         </Card>
       )}
 
-      {/* New Booking Dialog */}
+      {/* Booking Detail Dialog */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Détails de la réservation</DialogTitle>
+          </DialogHeader>
+          
+          {selectedBooking && (
+            <div className="space-y-4 py-4">
+              {/* Status */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Statut</span>
+                <Badge className={cn(
+                  bookingStatuses[selectedBooking.status]?.bg,
+                  bookingStatuses[selectedBooking.status]?.color,
+                  "border-0"
+                )}>
+                  {bookingStatuses[selectedBooking.status]?.label}
+                </Badge>
+              </div>
+
+              {/* Guest */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                <p className="text-sm text-gray-500 mb-1">Client</p>
+                <p className="font-medium">{selectedBooking.guest.firstName} {selectedBooking.guest.lastName}</p>
+                {selectedBooking.guest.email && (
+                  <p className="text-sm text-gray-500">{selectedBooking.guest.email}</p>
+                )}
+                {selectedBooking.guest.phone && (
+                  <p className="text-sm text-gray-500">{selectedBooking.guest.phone}</p>
+                )}
+              </div>
+
+              {/* Room */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Chambre</span>
+                <span className="font-medium">
+                  {selectedBooking.room.number}
+                  {selectedBooking.room.name && ` - ${selectedBooking.room.name}`}
+                </span>
+              </div>
+
+              {/* Dates */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Arrivée</span>
+                <span>{format(parseISO(selectedBooking.checkIn), "d MMMM yyyy", { locale: fr })}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Départ</span>
+                <span>{format(parseISO(selectedBooking.checkOut), "d MMMM yyyy", { locale: fr })}</span>
+              </div>
+
+              {/* Guests */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Voyageurs</span>
+                <span>{selectedBooking.adults} adulte{selectedBooking.adults > 1 ? "s" : ""}{selectedBooking.children > 0 && ` + ${selectedBooking.children} enfant${selectedBooking.children > 1 ? "s" : ""}`}</span>
+              </div>
+
+              {/* Price */}
+              <div className="p-4 bg-sky-50 dark:bg-sky-950 rounded-lg">
+                <div className="flex justify-between text-sm mb-2">
+                  <span>Prix/nuit</span>
+                  <span>{selectedBooking.nightlyRate} €</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span>Total</span>
+                  <span className="text-sky-600">{selectedBooking.totalPrice} €</span>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {selectedBooking.guestNotes && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Notes</p>
+                  <p className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">{selectedBooking.guestNotes}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => handleEditBooking(selectedBooking)}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Modifier
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  className="flex-1"
+                  onClick={() => handleDeleteBooking(selectedBooking.id)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* New/Edit Booking Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nouvelle réservation</DialogTitle>
+            <DialogTitle>
+              {editingBooking ? "Modifier la réservation" : "Nouvelle réservation"}
+            </DialogTitle>
             <DialogDescription>
-              Créez une nouvelle réservation
+              {editingBooking ? "Modifiez les informations de la réservation" : "Créez une nouvelle réservation"}
             </DialogDescription>
           </DialogHeader>
 
@@ -871,7 +1083,7 @@ export default function BookingsPage() {
                   Sauvegarde...
                 </>
               ) : (
-                "Créer la réservation"
+                editingBooking ? "Modifier" : "Créer la réservation"
               )}
             </Button>
           </div>
