@@ -59,7 +59,7 @@ export default function DashboardPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "confirmed":
-        return <Badge className="bg-emerald-100 text-emerald-700">Confirmé</Badge>
+        return <Badge className="bg-sky-100 text-sky-700">Confirmé</Badge>
       case "pending":
         return <Badge variant="secondary">En attente</Badge>
       case "checked_in":
@@ -84,7 +84,7 @@ export default function DashboardPage() {
             <CalendarDays className="w-4 h-4 mr-2" />
             Aujourd'hui
           </Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" size="sm">
+          <Button className="bg-sky-600 hover:bg-sky-700" size="sm">
             + Nouvelle réservation
           </Button>
         </div>
@@ -111,11 +111,11 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Arrivées aujourd'hui</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+            <ArrowUpRight className="h-4 w-4 text-sky-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.todayCheckIns}</div>
-            <p className="text-xs text-emerald-600 mt-2">
+            <p className="text-xs text-sky-600 mt-2">
               <CheckCircle2 className="inline w-3 h-3 mr-1" />
               {stats.pendingBookings} en attente de confirmation
             </p>
@@ -145,7 +145,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.monthlyRevenue.toLocaleString()} €</div>
-            <p className={`text-xs mt-2 ${stats.revenueChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            <p className={`text-xs mt-2 ${stats.revenueChange >= 0 ? "text-sky-600" : "text-red-600"}`}>
               {stats.revenueChange >= 0 ? (
                 <>
                   <TrendingUp className="inline w-3 h-3 mr-1" />
@@ -176,8 +176,8 @@ export default function DashboardPage() {
                 <AreaChart data={revenueData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
@@ -190,7 +190,7 @@ export default function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#10b981"
+                    stroke="#0ea5e9"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorRevenue)"
@@ -208,9 +208,9 @@ export default function DashboardPage() {
             <CardDescription>État des chambres</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-950 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-sky-50 dark:bg-sky-950 rounded-lg">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                <div className="w-2 h-2 bg-sky-500 rounded-full" />
                 <span className="text-sm">Disponibles</span>
               </div>
               <span className="font-semibold">{stats.availableRooms}</span>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Nouveaux ce mois</span>
-                <span className="font-semibold text-emerald-600">+{stats.newGuestsMonth}</span>
+                <span className="font-semibold text-sky-600">+{stats.newGuestsMonth}</span>
               </div>
             </div>
           </CardContent>

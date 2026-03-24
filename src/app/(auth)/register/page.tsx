@@ -98,10 +98,10 @@ export default function RegisterPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4">
         <Card className="w-full max-w-md shadow-xl border-0">
           <CardContent className="pt-8 pb-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-sky-100 text-sky-600 mb-4">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Compte créé avec succès !</h2>
@@ -115,11 +115,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="w-full max-w-md">
         {/* Logo et titre */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-sky-600 text-white mb-4">
             <Hotel className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -252,7 +252,7 @@ export default function RegisterPage() {
             <CardFooter className="flex flex-col gap-4 pt-0">
               <Button
                 type="submit"
-                className="w-full h-11 bg-emerald-600 hover:bg-emerald-700"
+                className="w-full h-11 bg-sky-600 hover:bg-sky-700"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -269,7 +269,7 @@ export default function RegisterPage() {
                 Déjà un compte ?{" "}
                 <Link
                   href="/login"
-                  className="text-emerald-600 hover:text-emerald-700 font-medium dark:text-emerald-400"
+                  className="text-sky-600 hover:text-sky-700 font-medium dark:text-sky-400"
                 >
                   Se connecter
                 </Link>

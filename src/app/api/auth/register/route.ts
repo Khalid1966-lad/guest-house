@@ -34,8 +34,9 @@ export async function POST(request: NextRequest) {
     // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(validatedData.password, 12)
     
-    // Créer un utilisateur temporaire sans maison d'hôtes
+    // Créer un utilisateur sans maison d'hôtes
     // L'utilisateur sera lié à une maison d'hôtes lors de l'onboarding
+    // Note: guestHouseId est maintenant optionnel dans le schéma
     const user = await db.user.create({
       data: {
         email: validatedData.email,
@@ -46,8 +47,7 @@ export async function POST(request: NextRequest) {
         phone: validatedData.phone,
         role: "owner",
         isActive: true,
-        // guestHouseId est requis - on crée une maison d'hôtes temporaire
-        // ou on utilise un système de pré-inscription
+        // guestHouseId est optionnel - sera défini lors de l'onboarding
       }
     })
     

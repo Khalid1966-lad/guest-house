@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -55,12 +55,15 @@ const navigation = [
 ]
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter()
   const pathname = usePathname()
   const { data: session } = useSession()
   const { theme, setTheme } = useTheme()
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/login" })
+    await signOut({ redirect: false })
+    router.push("/login")
+    router.refresh()
   }
 
   const initials = session?.user?.name
@@ -73,7 +76,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 px-6 border-b">
-        <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center">
           <Hotel className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1">
@@ -96,7 +99,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-100"
+                  ? "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-100"
                   : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               )}
             >
@@ -114,7 +117,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <Button variant="ghost" className="w-full justify-start gap-3 px-2">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={session?.user?.image || undefined} />
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
+                <AvatarFallback className="bg-sky-100 text-sky-700 text-xs">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -206,7 +209,7 @@ export function Header() {
         </Button>
 
         {/* Quick actions */}
-        <Button className="bg-emerald-600 hover:bg-emerald-700 hidden sm:flex">
+        <Button className="bg-sky-600 hover:bg-sky-700 hidden sm:flex">
           + Nouvelle réservation
         </Button>
       </div>

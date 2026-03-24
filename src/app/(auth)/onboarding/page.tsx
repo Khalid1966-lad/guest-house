@@ -1,15 +1,15 @@
 "use client"
 
 import { useState, Suspense, useMemo } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Hotel, ArrowRight, CheckCircle2, Building2 } from "lucide-react"
+import { Loader2, ArrowRight, CheckCircle2, Building2 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 
 // Étapes de l'onboarding
@@ -22,8 +22,7 @@ const STEPS = [
 
 function OnboardingForm() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const userId = searchParams.get("userId")
+  const { data: session, status, update } = useSession()
   
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -122,7 +121,7 @@ function OnboardingForm() {
 
     if (!validateStep(currentStep)) return
 
-    if (!userId) {
+    if (status !== "authenticated" || !session?.user?.id) {
       setError("Session invalide. Veuillez vous reconnecter.")
       return
     }
@@ -135,7 +134,6 @@ function OnboardingForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          ownerId: userId,
           email: formData.email || undefined,
           website: formData.website || undefined,
         }),
@@ -149,13 +147,20 @@ function OnboardingForm() {
         return
       }
 
+      // Mettre à jour la session avec les nouvelles informations
+      await update({
+        guestHouseId: data.guestHouse.id,
+        guestHouseSlug: data.guestHouse.slug,
+        guestHouseName: data.guestHouse.name,
+      })
+
       setIsSuccess(true)
       
-      // Connecter l'utilisateur automatiquement
-      // Note: Dans un vrai scénario, on utiliserait un token de session
+      // Rediriger vers le dashboard après création réussie
       setTimeout(() => {
-        router.push("/login?message=account_created")
-      }, 3000)
+        router.push("/app/dashboard")
+        router.refresh()
+      }, 2000)
       
     } catch (err) {
       setError("Une erreur inattendue s'est produite")
@@ -165,12 +170,27 @@ function OnboardingForm() {
 
   const progress = (currentStep / STEPS.length) * 100
 
+  // Afficher un loader pendant le chargement de la session
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
+        <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+      </div>
+    )
+  }
+
+  // Si non authentifié, rediriger vers login
+  if (status === "unauthenticated") {
+    router.push("/login")
+    return null
+  }
+
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4">
         <Card className="w-full max-w-md shadow-xl border-0">
           <CardContent className="pt-8 pb-8 text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-sky-100 text-sky-600 mb-6">
               <CheckCircle2 className="w-10 h-10" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Félicitations ! 🎉</h2>
@@ -178,7 +198,7 @@ function OnboardingForm() {
               Votre maison d'hôtes "<strong>{formData.name}</strong>" a été créée avec succès.
             </p>
             <p className="text-sm text-gray-500">
-              Redirection vers la connexion...
+              Redirection vers votre tableau de bord...
             </p>
           </CardContent>
         </Card>
@@ -187,11 +207,11 @@ function OnboardingForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-sky-600 text-white mb-4">
             <Building2 className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -210,13 +230,13 @@ function OnboardingForm() {
               <div
                 key={step.id}
                 className={`flex-1 text-center ${
-                  currentStep >= step.id ? "text-emerald-600" : "text-gray-400"
+                  currentStep >= step.id ? "text-sky-600" : "text-gray-400"
                 }`}
               >
                 <div
                   className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-sm font-medium ${
                     currentStep >= step.id
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-sky-600 text-white"
                       : "bg-gray-200 text-gray-500"
                   }`}
                 >
@@ -402,7 +422,7 @@ function OnboardingForm() {
                         name="currency"
                         value={formData.currency}
                         onChange={handleChange}
-                        className="w-full h-11 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full h-11 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
                       >
                         <option value="EUR">Euro (EUR)</option>
                         <option value="USD">Dollar US (USD)</option>
@@ -419,7 +439,7 @@ function OnboardingForm() {
                         name="timezone"
                         value={formData.timezone}
                         onChange={handleChange}
-                        className="w-full h-11 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full h-11 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
                       >
                         <option value="Europe/Paris">Paris (UTC+1)</option>
                         <option value="Europe/London">Londres (UTC)</option>
@@ -430,11 +450,11 @@ function OnboardingForm() {
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950 rounded-lg mt-4">
-                    <h4 className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">
+                  <div className="p-4 bg-sky-50 dark:bg-sky-950 rounded-lg mt-4">
+                    <h4 className="font-medium text-sky-800 dark:text-sky-200 mb-2">
                       Récapitulatif
                     </h4>
-                    <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
+                    <div className="text-sm text-sky-700 dark:text-sky-300 space-y-1">
                       <p><strong>Établissement:</strong> {formData.name}</p>
                       <p><strong>Identifiant:</strong> {formData.slug}</p>
                       <p><strong>Ville:</strong> {formData.city}</p>
@@ -459,7 +479,7 @@ function OnboardingForm() {
                 <Button
                   type="button"
                   onClick={handleNext}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-sky-600 hover:bg-sky-700"
                 >
                   Suivant
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -467,7 +487,7 @@ function OnboardingForm() {
               ) : (
                 <Button
                   type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-sky-600 hover:bg-sky-700"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -494,8 +514,8 @@ function OnboardingForm() {
 export default function OnboardingPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-100">
+        <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
       </div>
     }>
       <OnboardingForm />

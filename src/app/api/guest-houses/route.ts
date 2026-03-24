@@ -1,77 +1,152 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { z } from "zod"
-import { getCurrentUser } from "@/lib/session"
+import { Prisma } from "@prisma/client"
 
-// Schéma de validation pour créer une maison d'hôtes
-const createGuestHouseSchema = z.object({
-  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
-  slug: z.string()
-    .min(2, "L'identifiant doit contenir au moins 2 caractères")
-    .regex(/^[a-z0-9-]+$/, "L'identifiant ne peut contenir que des lettres minuscules, chiffres et tirets"),
-  description: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  postalCode: z.string().optional(),
-  country: z.string().default("France"),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  website: z.string().url().optional().or(z.literal("")),
-  currency: z.string().default("EUR"),
-  timezone: z.string().default("Europe/Paris"),
-  // Informations du propriétaire
-  ownerId: z.string(),
-})
-
-// GET - Lister les maisons d'hôtes (admin uniquement)
-export async function GET() {
+// POST - Créer une nouvelle maison d'hôtes
+export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non autorisé" },
+        { status: 401 }
+      )
     }
-    
-    // Un utilisateur normal ne voit que sa propre maison d'hôtes
-    if (user.role !== "super_admin") {
-      const guestHouse = await db.guestHouse.findUnique({
-        where: { id: user.guestHouseId },
-        include: {
-          settings: true,
-          _count: {
-            select: {
-              users: true,
-              rooms: true,
-              bookings: true,
-              guests: true,
-            }
-          }
-        }
-      })
-      
-      return NextResponse.json({ guestHouses: guestHouse ? [guestHouse] : [] })
+
+    const body = await request.json()
+    const {
+      name,
+      slug,
+      description,
+      address,
+      city,
+      postalCode,
+      country,
+      phone,
+      email,
+      website,
+      currency,
+      timezone,
+    } = body
+
+    // Validation des champs requis
+    if (!name || !slug) {
+      return NextResponse.json(
+        { error: "Le nom et l'identifiant sont requis" },
+        { status: 400 }
+      )
     }
-    
-    // Les super admins voient toutes les maisons d'hôtes
-    const guestHouses = await db.guestHouse.findMany({
-      include: {
-        settings: true,
-        _count: {
-          select: {
-            users: true,
-            rooms: true,
-            bookings: true,
-            guests: true,
-          }
-        }
-      },
-      orderBy: { createdAt: "desc" }
+
+    // Vérifier que le slug est unique
+    const existingGuestHouse = await db.guestHouse.findUnique({
+      where: { slug },
     })
-    
-    return NextResponse.json({ guestHouses })
-    
+
+    if (existingGuestHouse) {
+      return NextResponse.json(
+        { error: "Cet identifiant est déjà utilisé" },
+        { status: 400 }
+      )
+    }
+
+    // Vérifier que l'utilisateur n'a pas déjà une maison d'hôtes
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { guestHouseId: true },
+    })
+
+    if (user?.guestHouseId) {
+      return NextResponse.json(
+        { error: "Vous avez déjà une maison d'hôtes" },
+        { status: 400 }
+      )
+    }
+
+    // Créer la maison d'hôtes et associer l'utilisateur dans une transaction
+    const guestHouse = await db.$transaction(async (tx) => {
+      // 1. Créer la maison d'hôtes
+      const newGuestHouse = await tx.guestHouse.create({
+        data: {
+          name,
+          slug,
+          description: description || null,
+          address: address || null,
+          city: city || null,
+          postalCode: postalCode || null,
+          country: country || "France",
+          phone: phone || null,
+          email: email || null,
+          website: website || null,
+          currency: currency || "EUR",
+          timezone: timezone || "Europe/Paris",
+        },
+      })
+
+      // 2. Mettre à jour l'utilisateur avec le guestHouseId et le rôle owner
+      await tx.user.update({
+        where: { id: session.user.id },
+        data: {
+          guestHouseId: newGuestHouse.id,
+          role: "owner",
+        },
+      })
+
+      // 3. Créer les paramètres par défaut de la maison d'hôtes
+      await tx.guestHouseSetting.create({
+        data: {
+          guestHouseId: newGuestHouse.id,
+        },
+      })
+
+      // 4. Créer les équipements par défaut
+      const defaultAmenities = [
+        { name: "WiFi", icon: "Wifi", sortOrder: 1 },
+        { name: "TV", icon: "Tv", sortOrder: 2 },
+        { name: "Climatisation", icon: "Wind", sortOrder: 3 },
+        { name: "Minibar", icon: "Coffee", sortOrder: 4 },
+        { name: "Coffre-fort", icon: "Shield", sortOrder: 5 },
+        { name: "Baignoire", icon: "Bath", sortOrder: 6 },
+        { name: "Balcon", icon: "DoorOpen", sortOrder: 7 },
+        { name: "Vue mer", icon: "Waves", sortOrder: 8 },
+        { name: "Téléphone", icon: "Phone", sortOrder: 9 },
+        { name: "Bureau", icon: "Desk", sortOrder: 10 },
+        { name: "Sèche-cheveux", icon: "Wind", sortOrder: 11 },
+        { name: "Chauffage", icon: "Flame", sortOrder: 12 },
+      ]
+
+      await tx.amenity.createMany({
+        data: defaultAmenities.map((amenity) => ({
+          guestHouseId: newGuestHouse.id,
+          ...amenity,
+        })),
+      })
+
+      return newGuestHouse
+    })
+
+    return NextResponse.json({
+      success: true,
+      guestHouse: {
+        id: guestHouse.id,
+        name: guestHouse.name,
+        slug: guestHouse.slug,
+      },
+    })
   } catch (error) {
-    console.error("Erreur lors de la récupération des maisons d'hôtes:", error)
+    console.error("Erreur création maison d'hôtes:", error)
+    
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "Cet identifiant est déjà utilisé" },
+          { status: 400 }
+        )
+      }
+    }
+    
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
       { status: 500 }
@@ -79,109 +154,37 @@ export async function GET() {
   }
 }
 
-// POST - Créer une nouvelle maison d'hôtes
-export async function POST(request: NextRequest) {
+// GET - Récupérer les informations de la maison d'hôtes de l'utilisateur
+export async function GET() {
   try {
-    const body = await request.json()
-    const validatedData = createGuestHouseSchema.parse(body)
-    
-    // Vérifier si le slug existe déjà
-    const existingSlug = await db.guestHouse.findUnique({
-      where: { slug: validatedData.slug }
-    })
-    
-    if (existingSlug) {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Cet identifiant est déjà utilisé" },
-        { status: 400 }
+        { error: "Non autorisé" },
+        { status: 401 }
       )
     }
-    
-    // Vérifier si l'utilisateur existe
-    const owner = await db.user.findUnique({
-      where: { id: validatedData.ownerId }
-    })
-    
-    if (!owner) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 400 }
-      )
-    }
-    
-    // Vérifier si l'utilisateur a déjà une maison d'hôtes
-    if (owner.guestHouseId) {
-      return NextResponse.json(
-        { error: "Cet utilisateur a déjà une maison d'hôtes" },
-        { status: 400 }
-      )
-    }
-    
-    // Créer la maison d'hôtes avec ses paramètres par défaut
-    const guestHouse = await db.guestHouse.create({
-      data: {
-        name: validatedData.name,
-        slug: validatedData.slug,
-        description: validatedData.description,
-        address: validatedData.address,
-        city: validatedData.city,
-        postalCode: validatedData.postalCode,
-        country: validatedData.country,
-        phone: validatedData.phone,
-        email: validatedData.email || null,
-        website: validatedData.website || null,
-        currency: validatedData.currency,
-        timezone: validatedData.timezone,
-        plan: "trial",
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 jours d'essai
-        settings: {
-          create: {
-            // Les valeurs par défaut sont définies dans le schéma Prisma
-          }
-        }
-      },
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
       include: {
-        settings: true
-      }
+        guestHouse: true,
+      },
     })
-    
-    // Lier l'utilisateur à la maison d'hôtes
-    await db.user.update({
-      where: { id: validatedData.ownerId },
-      data: { 
-        guestHouseId: guestHouse.id,
-        role: "owner"
-      }
-    })
-    
-    // Logger la création
-    await db.auditLog.create({
-      data: {
-        guestHouseId: guestHouse.id,
-        action: "create",
-        entityType: "guest_house",
-        entityId: guestHouse.id,
-        userId: validatedData.ownerId,
-        description: `Création de la maison d'hôtes "${guestHouse.name}"`,
-      }
-    })
-    
-    return NextResponse.json({
-      success: true,
-      message: "Maison d'hôtes créée avec succès",
-      guestHouse
-    })
-    
-  } catch (error) {
-    console.error("Erreur lors de la création de la maison d'hôtes:", error)
-    
-    if (error instanceof z.ZodError) {
+
+    if (!user?.guestHouse) {
       return NextResponse.json(
-        { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { error: "Aucune maison d'hôtes trouvée" },
+        { status: 404 }
       )
     }
-    
+
+    return NextResponse.json({
+      guestHouse: user.guestHouse,
+    })
+  } catch (error) {
+    console.error("Erreur récupération maison d'hôtes:", error)
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
       { status: 500 }

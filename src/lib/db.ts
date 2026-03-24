@@ -11,3 +11,6 @@ export const db =
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+
+// Force re-export to ensure all models are available
+export type { PrismaClient }

@@ -1,9 +1,7 @@
 import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
-import type { User } from "@prisma/client"
 
 // Extension des types NextAuth pour inclure nos champs personnalisés
 declare module "next-auth" {
@@ -13,7 +11,7 @@ declare module "next-auth" {
       email: string
       name: string | null
       role: string
-      guestHouseId: string
+      guestHouseId: string | null
       guestHouseSlug: string | null
       guestHouseName: string | null
     }
@@ -21,7 +19,7 @@ declare module "next-auth" {
   interface User {
     id: string
     role: string
-    guestHouseId: string
+    guestHouseId: string | null
     guestHouseSlug?: string | null
     guestHouseName?: string | null
   }
@@ -31,15 +29,13 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string
     role: string
-    guestHouseId: string
+    guestHouseId: string | null
     guestHouseSlug?: string | null
     guestHouseName?: string | null
   }
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db),
-  
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -77,6 +73,20 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Identifiants invalides")
         }
 
+        // Vérifier si l'utilisateur a une maison d'hôtes
+        if (!user.guestHouseId || !user.guestHouse) {
+          // Utilisateur sans maison d'hôtes - rediriger vers onboarding
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            guestHouseId: null,
+            guestHouseSlug: null,
+            guestHouseName: null,
+          }
+        }
+
         // Vérifier si la maison d'hôtes est active
         if (!user.guestHouse.isActive) {
           throw new Error("Cette maison d'hôtes n'est plus active")
@@ -86,18 +96,6 @@ export const authOptions: NextAuthOptions = {
         await db.user.update({
           where: { id: user.id },
           data: { emailVerified: new Date() }
-        })
-
-        // Logger la connexion
-        await db.auditLog.create({
-          data: {
-            guestHouseId: user.guestHouseId,
-            action: "login",
-            entityType: "user",
-            entityId: user.id,
-            userId: user.id,
-            description: `Connexion de ${user.email}`,
-          }
         })
 
         return {
@@ -131,7 +129,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
-        token.guestHouseId = user.guestHouseId
+        token.guestHouseId = user.guestHouseId ?? null
         token.guestHouseSlug = user.guestHouseSlug ?? null
         token.guestHouseName = user.guestHouseName ?? null
       }
@@ -149,29 +147,11 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id
         session.user.role = token.role
-        session.user.guestHouseId = token.guestHouseId
+        session.user.guestHouseId = token.guestHouseId ?? null
         session.user.guestHouseSlug = token.guestHouseSlug ?? null
         session.user.guestHouseName = token.guestHouseName ?? null
       }
       return session
-    }
-  },
-
-  events: {
-    async signOut({ token }) {
-      // Logger la déconnexion
-      if (token?.id && token?.guestHouseId) {
-        await db.auditLog.create({
-          data: {
-            guestHouseId: token.guestHouseId,
-            action: "logout",
-            entityType: "user",
-            entityId: token.id,
-            userId: token.id,
-            description: `Déconnexion de ${token.email}`,
-          }
-        })
-      }
     }
   },
 

@@ -17,6 +17,9 @@ const onboardingRoutes = ["/onboarding"]
 // Routes protégées nécessitant une maison d'hôtes
 const protectedRoutes = ["/app"]
 
+// API routes - these handle their own authentication
+const apiRoutes = ["/api/"]
+
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl
@@ -24,6 +27,11 @@ export default withAuth(
 
     // Permettre les routes publiques
     if (publicRoutes.some(route => pathname === route || pathname.startsWith(route + "/"))) {
+      return NextResponse.next()
+    }
+
+    // Permettre les routes API (elles gèrent leur propre authentification)
+    if (apiRoutes.some(route => pathname.startsWith(route))) {
       return NextResponse.next()
     }
 

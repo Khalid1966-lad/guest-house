@@ -80,7 +80,7 @@ Le système utilise une architecture **shared database** avec colonne `guest_hou
 | Frontend | Next.js 16 (App Router) |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS 4 + shadcn/ui |
-| Database | SQLite (Prisma ORM) |
+| Database | PostgreSQL (Prisma ORM) |
 | Auth | NextAuth.js v4 |
 | Validation | Zod |
 | State | Zustand + TanStack Query |
@@ -130,7 +130,7 @@ src/
 
 - Node.js 18+
 - Bun (recommandé) ou npm
-- SQLite
+- PostgreSQL (local ou cloud)
 
 ### Installation
 
@@ -155,8 +155,9 @@ bun run dev
 ### Variables d'environnement
 
 ```env
-# Base de données
-DATABASE_URL=file:./db/custom.db
+# Base de données PostgreSQL (requis pour Vercel)
+DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
+DIRECT_URL="postgresql://user:password@host:5432/database?sslmode=require"
 
 # NextAuth.js
 NEXTAUTH_URL=http://localhost:3000
@@ -166,6 +167,66 @@ NEXTAUTH_SECRET=your-super-secret-key-here
 APP_NAME="PMS Guest House"
 APP_URL=http://localhost:3000
 ```
+
+## 🚀 Déploiement sur Vercel
+
+### Prérequis
+
+1. Un compte [Vercel](https://vercel.com)
+2. Une base de données PostgreSQL cloud (choisissez une option) :
+   - [Neon](https://neon.tech) (recommandé, gratuit)
+   - [Supabase](https://supabase.com) (gratuit)
+   - [PlanetScale](https://planetscale.com)
+   - [Railway](https://railway.app)
+
+### Étapes de déploiement
+
+1. **Créer la base de données**
+   ```bash
+   # Exemple avec Neon
+   # 1. Allez sur https://neon.tech
+   # 2. Créez un projet gratuit
+   # 3. Copiez les URLs de connexion
+   ```
+
+2. **Pousser sur GitHub**
+   ```bash
+   git add .
+   git commit -m "Prepare for Vercel deployment"
+   git push origin main
+   ```
+
+3. **Connecter à Vercel**
+   - Allez sur [vercel.com](https://vercel.com)
+   - Importez votre repository GitHub
+   - Configurez les variables d'environnement :
+     - `DATABASE_URL`
+     - `DIRECT_URL`
+     - `NEXTAUTH_URL` (votre URL Vercel)
+     - `NEXTAUTH_SECRET` (générez avec `openssl rand -base64 32`)
+
+4. **Déployer**
+   - Cliquez sur "Deploy"
+   - Vercel détectera automatiquement Next.js
+
+5. **Initialiser la base de données**
+   ```bash
+   # En local, avec les variables de production
+   bun run db:push
+   # ou
+   bun run db:migrate:deploy
+   ```
+
+### Variables d'environnement Vercel
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | URL de connexion PostgreSQL (pooled) |
+| `DIRECT_URL` | URL de connexion directe (migrations) |
+| `NEXTAUTH_URL` | URL de votre app Vercel |
+| `NEXTAUTH_SECRET` | Secret JWT (32+ caractères) |
+| `APP_NAME` | Nom de l'application |
+| `APP_URL` | URL publique de l'application |
 
 ## 📊 Schéma de base de données
 
@@ -218,19 +279,22 @@ APP_URL=http://localhost:3000
 - [x] Pages login/register/onboarding
 - [x] Dashboard basique
 
-### Sprint 2 (À venir)
-- [ ] Gestion complète des chambres
-- [ ] CRUD chambres avec formulaire
-- [ ] Statuts et disponibilité
+### Sprint 2 ✅
+- [x] Gestion complète des chambres
+- [x] CRUD chambres avec formulaire
+- [x] Statuts et disponibilité
+- [x] Tarifs saisonniers
+- [x] Équipements paramétrables
 
-### Sprint 3 (À venir)
-- [ ] Système de réservations
-- [ ] Calendrier interactif
+### Sprint 3 (En cours)
+- [x] Système de réservations
+- [x] Calendrier interactif
 - [ ] Gestion des conflits
+- [ ] Check-in/Check-out
 
 ### Sprint 4 (À venir)
-- [ ] Check-in/Check-out
 - [ ] Profil client enrichi
+- [ ] Historique des séjours
 
 ### Sprint 5-8 (À venir)
 - [ ] Facturation avancée

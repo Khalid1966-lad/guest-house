@@ -9,8 +9,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Pour Vercel/Prisma Data Proxy
 }
 
 // ============================================
@@ -40,6 +41,7 @@ model GuestHouse {
   // Relations
   users         User[]
   rooms         Room[]
+  amenities     Amenity[]
   bookings      Booking[]
   guests        Guest[]
   invoices      Invoice[]
@@ -88,8 +90,8 @@ model GuestHouseSetting {
 // ============================================
 model User {
   id            String @id @default(cuid())
-  guestHouseId  String
-  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  guestHouseId  String?  // Optionnel pour permettre l'inscription avant onboarding
+  guestHouse    GuestHouse? @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
   
   // Informations de base
   email         String  @unique
@@ -177,14 +179,20 @@ model Room {
   bedCount      Int     @default(1)
   bedType       String  @default("double") // single, double, queen, king, bunk
   size          Float?  // Taille en m²
+  maxExtraBeds  Int     @default(0) // Nombre max de lits supplémentaires
   
   // Tarification
   basePrice     Float   // Prix de base par nuit
   weekendPrice  Float?  // Prix weekend (optionnel)
   currency      String  @default("EUR")
   
-  // Équipements (JSON stringifié)
-  amenities     String? // wifi, tv, ac, minibar, safe, balcony, etc.
+  // Suppléments
+  extraBedPrice    Float @default(0) // Prix lit supplémentaire
+  babyBedAvailable Boolean @default(false) // Lit bébé disponible
+  babyBedPrice     Float @default(0) // Prix lit bébé
+  
+  // Équipements (JSON stringifié - IDs des équipements)
+  amenities     String? // ["wifi", "tv", "ac", ...]
   
   // Statut
   status        String  @default("available") // available, occupied, maintenance, out_of_order
@@ -201,6 +209,24 @@ model Room {
   updatedAt DateTime @updatedAt
   
   @@unique([guestHouseId, number])
+}
+
+// Équipements paramétrables par maison d'hôtes
+model Amenity {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  name          String  // Nom de l'équipement
+  icon          String? // Nom de l'icône Lucide (wifi, tv, wind, etc.)
+  description   String?
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, name])
 }
 
 // Tarifs saisonniers pour les chambres
@@ -565,8 +591,8 @@ model Expense {
 // ============================================
 model AuditLog {
   id            String @id @default(cuid())
-  guestHouseId  String
-  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  guestHouseId  String?  // Optionnel car l'utilisateur peut ne pas avoir de maison d'hôtes
+  guestHouse    GuestHouse? @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
   
   // Action
   action        String // create, update, delete, login, logout, etc.
