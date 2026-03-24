@@ -1,0 +1,590 @@
+// ============================================
+// PMS Multi-Tenants - Schéma de Base de Données
+// ============================================
+// Architecture: Base de données partagée avec colonne guest_house_id
+// RÈGLE D'OR: Toutes les tables métier ont un guest_house_id
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// TENANT ( Maison d'Hôtes )
+// ============================================
+model GuestHouse {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique // Pour le routing par sous-domaine
+  description   String?
+  address       String?
+  city          String?
+  postalCode    String?
+  country       String  @default("France")
+  phone         String?
+  email         String?
+  website       String?
+  logo          String? // URL du logo
+  coverImage    String? // URL de l'image de couverture
+  currency      String  @default("EUR")
+  timezone      String  @default("Europe/Paris")
+  taxRate       Float   @default(10.0) // Taxe de séjour en %
+  isActive      Boolean @default(true)
+  plan          String  @default("free") // free, starter, pro, enterprise
+  trialEndsAt   DateTime?
+  
+  // Relations
+  users         User[]
+  rooms         Room[]
+  bookings      Booking[]
+  guests        Guest[]
+  invoices      Invoice[]
+  payments      Payment[]
+  restaurantOrders RestaurantOrder[]
+  menuItems      MenuItem[]
+  expenses       Expense[]
+  auditLogs      AuditLog[]
+  settings       GuestHouseSetting?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Paramètres spécifiques à chaque maison d'hôtes
+model GuestHouseSetting {
+  id            String @id @default(cuid())
+  guestHouseId  String @unique
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Paramètres de réservation
+  checkInTime   String @default("15:00")
+  checkOutTime  String @default("11:00")
+  minBookingNotice Int @default(1) // Jours minimum avant réservation
+  maxBookingAdvance Int @default(365) // Jours maximum à l'avance
+  cancellationPolicy String? // Texte de la politique
+  
+  // Notifications
+  emailNotifications Boolean @default(true)
+  smsNotifications   Boolean @default(false)
+  emailNewBooking    Boolean @default(true)
+  emailCheckIn       Boolean @default(true)
+  emailCheckOut      Boolean @default(true)
+  
+  // Restaurant
+  restaurantEnabled  Boolean @default(true)
+  restaurantOpenTime String @default("07:00")
+  restaurantCloseTime String @default("22:00")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// UTILISATEURS
+// ============================================
+model User {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Informations de base
+  email         String  @unique
+  password      String  // Hash bcrypt
+  name          String?
+  firstName     String?
+  lastName      String?
+  phone         String?
+  avatar        String? // URL de l'avatar
+  
+  // Rôle et permissions
+  role          String  @default("staff") // owner, admin, manager, staff
+  isActive      Boolean @default(true)
+  emailVerified DateTime?
+  
+  // Préférences
+  language      String  @default("fr")
+  theme         String  @default("system") // light, dark, system
+  timezone      String?
+  
+  // Relations
+  sessions      Session[]
+  accounts      Account[]
+  auditLogs     AuditLog[]
+  bookingsCreated Booking[] @relation("BookingsCreatedBy")
+  checkIns      Booking[] @relation("CheckInsBy")
+  checkOuts     Booking[] @relation("CheckOutsBy")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Tables NextAuth.js
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// CHAMBRES
+// ============================================
+model Room {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Informations de la chambre
+  number        String  // Numéro ou nom de la chambre
+  name          String? // Nom optionnel (ex: "Chambre Rose")
+  description   String?
+  floor         Int?
+  
+  // Caractéristiques
+  type          String  @default("standard") // single, double, twin, suite, family, dormitory
+  capacity      Int     @default(2) // Nombre de personnes max
+  bedCount      Int     @default(1)
+  bedType       String  @default("double") // single, double, queen, king, bunk
+  size          Float?  // Taille en m²
+  
+  // Tarification
+  basePrice     Float   // Prix de base par nuit
+  weekendPrice  Float?  // Prix weekend (optionnel)
+  currency      String  @default("EUR")
+  
+  // Équipements (JSON stringifié)
+  amenities     String? // wifi, tv, ac, minibar, safe, balcony, etc.
+  
+  // Statut
+  status        String  @default("available") // available, occupied, maintenance, out_of_order
+  isActive      Boolean @default(true)
+  
+  // Images
+  images        String? // JSON array d'URLs
+  
+  // Relations
+  bookings      Booking[]
+  roomPrices    RoomPrice[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, number])
+}
+
+// Tarifs saisonniers pour les chambres
+model RoomPrice {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  
+  name      String   // ex: "Haute Saison", "Noël", "Été"
+  price     Float
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// CLIENTS / HÔTES
+// ============================================
+model Guest {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Informations personnelles
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  postalCode    String?
+  country       String?
+  nationality   String?
+  
+  // Documents
+  idType        String? // passport, id_card, driver_license
+  idNumber      String?
+  idExpiry      DateTime?
+  
+  // Informations additionnelles
+  birthDate     DateTime?
+  notes         String? // Notes privées
+  
+  // Statut VIP
+  isVip         Boolean @default(false)
+  vipLevel      String? // bronze, silver, gold, platinum
+  totalStays    Int     @default(0)
+  totalSpent    Float   @default(0)
+  
+  // Préférences
+  preferences   String? // JSON: chambre préférée, allergies, etc.
+  
+  // Relations
+  bookings      Booking[]
+  invoices      Invoice[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, email])
+}
+
+// ============================================
+// RÉSERVATIONS
+// ============================================
+model Booking {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Références
+  guestId       String
+  guest         Guest   @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomId        String
+  room          Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  
+  // Dates
+  checkIn       DateTime
+  checkOut      DateTime
+  actualCheckIn  DateTime? // Heure réelle d'arrivée
+  actualCheckOut DateTime? // Heure réelle de départ
+  
+  // Nombre de personnes
+  adults        Int     @default(1)
+  children      Int     @default(0)
+  
+  // Tarification
+  nightlyRate   Float   // Prix par nuit calculé
+  totalPrice    Float   // Prix total
+  discount      Float   @default(0)
+  discountReason String?
+  taxes         Float   @default(0)
+  grandTotal    Float   // Prix final taxes incluses
+  
+  // Source de la réservation
+  source        String  @default("direct") // direct, booking, airbnb, expedia, phone, other
+  sourceRef     String? // Référence externe
+  
+  // Statut
+  status        String  @default("confirmed") // pending, confirmed, checked_in, checked_out, cancelled, no_show
+  paymentStatus String  @default("pending") // pending, partial, paid, refunded
+  
+  // Notes
+  guestNotes    String? // Demandes spéciales du client
+  internalNotes String? // Notes internes
+  
+  // Traçabilité
+  createdBy     String
+  createdByUser User    @relation("BookingsCreatedBy", fields: [createdBy], references: [id])
+  checkedInBy   String?
+  checkedInUser User?   @relation("CheckInsBy", fields: [checkedInBy], references: [id])
+  checkedOutBy  String?
+  checkedOutUser User?  @relation("CheckOutsBy", fields: [checkedOutBy], references: [id])
+  
+  // Annulation
+  cancelledAt   DateTime?
+  cancelledBy   String?
+  cancelReason  String?
+  
+  // Relations
+  invoice       Invoice?
+  payments      Payment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// FACTURATION
+// ============================================
+model Invoice {
+  id            String   @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Numéro de facture
+  invoiceNumber String   @unique
+  invoiceDate   DateTime @default(now())
+  dueDate       DateTime?
+  
+  // Références
+  guestId       String
+  guest         Guest    @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  bookingId     String?  @unique
+  booking       Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  // Montants
+  subtotal      Float
+  taxes         Float    @default(0)
+  discount      Float    @default(0)
+  total         Float
+  
+  // Statut
+  status        String   @default("draft") // draft, sent, paid, cancelled, refunded
+  paidAt        DateTime?
+  
+  // Notes
+  notes         String?
+  terms         String?
+  
+  // Relations
+  items         InvoiceItem[]
+  payments      Payment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  total       Float   // quantity * unitPrice
+  taxRate     Float   @default(0)
+  
+  // Référence optionnelle
+  itemType    String? // room, restaurant, service, other
+  referenceId String? // ID de l'élément source
+  
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// PAIEMENTS
+// ============================================
+model Payment {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Références
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  bookingId     String?
+  booking       Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  // Détails du paiement
+  amount        Float
+  currency      String @default("EUR")
+  
+  // Méthode
+  method        String // cash, card, transfer, check, online
+  provider      String? // stripe, paypal, etc.
+  transactionId String? // ID de transaction externe
+  
+  // Statut
+  status        String @default("completed") // pending, completed, failed, refunded
+  
+  // Dates
+  paymentDate   DateTime @default(now())
+  refundedAt    DateTime?
+  
+  // Notes
+  notes         String?
+  receiptNumber String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// RESTAURANT
+// ============================================
+model MenuItem {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Informations
+  name          String
+  description   String?
+  category      String // breakfast, lunch, dinner, drinks, snacks
+  subcategory   String?
+  
+  // Prix
+  price         Float
+  currency      String @default("EUR")
+  
+  // Détails
+  image         String?
+  isAvailable   Boolean @default(true)
+  isVegetarian  Boolean @default(false)
+  isVegan       Boolean @default(false)
+  allergens     String? // JSON array
+  preparationTime Int? // en minutes
+  
+  // Ordre d'affichage
+  sortOrder     Int    @default(0)
+  
+  // Relations
+  orderItems    OrderItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RestaurantOrder {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Référence chambre/réservation
+  roomId        String?
+  bookingId     String?
+  tableNumber   String?
+  guestName     String? // Pour les clients non enregistrés
+  
+  // Détails
+  orderType     String @default("room") // room, table, takeaway
+  notes         String?
+  
+  // Montants
+  subtotal      Float
+  taxes         Float  @default(0)
+  total         Float
+  
+  // Statut
+  status        String @default("pending") // pending, preparing, ready, delivered, cancelled
+  paymentStatus String @default("pending") // pending, paid, billed_to_room
+  
+  // Dates
+  orderDate     DateTime @default(now())
+  readyAt       DateTime?
+  deliveredAt   DateTime?
+  
+  // Relations
+  items         OrderItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrderItem {
+  id            String @id @default(cuid())
+  orderId       String
+  order         RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  menuItemId    String
+  menuItem      MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  
+  quantity      Int    @default(1)
+  unitPrice     Float
+  total         Float
+  notes         String? // Modifications spéciales
+  
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// DÉPENSES
+// ============================================
+model Expense {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Catégorie
+  category      String // supplies, maintenance, utilities, salary, marketing, other
+  subcategory   String?
+  
+  // Détails
+  description   String
+  amount        Float
+  currency      String @default("EUR")
+  
+  // Références
+  vendor        String?
+  invoiceNumber String?
+  receiptImage  String?
+  
+  // Dates
+  expenseDate   DateTime @default(now())
+  paidDate      DateTime?
+  
+  // Statut
+  status        String @default("pending") // pending, paid, cancelled
+  
+  // Récurrent
+  isRecurring   Boolean @default(false)
+  recurrence     String? // daily, weekly, monthly, yearly
+  
+  // Notes
+  notes         String?
+  
+  // Traçabilité
+  createdBy     String
+  approvedBy    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// AUDIT LOGS (Traçabilité)
+// ============================================
+model AuditLog {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  // Action
+  action        String // create, update, delete, login, logout, etc.
+  entityType    String // booking, guest, room, invoice, etc.
+  entityId      String?
+  
+  // Utilisateur
+  userId        String?
+  user          User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // Détails
+  description   String
+  oldValue      String? // JSON de l'ancienne valeur
+  newValue      String? // JSON de la nouvelle valeur
+  
+  // Métadonnées
+  ipAddress     String?
+  userAgent     String?
+  
+  createdAt DateTime @default(now())
+}
