@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ArrowRight,
 } from "lucide-react"
+import { APP_VERSION, COPYRIGHT_YEAR } from "@/lib/version"
 
 const features = [
   {
@@ -301,7 +302,8 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="pt-8 border-t border-gray-800 text-center text-sm">
-            <p>© 2024 PMS Guest House. Tous droits réservés.</p>
+            <p>© {COPYRIGHT_YEAR} PMS Guest House. Tous droits réservés.</p>
+            <p className="mt-1 text-xs text-gray-500">v{APP_VERSION}</p>
           </div>
         </div>
       </footer>

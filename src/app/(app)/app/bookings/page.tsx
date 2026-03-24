@@ -20,9 +20,20 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +60,8 @@ import {
   Edit,
   Trash2,
   Eye,
+  Filter,
+  XCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, startOfDay } from "date-fns"
@@ -89,13 +102,13 @@ interface Booking {
 }
 
 // Status colors and labels
-const bookingStatuses: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: "En attente", color: "text-yellow-700", bg: "bg-yellow-100" },
-  confirmed: { label: "Confirmée", color: "text-sky-700", bg: "bg-sky-100" },
-  checked_in: { label: "Arrivée", color: "text-green-700", bg: "bg-green-100" },
-  checked_out: { label: "Parti", color: "text-gray-700", bg: "bg-gray-100" },
-  cancelled: { label: "Annulée", color: "text-red-700", bg: "bg-red-100" },
-  no_show: { label: "No-show", color: "text-orange-700", bg: "bg-orange-100" },
+const bookingStatuses: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  pending: { label: "En attente", color: "text-yellow-700", bg: "bg-yellow-100", border: "border-yellow-300" },
+  confirmed: { label: "Confirmée", color: "text-sky-700", bg: "bg-sky-100", border: "border-sky-300" },
+  checked_in: { label: "Arrivée", color: "text-green-700", bg: "bg-green-100", border: "border-green-300" },
+  checked_out: { label: "Parti", color: "text-gray-700", bg: "bg-gray-100", border: "border-gray-300" },
+  cancelled: { label: "Annulée", color: "text-red-700", bg: "bg-red-100", border: "border-red-300" },
+  no_show: { label: "No-show", color: "text-orange-700", bg: "bg-orange-100", border: "border-orange-300" },
 }
 
 // Booking sources
@@ -145,6 +158,7 @@ export default function BookingsPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [roomFilter, setRoomFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
@@ -153,6 +167,9 @@ export default function BookingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState("")
   const [searchGuest, setSearchGuest] = useState("")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -161,19 +178,31 @@ export default function BookingsPage() {
     return eachDayOfInterval({ start, end })
   }, [currentDate])
 
-  // Filter bookings by status
+  // Filter bookings by status and room
   const filteredBookings = useMemo(() => {
-    if (statusFilter === "all") return bookings
-    return bookings.filter((b) => b.status === statusFilter)
-  }, [bookings, statusFilter])
+    return bookings.filter((b) => {
+      const matchesStatus = statusFilter === "all" || b.status === statusFilter
+      const matchesRoom = roomFilter === "all" || b.room.id === roomFilter
+      return matchesStatus && matchesRoom
+    })
+  }, [bookings, statusFilter, roomFilter])
 
-  // Get bookings for a specific day (with status filter)
+  // Get bookings for a specific day (with filters)
   const getBookingsForDay = (day: Date) => {
     return filteredBookings.filter((booking) => {
       const checkIn = parseISO(booking.checkIn)
       const checkOut = parseISO(booking.checkOut)
       return day >= startOfDay(checkIn) && day < startOfDay(checkOut)
     })
+  }
+
+  // Check if any filter is active
+  const hasActiveFilters = statusFilter !== "all" || roomFilter !== "all"
+
+  // Clear all filters
+  const clearFilters = () => {
+    setStatusFilter("all")
+    setRoomFilter("all")
   }
 
   // Fetch data
@@ -365,21 +394,33 @@ export default function BookingsPage() {
     }
   }
 
-  // Delete booking
-  const handleDeleteBooking = async (bookingId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette réservation ?")) return
+  // Open delete confirmation dialog
+  const handleDeleteClick = (booking: Booking) => {
+    setBookingToDelete(booking)
+    setIsDetailOpen(false)
+    setIsDeleteDialogOpen(true)
+  }
+
+  // Confirm delete booking
+  const handleConfirmDelete = async () => {
+    if (!bookingToDelete) return
+
+    setIsDeleting(true)
 
     try {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+      const response = await fetch(`/api/bookings/${bookingToDelete.id}`, {
         method: "DELETE",
       })
 
       if (response.ok) {
-        setIsDetailOpen(false)
+        setIsDeleteDialogOpen(false)
+        setBookingToDelete(null)
         fetchData()
       }
     } catch (err) {
       console.error("Erreur suppression:", err)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -406,6 +447,37 @@ export default function BookingsPage() {
       phone: guest.phone || "",
     }))
     setSearchGuest("")
+  }
+
+  // Get available status actions for a booking
+  const getStatusActions = (booking: Booking) => {
+    const actions: { status: string; label: string; icon: React.ReactNode; className?: string }[] = []
+    
+    if (booking.status === "pending") {
+      actions.push({ status: "confirmed", label: "Confirmer", icon: <Check className="w-4 h-4 mr-2" /> })
+    }
+    
+    if (booking.status === "confirmed") {
+      const canCheckIn = isSameDay(parseISO(booking.checkIn), new Date()) || 
+        parseISO(booking.checkIn) <= new Date()
+      if (canCheckIn) {
+        actions.push({ status: "checked_in", label: "Check-in", icon: <LogIn className="w-4 h-4 mr-2" /> })
+      }
+    }
+    
+    if (booking.status === "checked_in") {
+      actions.push({ status: "checked_out", label: "Check-out", icon: <LogOut className="w-4 h-4 mr-2" /> })
+    }
+    
+    if (!["cancelled", "checked_out"].includes(booking.status)) {
+      actions.push({ status: "cancelled", label: "Annuler", icon: <X className="w-4 h-4 mr-2" />, className: "text-red-600" })
+    }
+    
+    if (booking.status === "confirmed") {
+      actions.push({ status: "no_show", label: "No-show", icon: <AlertCircle className="w-4 h-4 mr-2" />, className: "text-orange-600" })
+    }
+    
+    return actions
   }
 
   // Check if user needs onboarding
@@ -460,64 +532,139 @@ export default function BookingsPage() {
         </Card>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filtrer par statut" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les statuts</SelectItem>
-            {Object.entries(bookingStatuses).map(([key, value]) => (
-              <SelectItem key={key} value={key}>
+      {/* Status Filter Chips */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-gray-500 flex items-center gap-1">
+            <Filter className="w-4 h-4" />
+            Statut:
+          </span>
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-sm font-medium transition-all border",
+              statusFilter === "all" 
+                ? "bg-gray-900 text-white border-gray-900" 
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+            )}
+          >
+            Tous
+          </button>
+          {Object.entries(bookingStatuses).map(([key, value]) => {
+            const count = bookings.filter((b) => b.status === key).length
+            return (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-medium transition-all border flex items-center gap-2",
+                  statusFilter === key 
+                    ? `${value.bg} ${value.color} ${value.border}` 
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                )}
+              >
                 {value.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex gap-1">
-          <Button
-            variant={viewMode === "calendar" ? "default" : "outline"}
-            size="icon"
-            onClick={() => setViewMode("calendar")}
-            className={viewMode === "calendar" ? "bg-sky-600 hover:bg-sky-700" : ""}
-          >
-            <CalendarDays className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={viewMode === "list" ? "default" : "outline"}
-            size="icon"
-            onClick={() => setViewMode("list")}
-            className={viewMode === "list" ? "bg-sky-600 hover:bg-sky-700" : ""}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
+                <span className={cn(
+                  "text-xs px-1.5 py-0.5 rounded-full",
+                  statusFilter === key ? "bg-white/50" : "bg-gray-100"
+                )}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
+
+        {/* Room Filter */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-gray-500 flex items-center gap-1">
+            <BedDouble className="w-4 h-4" />
+            Chambre:
+          </span>
+          <button
+            onClick={() => setRoomFilter("all")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-sm font-medium transition-all border",
+              roomFilter === "all" 
+                ? "bg-gray-900 text-white border-gray-900" 
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+            )}
+          >
+            Toutes
+          </button>
+          {rooms.map((room) => {
+            const count = bookings.filter((b) => b.room.id === room.id).length
+            return (
+              <button
+                key={room.id}
+                onClick={() => setRoomFilter(roomFilter === room.id ? "all" : room.id)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-medium transition-all border flex items-center gap-2",
+                  roomFilter === room.id 
+                    ? "bg-sky-100 text-sky-700 border-sky-300" 
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                )}
+              >
+                {room.number}
+                <span className={cn(
+                  "text-xs px-1.5 py-0.5 rounded-full",
+                  roomFilter === room.id ? "bg-sky-200" : "bg-gray-100"
+                )}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Active Filters Summary */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
+              {filteredBookings.length} réservation{filteredBookings.length > 1 ? "s" : ""} trouvée{filteredBookings.length > 1 ? "s" : ""}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              Effacer les filtres
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {Object.entries(bookingStatuses).map(([key, value]) => {
-          const count = bookings.filter((b) => b.status === key).length
-          return (
-            <Card key={key} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div className={cn("w-3 h-3 rounded-full", value.bg)} />
-                  <span className="text-2xl font-bold">{count}</span>
-                </div>
-                <p className="text-sm text-gray-500 mt-1">{value.label}</p>
-              </CardContent>
-            </Card>
-          )
-        })}
+      {/* View Mode Toggle */}
+      <div className="flex justify-end">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+          <Button
+            variant={viewMode === "calendar" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("calendar")}
+            className={viewMode === "calendar" ? "bg-white shadow-sm" : ""}
+          >
+            <CalendarDays className="w-4 h-4 mr-2" />
+            Calendrier
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className={viewMode === "list" ? "bg-white shadow-sm" : ""}
+          >
+            <Search className="w-4 h-4 mr-2" />
+            Liste
+          </Button>
+        </div>
       </div>
 
       {/* Calendar View */}
       {viewMode === "calendar" ? (
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
                   <ChevronLeft className="w-4 h-4" />
@@ -530,9 +677,9 @@ export default function BookingsPage() {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
-                {statusFilter !== "all" && (
-                  <Badge className={cn(bookingStatuses[statusFilter]?.bg, bookingStatuses[statusFilter]?.color)}>
-                    Filtre: {bookingStatuses[statusFilter]?.label}
+                {hasActiveFilters && (
+                  <Badge className="bg-sky-100 text-sky-700 border-sky-200">
+                    {filteredBookings.length} réservation{filteredBookings.length > 1 ? "s" : ""}
                   </Badge>
                 )}
                 <Button variant="outline" size="sm" onClick={goToToday}>
@@ -611,7 +758,7 @@ export default function BookingsPage() {
             <CardTitle>Liste des réservations</CardTitle>
             <CardDescription>
               {filteredBookings.length} réservation{filteredBookings.length > 1 ? "s" : ""}
-              {statusFilter !== "all" && ` (${bookingStatuses[statusFilter]?.label})`}
+              {hasActiveFilters && " (filtrées)"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -620,21 +767,26 @@ export default function BookingsPage() {
                 <CalendarDays className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium">Aucune réservation</h3>
                 <p className="text-gray-500 mb-4">
-                  {statusFilter !== "all" 
-                    ? "Aucune réservation avec ce statut"
+                  {hasActiveFilters 
+                    ? "Aucune réservation ne correspond aux filtres"
                     : "Commencez par créer votre première réservation"}
                 </p>
-                <Button className="bg-sky-600 hover:bg-sky-700" onClick={handleNewBooking}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouvelle réservation
-                </Button>
+                {hasActiveFilters ? (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Effacer les filtres
+                  </Button>
+                ) : (
+                  <Button className="bg-sky-600 hover:bg-sky-700" onClick={handleNewBooking}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nouvelle réservation
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
                 {filteredBookings.map((booking) => {
                   const statusInfo = bookingStatuses[booking.status] || bookingStatuses.pending
-                  const canCheckIn = booking.status === "confirmed" && isSameDay(parseISO(booking.checkIn), new Date())
-                  const canCheckOut = booking.status === "checked_in"
+                  const statusActions = getStatusActions(booking)
                   
                   return (
                     <div
@@ -677,38 +829,21 @@ export default function BookingsPage() {
                               <Edit className="w-4 h-4 mr-2" />
                               Modifier
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {canCheckIn && (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "checked_in")}>
-                                <LogIn className="w-4 h-4 mr-2" />
-                                Check-in
-                              </DropdownMenuItem>
-                            )}
-                            {canCheckOut && (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "checked_out")}>
-                                <LogOut className="w-4 h-4 mr-2" />
-                                Check-out
-                              </DropdownMenuItem>
-                            )}
-                            {booking.status === "pending" && (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(booking.id, "confirmed")}>
-                                <Check className="w-4 h-4 mr-2" />
-                                Confirmer
-                              </DropdownMenuItem>
-                            )}
-                            {booking.status !== "cancelled" && booking.status !== "checked_out" && (
-                              <DropdownMenuItem 
-                                className="text-red-600"
-                                onClick={() => handleUpdateStatus(booking.id, "cancelled")}
+                            {statusActions.length > 0 && <DropdownMenuSeparator />}
+                            {statusActions.map((action) => (
+                              <DropdownMenuItem
+                                key={action.status}
+                                onClick={() => handleUpdateStatus(booking.id, action.status)}
+                                className={action.className}
                               >
-                                <X className="w-4 h-4 mr-2" />
-                                Annuler
+                                {action.icon}
+                                {action.label}
                               </DropdownMenuItem>
-                            )}
+                            ))}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               className="text-red-600"
-                              onClick={() => handleDeleteBooking(booking.id)}
+                              onClick={() => handleDeleteClick(booking)}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Supprimer
@@ -745,6 +880,24 @@ export default function BookingsPage() {
                   {bookingStatuses[selectedBooking.status]?.label}
                 </Badge>
               </div>
+
+              {/* Quick Status Actions */}
+              {getStatusActions(selectedBooking).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {getStatusActions(selectedBooking).map((action) => (
+                    <Button
+                      key={action.status}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleUpdateStatus(selectedBooking.id, action.status)}
+                      className={action.className}
+                    >
+                      {action.icon}
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
 
               {/* Guest */}
               <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
@@ -816,7 +969,7 @@ export default function BookingsPage() {
                 <Button 
                   variant="destructive" 
                   className="flex-1"
-                  onClick={() => handleDeleteBooking(selectedBooking.id)}
+                  onClick={() => handleDeleteClick(selectedBooking)}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Supprimer
@@ -826,6 +979,41 @@ export default function BookingsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la réservation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer la réservation de{" "}
+              <strong>{bookingToDelete?.guest.firstName} {bookingToDelete?.guest.lastName}</strong> ?
+              <br />
+              <span className="text-red-600 font-medium">Cette action est irréversible.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Suppression...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* New/Edit Booking Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
