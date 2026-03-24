@@ -66,7 +66,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { firstName, lastName, email, phone, address, city, postalCode, country, nationality, notes } = body
+    const { 
+      firstName, 
+      lastName, 
+      email, 
+      phone, 
+      address, 
+      city, 
+      postalCode,
+      country, 
+      nationality, 
+      notes,
+      isVip,
+      vipLevel 
+    } = body
 
     if (!firstName || !lastName) {
       return NextResponse.json(
@@ -105,6 +118,8 @@ export async function POST(request: NextRequest) {
         country: country || null,
         nationality: nationality || null,
         notes: notes || null,
+        isVip: isVip || false,
+        vipLevel: isVip && vipLevel ? vipLevel : null,
       },
     })
 
