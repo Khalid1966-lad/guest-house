@@ -41,13 +41,31 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    // Optimized query - only select needed fields
     const rooms = await db.room.findMany({
       where,
-      include: {
-        roomPrices: {
-          where: { isActive: true },
-          orderBy: { startDate: "asc" },
-        },
+      select: {
+        id: true,
+        number: true,
+        name: true,
+        description: true,
+        floor: true,
+        type: true,
+        capacity: true,
+        bedCount: true,
+        bedType: true,
+        size: true,
+        maxExtraBeds: true,
+        basePrice: true,
+        weekendPrice: true,
+        extraBedPrice: true,
+        babyBedAvailable: true,
+        babyBedPrice: true,
+        status: true,
+        amenities: true,
+        images: true,
+        isActive: true,
+        // Count bookings for this room
         _count: {
           select: { bookings: true },
         },
@@ -55,7 +73,15 @@ export async function GET(request: NextRequest) {
       orderBy: { number: "asc" },
     })
 
-    return NextResponse.json({ rooms })
+    // Return with cache headers for better performance
+    return NextResponse.json(
+      { rooms },
+      { 
+        headers: { 
+          'Cache-Control': 'private, max-age=10, stale-while-revalidate=30'
+        }
+      }
+    )
   } catch (error) {
     console.error("Erreur récupération chambres:", error)
     return NextResponse.json(
