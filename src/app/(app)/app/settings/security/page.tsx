@@ -25,6 +25,7 @@ import {
   CheckCircle,
   AlertTriangle,
 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { signOut } from "next-auth/react"
