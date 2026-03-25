@@ -121,6 +121,43 @@
   }
 }
 
+/* Landing Page Styles */
+.landing-page {
+  scroll-behavior: smooth;
+}
+
+.landing-page header {
+  transition: all 0.3s ease;
+}
+
+.landing-page header:hover {
+  background-color: rgba(255, 255, 255, 0.95);
+}
+
+.hero-gradient {
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%, #eff6ff 100%);
+}
+
+.feature-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+}
+
+.cta-section {
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+}
+
+.footer-link {
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: white;
+}
+
 /* Print Styles */
 @media print {
   /* Hide non-printable elements */
