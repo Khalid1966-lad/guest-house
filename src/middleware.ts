@@ -6,18 +6,10 @@ const publicRoutes = [
   "/",
   "/login",
   "/register",
-  "/api/auth/register",
-  "/api/auth/signin",
-  "/api/auth/callback",
+  "/onboarding",
 ]
 
-// Routes accessibles uniquement aux utilisateurs sans maison d'hôtes
-const onboardingRoutes = ["/onboarding"]
-
-// Routes protégées nécessitant une maison d'hôtes
-const protectedRoutes = ["/app"]
-
-// API routes - these handle their own authentication
+// Routes API
 const apiRoutes = ["/api/"]
 
 export default withAuth(
@@ -25,55 +17,45 @@ export default withAuth(
     const { pathname } = req.nextUrl
     const token = req.nextauth.token
 
-    // Permettre les routes publiques
-    if (publicRoutes.some(route => pathname === route || pathname.startsWith(route + "/"))) {
-      return NextResponse.next()
-    }
-
-    // Permettre les routes API (elles gèrent leur propre authentification)
-    if (apiRoutes.some(route => pathname.startsWith(route))) {
-      return NextResponse.next()
-    }
-
-    // Si l'utilisateur n'est pas authentifié, rediriger vers login
-    if (!token) {
-      const loginUrl = new URL("/login", req.url)
-      loginUrl.searchParams.set("callbackUrl", pathname)
-      return NextResponse.redirect(loginUrl)
-    }
-
-    // Vérifier si l'utilisateur a une maison d'hôtes
-    const hasGuestHouse = !!token.guestHouseId
-
-    // Si l'utilisateur n'a pas de maison d'hôtes et essaie d'accéder à une route protégée
-    if (!hasGuestHouse && protectedRoutes.some(route => pathname.startsWith(route))) {
-      const onboardingUrl = new URL("/onboarding", req.url)
-      return NextResponse.redirect(onboardingUrl)
-    }
-
-    // Si l'utilisateur a une maison d'hôtes et essaie d'accéder à l'onboarding
-    if (hasGuestHouse && onboardingRoutes.some(route => pathname.startsWith(route))) {
-      const dashboardUrl = new URL("/app/dashboard", req.url)
-      return NextResponse.redirect(dashboardUrl)
-    }
-
-    // Si l'utilisateur est authentifié et essaie d'accéder à login/register
-    if (token && (pathname === "/login" || pathname === "/register")) {
-      if (hasGuestHouse) {
-        const dashboardUrl = new URL("/app/dashboard", req.url)
-        return NextResponse.redirect(dashboardUrl)
-      } else {
-        const onboardingUrl = new URL("/onboarding", req.url)
-        return NextResponse.redirect(onboardingUrl)
+    // Si l'utilisateur est connecté et essaie d'accéder aux pages publiques
+    if (token && publicRoutes.includes(pathname)) {
+      // Rediriger vers /app sauf si c'est la landing page (/)
+      if (pathname === "/login" || pathname === "/register") {
+        // Si l'utilisateur a une maison d'hôtes, le rediriger vers /app
+        if (token.guestHouseId) {
+          return NextResponse.redirect(new URL("/app/dashboard", req.url))
+        }
+        // Sinon, le rediriger vers /onboarding
+        return NextResponse.redirect(new URL("/onboarding", req.url))
       }
+    }
+
+    // Si l'utilisateur connecté n'a pas de maison d'hôtes et essaie d'accéder à /app
+    if (token && pathname.startsWith("/app") && !token.guestHouseId) {
+      return NextResponse.redirect(new URL("/onboarding", req.url))
     }
 
     return NextResponse.next()
   },
   {
     callbacks: {
-      // Autoriser le middleware à s'exécuter pour toutes les routes
-      authorized: () => true
+      // Le middleware s'exécute seulement si l'utilisateur est authentifié
+      // ou si la route n'est pas protégée
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
+
+        // Toujours autoriser les routes publiques et API
+        if (publicRoutes.some(route => pathname === route || pathname.startsWith(route + "/"))) {
+          return true
+        }
+
+        if (apiRoutes.some(route => pathname.startsWith(route))) {
+          return true
+        }
+
+        // Pour les routes protégées, nécessiter un token
+        return !!token
+      }
     },
   }
 )
@@ -84,7 +66,6 @@ export const config = {
     /*
      * Appliquer le middleware sur toutes les routes SAUF:
      * - Les fichiers statiques (_next/static, favicon, images, etc.)
-     * - Les fichiers publics
      */
     "/((?!_next/static|_next/image|favicon.ico|public/|images/|icons/).*)",
   ],
