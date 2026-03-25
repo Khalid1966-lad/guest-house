@@ -128,6 +128,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check for duplicate invoice (one invoice per booking)
+    if (bookingId) {
+      const existingInvoice = await db.invoice.findFirst({
+        where: {
+          bookingId,
+          guestHouseId: session.user.guestHouseId,
+          status: { notIn: ['cancelled'] },
+        },
+      })
+      if (existingInvoice) {
+        return NextResponse.json(
+          { error: `Une facture (${existingInvoice.invoiceNumber}) existe déjà pour ce séjour` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Générer le numéro de facture
     const invoiceCount = await db.invoice.count({
       where: { guestHouseId: session.user.guestHouseId },

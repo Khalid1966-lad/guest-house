@@ -79,11 +79,25 @@ export async function GET(request: NextRequest) {
             basePrice: true,
           },
         },
+        invoice: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+          },
+        },
       },
       orderBy: { checkIn: "asc" },
     })
 
-    return NextResponse.json({ bookings })
+    // Transform to include hasInvoice flag
+    const bookingsWithInvoiceFlag = bookings.map((booking) => ({
+      ...booking,
+      hasInvoice: !!booking.invoice,
+      invoice: undefined, // Remove invoice from response
+    }))
+
+    return NextResponse.json({ bookings: bookingsWithInvoiceFlag })
   } catch (error) {
     console.error("Erreur récupération réservations:", error)
     return NextResponse.json(

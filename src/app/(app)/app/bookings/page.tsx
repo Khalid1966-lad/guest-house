@@ -638,12 +638,12 @@ export default function BookingsPage() {
 
       {/* View Mode Toggle */}
       <div className="flex justify-end">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
           <Button
             variant={viewMode === "calendar" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("calendar")}
-            className={viewMode === "calendar" ? "bg-white shadow-sm" : ""}
+            className={viewMode === "calendar" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-700 dark:text-gray-300"}
           >
             <CalendarDays className="w-4 h-4 mr-2" />
             Calendrier
@@ -652,7 +652,7 @@ export default function BookingsPage() {
             variant={viewMode === "list" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("list")}
-            className={viewMode === "list" ? "bg-white shadow-sm" : ""}
+            className={viewMode === "list" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-700 dark:text-gray-300"}
           >
             <Search className="w-4 h-4 mr-2" />
             Liste

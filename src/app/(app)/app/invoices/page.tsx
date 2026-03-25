@@ -58,6 +58,9 @@ import {
   Receipt,
   CalendarDays,
   User,
+  RotateCcw,
+  AlertCircle,
+  ArrowRightLeft,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
@@ -72,14 +75,22 @@ interface Guest {
   phone: string | null
 }
 
+interface Room {
+  id: string
+  number: string
+  name: string | null
+}
+
 interface Booking {
   id: string
   checkIn: string
   checkOut: string
-  room: {
-    number: string
-    name: string | null
-  }
+  nightlyRate: number
+  totalPrice: number
+  adults: number
+  children: number
+  room: Room
+  hasInvoice: boolean
 }
 
 interface InvoiceItem {
@@ -109,13 +120,19 @@ interface Invoice {
   remainingAmount: number
 }
 
-// Status colors and labels
+// Status colors and labels - with all possible statuses
 const invoiceStatuses: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: "Brouillon", color: "text-gray-700", bg: "bg-gray-100" },
   sent: { label: "Envoyée", color: "text-sky-700", bg: "bg-sky-100" },
   paid: { label: "Payée", color: "text-green-700", bg: "bg-green-100" },
-  cancelled: { label: "Annulée", color: "text-red-700", bg: "bg-red-100" },
+  partial: { label: "Partielle", color: "text-yellow-700", bg: "bg-yellow-100" },
   refunded: { label: "Remboursée", color: "text-orange-700", bg: "bg-orange-100" },
+  cancelled: { label: "Annulée", color: "text-red-700", bg: "bg-red-100" },
+}
+
+// Format amount with 2 decimal places
+const formatAmount = (amount: number): string => {
+  return amount.toFixed(2) + " €"
 }
 
 const defaultItemForm = {
@@ -130,6 +147,7 @@ export default function InvoicesPage() {
   const router = useRouter()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
@@ -141,10 +159,15 @@ export default function InvoicesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
+  const [invoiceToUpdate, setInvoiceToUpdate] = useState<Invoice | null>(null)
+  const [newStatus, setNewStatus] = useState("")
+  const [selectedBookingId, setSelectedBookingId] = useState<string>("")
 
   // Form state
   const [formData, setFormData] = useState({
     guestId: "",
+    bookingId: "",
     dueDate: "",
     notes: "",
     terms: "",
@@ -162,6 +185,12 @@ export default function InvoicesPage() {
       return matchesStatus && matchesSearch
     })
   }, [invoices, statusFilter, searchQuery])
+
+  // Get available bookings for selected guest (not yet invoiced)
+  const availableBookings = useMemo(() => {
+    if (!formData.guestId) return []
+    return bookings.filter(b => b.guestId === formData.guestId && !b.hasInvoice)
+  }, [bookings, formData.guestId])
 
   // Calculate totals
   const calculateTotals = () => {
@@ -190,9 +219,10 @@ export default function InvoicesPage() {
 
     try {
       setError(null)
-      const [invoicesRes, guestsRes] = await Promise.all([
+      const [invoicesRes, guestsRes, bookingsRes] = await Promise.all([
         fetch("/api/invoices"),
         fetch("/api/guests"),
+        fetch("/api/bookings"),
       ])
 
       if (invoicesRes.ok) {
@@ -203,6 +233,11 @@ export default function InvoicesPage() {
       if (guestsRes.ok) {
         const data = await guestsRes.json()
         setGuests(data.guests || [])
+      }
+
+      if (bookingsRes.ok) {
+        const data = await bookingsRes.json()
+        setBookings(data.bookings || [])
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -228,11 +263,13 @@ export default function InvoicesPage() {
     setEditingInvoice(null)
     setFormData({
       guestId: "",
+      bookingId: "",
       dueDate: "",
       notes: "",
       terms: "",
       items: [{ ...defaultItemForm }],
     })
+    setSelectedBookingId("")
     setFormError("")
     setIsDialogOpen(true)
   }
@@ -242,6 +279,7 @@ export default function InvoicesPage() {
     setEditingInvoice(invoice)
     setFormData({
       guestId: invoice.guest.id,
+      bookingId: invoice.booking?.id || "",
       dueDate: invoice.dueDate ? format(parseISO(invoice.dueDate), "yyyy-MM-dd") : "",
       notes: invoice.notes || "",
       terms: "",
@@ -259,6 +297,40 @@ export default function InvoicesPage() {
   // Handle form change
   const handleFormChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    
+    // Reset booking when guest changes
+    if (field === "guestId") {
+      setFormData(prev => ({ ...prev, bookingId: "", items: [{ ...defaultItemForm }] }))
+    }
+  }
+
+  // Handle booking selection - import stay costs
+  const handleBookingSelect = (bookingId: string) => {
+    setFormData(prev => ({ ...prev, bookingId }))
+    
+    if (!bookingId) {
+      setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }] }))
+      return
+    }
+
+    const booking = bookings.find(b => b.id === bookingId)
+    if (booking) {
+      const nights = Math.ceil(
+        (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)
+      )
+      
+      // Auto-fill with booking details
+      setFormData(prev => ({
+        ...prev,
+        bookingId,
+        items: [{
+          description: `Séjour chambre ${booking.room.number} (${format(parseISO(booking.checkIn), "d MMM", { locale: fr })} - ${format(parseISO(booking.checkOut), "d MMM yyyy", { locale: fr })}) - ${nights} nuit${nights > 1 ? 's' : ''}`,
+          quantity: nights.toString(),
+          unitPrice: booking.nightlyRate.toString(),
+          taxRate: "10", // Default tax rate
+        }],
+      }))
+    }
   }
 
   // Handle item change
@@ -301,6 +373,15 @@ export default function InvoicesPage() {
       return
     }
 
+    // Check for duplicate invoice if booking is selected
+    if (formData.bookingId && !editingInvoice) {
+      const existingInvoice = invoices.find(inv => inv.booking?.id === formData.bookingId)
+      if (existingInvoice) {
+        setFormError(`Une facture (${existingInvoice.invoiceNumber}) existe déjà pour ce séjour. Un séjour ne peut avoir qu'une seule facture.`)
+        return
+      }
+    }
+
     setIsSaving(true)
 
     const { subtotal, taxes, total } = calculateTotals()
@@ -314,6 +395,7 @@ export default function InvoicesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           guestId: formData.guestId,
+          bookingId: formData.bookingId || null,
           dueDate: formData.dueDate || null,
           notes: formData.notes || null,
           terms: formData.terms || null,
@@ -347,13 +429,41 @@ export default function InvoicesPage() {
     }
   }
 
+  // Open status change dialog
+  const handleOpenStatusDialog = (invoice: Invoice) => {
+    setInvoiceToUpdate(invoice)
+    setNewStatus(invoice.status)
+    setIsStatusDialogOpen(true)
+  }
+
   // Update invoice status
-  const handleUpdateStatus = async (invoiceId: string, newStatus: string) => {
+  const handleUpdateStatus = async () => {
+    if (!invoiceToUpdate || !newStatus) return
+
+    try {
+      const response = await fetch(`/api/invoices/${invoiceToUpdate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (response.ok) {
+        setIsStatusDialogOpen(false)
+        setInvoiceToUpdate(null)
+        fetchData()
+      }
+    } catch (err) {
+      console.error("Erreur mise à jour:", err)
+    }
+  }
+
+  // Quick status update
+  const handleQuickStatusUpdate = async (invoiceId: string, status: string) => {
     try {
       const response = await fetch(`/api/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status }),
       })
 
       if (response.ok) {
@@ -477,7 +587,7 @@ export default function InvoicesPage() {
               <Receipt className="w-4 h-4" />
               <span className="text-sm">Montant total</span>
             </div>
-            <p className="text-2xl font-bold">{stats.totalAmount.toLocaleString("fr-FR")} €</p>
+            <p className="text-2xl font-bold">{formatAmount(stats.totalAmount)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -486,7 +596,7 @@ export default function InvoicesPage() {
               <CheckCircle className="w-4 h-4" />
               <span className="text-sm">Encaissé</span>
             </div>
-            <p className="text-2xl font-bold text-green-600">{stats.paidAmount.toLocaleString("fr-FR")} €</p>
+            <p className="text-2xl font-bold text-green-600">{formatAmount(stats.paidAmount)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -495,7 +605,7 @@ export default function InvoicesPage() {
               <CalendarDays className="w-4 h-4" />
               <span className="text-sm">En attente</span>
             </div>
-            <p className="text-2xl font-bold text-orange-600">{stats.pendingAmount.toLocaleString("fr-FR")} €</p>
+            <p className="text-2xl font-bold text-orange-600">{formatAmount(stats.pendingAmount)}</p>
           </CardContent>
         </Card>
       </div>
@@ -537,8 +647,8 @@ export default function InvoicesPage() {
           className={cn(
             "px-3 py-1.5 rounded-full text-sm font-medium transition-all border",
             statusFilter === "all"
-              ? "bg-gray-900 text-white border-gray-900"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+              ? "bg-gray-900 text-white border-gray-900 dark:bg-gray-100 dark:text-gray-900"
+              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
           )}
         >
           Tous
@@ -553,13 +663,13 @@ export default function InvoicesPage() {
                 "px-3 py-1.5 rounded-full text-sm font-medium transition-all border flex items-center gap-2",
                 statusFilter === key
                   ? `${value.bg} ${value.color}`
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
               )}
             >
               {value.label}
               <span className={cn(
                 "text-xs px-1.5 py-0.5 rounded-full",
-                statusFilter === key ? "bg-white/50" : "bg-gray-100"
+                statusFilter === key ? "bg-white/50" : "bg-gray-100 dark:bg-gray-700"
               )}>
                 {count}
               </span>
@@ -622,7 +732,7 @@ export default function InvoicesPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right hidden sm:block">
-                        <p className="font-semibold">{invoice.total.toLocaleString("fr-FR")} €</p>
+                        <p className="font-semibold">{formatAmount(invoice.total)}</p>
                         <p className="text-xs text-gray-500">{format(parseISO(invoice.invoiceDate), "d MMM yyyy", { locale: fr })}</p>
                       </div>
                       <Badge className={cn(statusInfo.bg, statusInfo.color, "border-0")}>
@@ -630,7 +740,7 @@ export default function InvoicesPage() {
                       </Badge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" className="text-gray-700 dark:text-gray-300">
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -646,16 +756,30 @@ export default function InvoicesPage() {
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleOpenStatusDialog(invoice)}>
+                            <ArrowRightLeft className="w-4 h-4 mr-2" />
+                            Changer le statut
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           {invoice.status === "draft" && (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, "sent")}>
+                            <DropdownMenuItem onClick={() => handleQuickStatusUpdate(invoice.id, "sent")}>
                               <Send className="w-4 h-4 mr-2" />
                               Marquer envoyée
                             </DropdownMenuItem>
                           )}
                           {(invoice.status === "sent" || invoice.status === "draft") && (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, "paid")}>
+                            <DropdownMenuItem onClick={() => handleQuickStatusUpdate(invoice.id, "paid")}>
                               <CheckCircle className="w-4 h-4 mr-2" />
                               Marquer payée
+                            </DropdownMenuItem>
+                          )}
+                          {invoice.status === "paid" && (
+                            <DropdownMenuItem 
+                              className="text-orange-600"
+                              onClick={() => handleQuickStatusUpdate(invoice.id, "refunded")}
+                            >
+                              <RotateCcw className="w-4 h-4 mr-2" />
+                              Marquer remboursée
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -678,6 +802,44 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Status Change Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Changer le statut</DialogTitle>
+            <DialogDescription>
+              Facture : {invoiceToUpdate?.invoiceNumber}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Nouveau statut</Label>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(invoiceStatuses).map(([key, value]) => (
+                  <SelectItem key={key} value={key}>
+                    <div className="flex items-center gap-2">
+                      <div className={cn("w-3 h-3 rounded-full", value.bg)} />
+                      {value.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button className="bg-sky-600 hover:bg-sky-700" onClick={handleUpdateStatus}>
+              Confirmer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -728,7 +890,8 @@ export default function InvoicesPage() {
 
           <div className="space-y-6 py-4">
             {formError && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+              <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-950 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 {formError}
               </div>
             )}
@@ -750,6 +913,39 @@ export default function InvoicesPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Booking Selection - Import stay costs */}
+            {!editingInvoice && formData.guestId && availableBookings.length > 0 && (
+              <div className="space-y-2 p-4 bg-sky-50 dark:bg-sky-950 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-sky-600" />
+                  <Label>Importer un séjour (optionnel)</Label>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Sélectionnez un séjour pour importer automatiquement les frais. Cela évitera la double facturation.
+                </p>
+                <Select value={formData.bookingId} onValueChange={handleBookingSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un séjour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucun séjour</SelectItem>
+                    {availableBookings.map((booking) => (
+                      <SelectItem key={booking.id} value={booking.id}>
+                        Chambre {booking.room.number} - {format(parseISO(booking.checkIn), "d MMM", { locale: fr })} au {format(parseISO(booking.checkOut), "d MMM yyyy", { locale: fr })} ({formatAmount(booking.totalPrice)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Warning if no bookings available */}
+            {!editingInvoice && formData.guestId && availableBookings.length === 0 && (
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-700 dark:text-yellow-300">
+                Aucun séjour sans facture disponible pour ce client.
+              </div>
+            )}
 
             {/* Items */}
             <div className="space-y-4">
@@ -819,15 +1015,15 @@ export default function InvoicesPage() {
               <div className="bg-sky-50 dark:bg-sky-950 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Sous-total</span>
-                  <span>{subtotal.toLocaleString("fr-FR")} €</span>
+                  <span>{formatAmount(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>TVA</span>
-                  <span>{taxes.toLocaleString("fr-FR")} €</span>
+                  <span>{formatAmount(taxes)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-lg border-t pt-2">
                   <span>Total</span>
-                  <span className="text-sky-600">{total.toLocaleString("fr-FR")} €</span>
+                  <span className="text-sky-600">{formatAmount(total)}</span>
                 </div>
               </div>
             </div>
