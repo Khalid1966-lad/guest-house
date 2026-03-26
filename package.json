@@ -15,7 +15,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
-    "db:seed": "bunx tsx prisma/seed.ts"
+    "db:seed": "bunx tsx prisma/seed.ts",
+    "version": "bash scripts/version.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -950,15 +950,26 @@ export default function InvoicesPage() {
                 <p className="text-sm text-gray-500">
                   Sélectionnez un séjour pour importer automatiquement les frais. Cela évitera la double facturation.
                 </p>
-                <Select value={formData.bookingId} onValueChange={handleBookingSelect}>
-                  <SelectTrigger>
+                <Select value={formData.bookingId || undefined} onValueChange={handleBookingSelect}>
+                  <SelectTrigger className="relative">
                     <SelectValue placeholder="Sélectionner un séjour" />
+                    {formData.bookingId && (
+                      <button
+                        type="button"
+                        className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setFormData(prev => ({ ...prev, bookingId: "", items: [{ ...defaultItemForm }] }))
+                        }}
+                      >
+                        <XCircle className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    )}
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun séjour</SelectItem>
                     {availableBookings.map((booking) => (
                       <SelectItem key={booking.id} value={booking.id}>
-                        Chambre {booking.room.number} - {format(parseISO(booking.checkIn), "d MMM", { locale: fr })} au {format(parseISO(booking.checkOut), "d MMM yyyy", { locale: fr })} ({formatAmount(booking.totalPrice)})
+                        Chambre {booking.room?.number || 'N/A'} - {format(new Date(booking.checkIn), "d MMM", { locale: fr })} au {format(new Date(booking.checkOut), "d MMM yyyy", { locale: fr })} ({formatAmount(booking.totalPrice)})
                       </SelectItem>
                     ))}
                   </SelectContent>
