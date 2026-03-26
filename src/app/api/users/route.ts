@@ -1,0 +1,119 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { db } from "@/lib/db"
+import bcrypt from "bcryptjs"
+
+// GET - List users in the guest house
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.guestHouseId) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    const users = await db.user.findMany({
+      where: {
+        guestHouseId: session.user.guestHouseId,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    })
+
+    return NextResponse.json({ users })
+  } catch (error) {
+    console.error("Error fetching users:", error)
+    return NextResponse.json(
+      { error: "Erreur lors de la récupération des utilisateurs" },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Create a new user
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.guestHouseId) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    // Only owner and manager can create users
+    if (!["owner", "manager"].includes(session.user.role)) {
+      return NextResponse.json(
+        { error: "Permissions insuffisantes" },
+        { status: 403 }
+      )
+    }
+
+    const data = await request.json()
+    const { email, firstName, lastName, role, password, guestHouseId } = data
+
+    // Validation
+    if (!email || !password || !guestHouseId) {
+      return NextResponse.json(
+        { error: "Email, mot de passe et établissement requis" },
+        { status: 400 }
+      )
+    }
+
+    // Check if email already exists
+    const existingUser = await db.user.findUnique({
+      where: { email },
+    })
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: "Un utilisateur avec cet email existe déjà" },
+        { status: 400 }
+      )
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Create user
+    const user = await db.user.create({
+      data: {
+        email,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        name: firstName && lastName ? `${firstName} ${lastName}` : null,
+        password: hashedPassword,
+        role: role || "staff",
+        guestHouseId,
+        isActive: true,
+        emailVerified: new Date(),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    })
+
+    return NextResponse.json({ user }, { status: 201 })
+  } catch (error) {
+    console.error("Error creating user:", error)
+    return NextResponse.json(
+      { error: "Erreur lors de la création de l'utilisateur" },
+      { status: 500 }
+    )
+  }
+}
