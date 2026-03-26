@@ -83,6 +83,7 @@ interface Room {
 
 interface Booking {
   id: string
+  guestId: string
   checkIn: string
   checkOut: string
   nightlyRate: number

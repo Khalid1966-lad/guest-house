@@ -59,7 +59,17 @@ export async function GET(request: NextRequest) {
 
     const bookings = await db.booking.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        guestId: true,
+        roomId: true,
+        checkIn: true,
+        checkOut: true,
+        nightlyRate: true,
+        totalPrice: true,
+        adults: true,
+        children: true,
+        status: true,
         guest: {
           select: {
             id: true,
@@ -82,8 +92,6 @@ export async function GET(request: NextRequest) {
         invoice: {
           select: {
             id: true,
-            invoiceNumber: true,
-            status: true,
           },
         },
       },
