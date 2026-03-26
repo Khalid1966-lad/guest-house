@@ -189,8 +189,13 @@ export default function InvoicesPage() {
 
   // Get available bookings for selected guest (not yet invoiced)
   const availableBookings = useMemo(() => {
-    if (!formData.guestId) return []
-    return bookings.filter(b => b.guestId === formData.guestId && !b.hasInvoice)
+    if (!formData.guestId || !bookings || bookings.length === 0) return []
+    try {
+      return bookings.filter(b => b && b.guestId === formData.guestId && !b.hasInvoice)
+    } catch (err) {
+      console.error("Error calculating availableBookings:", err)
+      return []
+    }
   }, [bookings, formData.guestId])
 
   // Calculate totals
@@ -228,17 +233,23 @@ export default function InvoicesPage() {
 
       if (invoicesRes.ok) {
         const data = await invoicesRes.json()
-        setInvoices(data.invoices || [])
+        setInvoices(Array.isArray(data.invoices) ? data.invoices : [])
+      } else {
+        console.error("Failed to fetch invoices:", invoicesRes.status)
       }
 
       if (guestsRes.ok) {
         const data = await guestsRes.json()
-        setGuests(data.guests || [])
+        setGuests(Array.isArray(data.guests) ? data.guests : [])
+      } else {
+        console.error("Failed to fetch guests:", guestsRes.status)
       }
 
       if (bookingsRes.ok) {
         const data = await bookingsRes.json()
-        setBookings(data.bookings || [])
+        setBookings(Array.isArray(data.bookings) ? data.bookings : [])
+      } else {
+        console.error("Failed to fetch bookings:", bookingsRes.status)
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -297,40 +308,54 @@ export default function InvoicesPage() {
 
   // Handle form change
   const handleFormChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    
-    // Reset booking when guest changes
-    if (field === "guestId") {
-      setFormData(prev => ({ ...prev, bookingId: "", items: [{ ...defaultItemForm }] }))
+    try {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      
+      // Reset booking when guest changes
+      if (field === "guestId") {
+        setFormData(prev => ({ ...prev, bookingId: "", items: [{ ...defaultItemForm }] }))
+      }
+    } catch (err) {
+      console.error("Error in handleFormChange:", err)
     }
   }
 
   // Handle booking selection - import stay costs
   const handleBookingSelect = (bookingId: string) => {
-    setFormData(prev => ({ ...prev, bookingId }))
-    
-    if (!bookingId) {
-      setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }] }))
-      return
-    }
-
-    const booking = bookings.find(b => b.id === bookingId)
-    if (booking) {
-      const nights = Math.ceil(
-        (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)
-      )
+    try {
+      setFormData(prev => ({ ...prev, bookingId }))
       
-      // Auto-fill with booking details
-      setFormData(prev => ({
-        ...prev,
-        bookingId,
-        items: [{
-          description: `Séjour chambre ${booking.room.number} (${format(parseISO(booking.checkIn), "d MMM", { locale: fr })} - ${format(parseISO(booking.checkOut), "d MMM yyyy", { locale: fr })}) - ${nights} nuit${nights > 1 ? 's' : ''}`,
-          quantity: nights.toString(),
-          unitPrice: booking.nightlyRate.toString(),
-          taxRate: "10", // Default tax rate
-        }],
-      }))
+      if (!bookingId) {
+        setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }] }))
+        return
+      }
+
+      const booking = bookings.find(b => b.id === bookingId)
+      if (booking && booking.room) {
+        const checkInDate = new Date(booking.checkIn)
+        const checkOutDate = new Date(booking.checkOut)
+        const nights = Math.max(1, Math.ceil(
+          (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+        ))
+        
+        const roomNumber = booking.room?.number || 'N/A'
+        
+        // Auto-fill with booking details
+        setFormData(prev => ({
+          ...prev,
+          bookingId,
+          items: [{
+            description: `Séjour chambre ${roomNumber} (${format(checkInDate, "d MMM", { locale: fr })} - ${format(checkOutDate, "d MMM yyyy", { locale: fr })}) - ${nights} nuit${nights > 1 ? 's' : ''}`,
+            quantity: nights.toString(),
+            unitPrice: (booking.nightlyRate || 0).toString(),
+            taxRate: "10", // Default tax rate
+          }],
+        }))
+      }
+    } catch (err) {
+      console.error("Error in handleBookingSelect:", err)
+      // Fallback to default items
+      setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }] }))
     }
   }
 
