@@ -44,12 +44,14 @@ function LoginForm() {
         return
       }
 
-      // Connexion réussie - vérifier si l'utilisateur a une maison d'hôtes
-      // Récupérer la session pour vérifier
+      // Connexion réussie - vérifier le rôle et rediriger
       const sessionRes = await fetch("/api/auth/session")
       const session = await sessionRes.json()
       
-      if (session?.user?.guestHouseId) {
+      if (session?.user?.role === "super_admin") {
+        // Super admin → panneau d'administration
+        router.push("/app/admin/guesthouses")
+      } else if (session?.user?.guestHouseId) {
         // L'utilisateur a une maison d'hôtes, rediriger vers le dashboard
         router.push(callbackUrl)
       } else {
