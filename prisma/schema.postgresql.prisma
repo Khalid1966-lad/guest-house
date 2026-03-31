@@ -1,0 +1,616 @@
+// ============================================
+// PMS Multi-Tenants - Schéma de Base de Données
+// ============================================
+// Architecture: Base de données partagée avec colonne guest_house_id
+// RÈGLE D'OR: Toutes les tables métier ont un guest_house_id
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// TENANT ( Maison d'Hôtes )
+// ============================================
+model GuestHouse {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  address       String?
+  city          String?
+  postalCode    String?
+  country       String  @default("France")
+  phone         String?
+  email         String?
+  website       String?
+  logo          String?
+  coverImage    String?
+  currency      String  @default("EUR")
+  timezone      String  @default("Europe/Paris")
+  taxRate       Float   @default(10.0)
+  isActive      Boolean @default(true)
+  plan          String  @default("free")
+  status        String  @default("pending") // pending, active, blocked, suspended
+  trialEndsAt   DateTime?
+  
+  users         User[]
+  rooms         Room[]
+  amenities     Amenity[]
+  bookings      Booking[]
+  guests        Guest[]
+  invoices      Invoice[]
+  payments      Payment[]
+  restaurantOrders RestaurantOrder[]
+  menuItems      MenuItem[]
+  expenses       Expense[]
+  auditLogs      AuditLog[]
+  settings       GuestHouseSetting?
+  roles          Role[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GuestHouseSetting {
+  id            String @id @default(cuid())
+  guestHouseId  String @unique
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  checkInTime   String @default("15:00")
+  checkOutTime   String @default("11:00")
+  minBookingNotice Int @default(1)
+  maxBookingAdvance Int @default(365)
+  cancellationPolicy String?
+  
+  emailNotifications Boolean @default(true)
+  smsNotifications   Boolean @default(false)
+  emailNewBooking    Boolean @default(true)
+  emailCheckIn       Boolean @default(true)
+  emailCheckOut      Boolean @default(true)
+  
+  restaurantEnabled  Boolean @default(true)
+  restaurantOpenTime String @default("07:00")
+  restaurantCloseTime String @default("22:00")
+  
+  // Tourist tax settings
+  touristTaxEnabled  Boolean @default(false)
+  touristTaxPerAdult Float   @default(0.60)  // Tax per adult per night
+  touristTaxPerChild Float   @default(0.30)  // Tax per child per night
+  touristTaxFreeAge  Int     @default(18)    // Free for children under this age
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// UTILISATEURS
+// ============================================
+model User {
+  id            String @id @default(cuid())
+  guestHouseId  String?
+  guestHouse    GuestHouse? @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  email         String  @unique
+  password      String
+  name          String?
+  firstName     String?
+  lastName      String?
+  phone         String?
+  avatar        String?
+  
+  role          String  @default("staff")
+  isActive      Boolean @default(true)
+  emailVerified DateTime?
+  
+  language      String  @default("fr")
+  theme         String  @default("system")
+  timezone      String?
+  
+  sessions      Session[]
+  accounts      Account[]
+  auditLogs     AuditLog[]
+  bookingsCreated Booking[] @relation("BookingsCreatedBy")
+  checkIns      Booking[] @relation("CheckInsBy")
+  checkOuts     Booking[] @relation("CheckOutsBy")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// RÔLES ET PERMISSIONS
+// ============================================
+model Role {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  name          String  @default("staff")  // owner, manager, staff
+  label         String  // "Propriétaire", "Gestionnaire", "Personnel"
+  
+  // Menu access permissions
+  canViewDashboard   Boolean @default(true)
+  canViewRooms       Boolean @default(true)
+  canViewBookings    Boolean @default(true)
+  canViewGuests      Boolean @default(true)
+  canViewInvoices    Boolean @default(true)
+  canViewRestaurant  Boolean @default(true)
+  canViewExpenses    Boolean @default(false)
+  canViewStatistics  Boolean @default(false)
+  canViewSettings    Boolean @default(false)
+  canViewUsers       Boolean @default(false)
+  
+  // Action permissions
+  canCreateBookings  Boolean @default(true)
+  canEditBookings    Boolean @default(true)
+  canDeleteBookings  Boolean @default(false)
+  canCreateInvoices  Boolean @default(true)
+  canEditInvoices    Boolean @default(true)
+  canDeleteInvoices  Boolean @default(false)
+  canManageRooms     Boolean @default(false)
+  canManageGuests    Boolean @default(true)
+  canManageExpenses  Boolean @default(false)
+  canManageUsers     Boolean @default(false)
+  canManageSettings  Boolean @default(false)
+  
+  // Financial permissions
+  canViewRevenue     Boolean @default(false)
+  canApplyDiscounts  Boolean @default(false)
+  canRefundPayments  Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, name])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// CHAMBRES
+// ============================================
+model Room {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  number        String
+  name          String?
+  description   String?
+  floor         Int?
+  
+  type          String  @default("standard")
+  capacity      Int     @default(2)
+  bedCount      Int     @default(1)
+  bedType       String  @default("double")
+  size          Float?
+  maxExtraBeds  Int     @default(0)
+  
+  basePrice     Float
+  weekendPrice  Float?
+  currency      String  @default("EUR")
+  
+  extraBedPrice    Float @default(0)
+  babyBedAvailable Boolean @default(false)
+  babyBedPrice     Float @default(0)
+  
+  amenities     String?
+  
+  status        String  @default("available")
+  isActive      Boolean @default(true)
+  
+  images        String?
+  
+  bookings      Booking[]
+  roomPrices    RoomPrice[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, number])
+}
+
+model Amenity {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  name          String
+  icon          String?
+  description   String?
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, name])
+}
+
+model RoomPrice {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  
+  name      String
+  price     Float
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// CLIENTS / HÔTES
+// ============================================
+model Guest {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  postalCode    String?
+  country       String?
+  nationality   String?
+  
+  idType        String?
+  idNumber      String?
+  idExpiry      DateTime?
+  
+  birthDate     DateTime?
+  notes         String?
+  
+  isVip         Boolean @default(false)
+  vipLevel      String?
+  totalStays    Int     @default(0)
+  totalSpent    Float   @default(0)
+  
+  preferences   String?
+  
+  bookings      Booking[]
+  invoices      Invoice[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([guestHouseId, email])
+}
+
+// ============================================
+// RÉSERVATIONS
+// ============================================
+model Booking {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  guestId       String
+  guest         Guest   @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomId        String
+  room          Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  
+  checkIn       DateTime
+  checkOut      DateTime
+  actualCheckIn  DateTime?
+  actualCheckOut DateTime?
+  
+  adults        Int     @default(1)
+  children      Int     @default(0)
+  
+  // Extra beds and baby bed
+  extraBeds     Int     @default(0)
+  extraBedPrice Float   @default(0)
+  babyBed       Boolean @default(false)
+  babyBedPrice  Float   @default(0)
+  
+  // Tourist tax
+  touristTaxApplied  Boolean @default(false)
+  touristTaxPerNight Float   @default(0)
+  touristTaxAmount   Float   @default(0)
+  
+  nightlyRate   Float
+  totalPrice    Float
+  discount      Float   @default(0)
+  discountReason String?
+  taxes         Float   @default(0)
+  grandTotal    Float
+  
+  source        String  @default("direct")
+  sourceRef     String?
+  
+  status        String  @default("confirmed")
+  paymentStatus String  @default("pending")
+  
+  guestNotes    String?
+  internalNotes String?
+  
+  createdBy     String
+  createdByUser User    @relation("BookingsCreatedBy", fields: [createdBy], references: [id])
+  checkedInBy   String?
+  checkedInUser User?   @relation("CheckInsBy", fields: [checkedInBy], references: [id])
+  checkedOutBy  String?
+  checkedOutUser User?  @relation("CheckOutsBy", fields: [checkedOutBy], references: [id])
+  
+  cancelledAt   DateTime?
+  cancelledBy   String?
+  cancelReason  String?
+  
+  invoice       Invoice?
+  payments      Payment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// FACTURATION
+// ============================================
+model Invoice {
+  id            String   @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  invoiceNumber String   @unique
+  invoiceDate   DateTime @default(now())
+  dueDate       DateTime?
+  
+  guestId       String
+  guest         Guest    @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  bookingId     String?  @unique
+  booking       Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  subtotal      Float
+  taxes         Float    @default(0)
+  discount      Float    @default(0)
+  
+  // Tourist tax (taxe de séjour)
+  touristTaxApplied  Boolean @default(false)
+  touristTaxPerNight Float   @default(0)
+  touristTaxNights   Int     @default(0)
+  touristTaxAmount   Float   @default(0)
+  
+  total         Float
+  
+  status        String   @default("draft")
+  paidAt        DateTime?
+  
+  notes         String?
+  terms         String?
+  
+  items         InvoiceItem[]
+  payments      Payment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  total       Float
+  taxRate     Float   @default(0)
+  
+  itemType    String?
+  referenceId String?
+  
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// PAIEMENTS
+// ============================================
+model Payment {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  bookingId     String?
+  booking       Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  amount        Float
+  currency      String @default("EUR")
+  
+  method        String
+  provider      String?
+  transactionId String?
+  
+  status        String @default("completed")
+  
+  paymentDate   DateTime @default(now())
+  refundedAt    DateTime?
+  
+  notes         String?
+  receiptNumber String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// RESTAURANT
+// ============================================
+model MenuItem {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  name          String
+  description   String?
+  category      String
+  subcategory   String?
+  
+  price         Float
+  currency      String @default("EUR")
+  
+  image         String?
+  isAvailable   Boolean @default(true)
+  isVegetarian  Boolean @default(false)
+  isVegan       Boolean @default(false)
+  allergens     String?
+  preparationTime Int?
+  
+  sortOrder     Int    @default(0)
+  
+  orderItems    OrderItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RestaurantOrder {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  roomId        String?
+  bookingId     String?
+  tableNumber   String?
+  guestName     String?
+  
+  orderType     String @default("room")
+  notes         String?
+  
+  subtotal      Float
+  taxes         Float  @default(0)
+  total         Float
+  
+  status        String @default("pending")
+  paymentStatus String @default("pending")
+  
+  orderDate     DateTime @default(now())
+  readyAt       DateTime?
+  deliveredAt   DateTime?
+  
+  items         OrderItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrderItem {
+  id            String @id @default(cuid())
+  orderId       String
+  order         RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  menuItemId    String
+  menuItem      MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  
+  quantity      Int    @default(1)
+  unitPrice     Float
+  total         Float
+  notes         String?
+  
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// DÉPENSES
+// ============================================
+model Expense {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  category      String
+  subcategory   String?
+  
+  description   String
+  amount        Float
+  currency      String @default("EUR")
+  
+  vendor        String?
+  invoiceNumber String?
+  receiptImage  String?
+  
+  expenseDate   DateTime @default(now())
+  paidDate      DateTime?
+  
+  status        String @default("pending")
+  
+  isRecurring   Boolean @default(false)
+  recurrence     String?
+  
+  notes         String?
+  
+  createdBy     String
+  approvedBy    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+model AuditLog {
+  id            String @id @default(cuid())
+  guestHouseId  String?
+  guestHouse    GuestHouse? @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  action        String
+  entityType    String
+  entityId      String?
+  
+  userId        String?
+  user          User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  description   String
+  oldValue      String?
+  newValue      String?
+  
+  ipAddress     String?
+  userAgent     String?
+  
+  createdAt DateTime @default(now())
+}

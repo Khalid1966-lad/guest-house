@@ -1,0 +1,129 @@
+import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { db } from "@/lib/db"
+
+// GET - Get current user's permissions
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    // Super admin: no permissions needed, return empty (sidebar handles it)
+    if (session.user.role === "super_admin") {
+      return NextResponse.json({ permissions: {} })
+    }
+
+    if (!session.user.guestHouseId) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    // Get the role permissions for this user
+    const role = await db.role.findFirst({
+      where: {
+        guestHouseId: session.user.guestHouseId,
+        name: session.user.role,
+      },
+    })
+
+    // If no role record exists, return default permissions based on role name
+    if (!role) {
+      // Default permissions based on role
+      const defaultPermissions = {
+        owner: {
+          canViewDashboard: true,
+          canViewRooms: true,
+          canViewBookings: true,
+          canViewGuests: true,
+          canViewInvoices: true,
+          canViewRestaurant: true,
+          canViewExpenses: true,
+          canViewStatistics: true,
+          canViewSettings: true,
+          canViewUsers: true,
+          canCreateBookings: true,
+          canEditBookings: true,
+          canDeleteBookings: true,
+          canCreateInvoices: true,
+          canEditInvoices: true,
+          canDeleteInvoices: true,
+          canManageRooms: true,
+          canManageGuests: true,
+          canManageExpenses: true,
+          canManageUsers: true,
+          canManageSettings: true,
+          canViewRevenue: true,
+          canApplyDiscounts: true,
+          canRefundPayments: true,
+        },
+        manager: {
+          canViewDashboard: true,
+          canViewRooms: true,
+          canViewBookings: true,
+          canViewGuests: true,
+          canViewInvoices: true,
+          canViewRestaurant: true,
+          canViewExpenses: true,
+          canViewStatistics: true,
+          canViewSettings: false,
+          canViewUsers: false,
+          canCreateBookings: true,
+          canEditBookings: true,
+          canDeleteBookings: true,
+          canCreateInvoices: true,
+          canEditInvoices: true,
+          canDeleteInvoices: true,
+          canManageRooms: true,
+          canManageGuests: true,
+          canManageExpenses: true,
+          canManageUsers: false,
+          canManageSettings: false,
+          canViewRevenue: true,
+          canApplyDiscounts: true,
+          canRefundPayments: false,
+        },
+        staff: {
+          canViewDashboard: true,
+          canViewRooms: true,
+          canViewBookings: true,
+          canViewGuests: true,
+          canViewInvoices: true,
+          canViewRestaurant: true,
+          canViewExpenses: false,
+          canViewStatistics: false,
+          canViewSettings: false,
+          canViewUsers: false,
+          canCreateBookings: true,
+          canEditBookings: true,
+          canDeleteBookings: false,
+          canCreateInvoices: true,
+          canEditInvoices: false,
+          canDeleteInvoices: false,
+          canManageRooms: false,
+          canManageGuests: true,
+          canManageExpenses: false,
+          canManageUsers: false,
+          canManageSettings: false,
+          canViewRevenue: false,
+          canApplyDiscounts: false,
+          canRefundPayments: false,
+        },
+      }
+
+      const permissions = defaultPermissions[session.user.role as keyof typeof defaultPermissions] || defaultPermissions.staff
+
+      return NextResponse.json({ permissions })
+    }
+
+    return NextResponse.json({ permissions: role })
+  } catch (error) {
+    console.error("Error fetching permissions:", error)
+    return NextResponse.json(
+      { error: "Erreur lors de la récupération des permissions" },
+      { status: 500 }
+    )
+  }
+}
