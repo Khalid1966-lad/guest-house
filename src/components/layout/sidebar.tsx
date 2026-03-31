@@ -39,6 +39,9 @@ import {
   Sun,
   Shield,
   Building2,
+  Activity,
+  Database,
+  UserCog,
   type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -50,8 +53,10 @@ interface NavItem {
   permission?: string
 }
 
-// Navigation avec permissions requises
-const navigation: NavItem[] = [
+// ============================================
+// Navigation GUEST HOUSE (utilisateurs normaux)
+// ============================================
+const guestHouseNavigation: NavItem[] = [
   { name: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard, permission: "canViewDashboard" },
   { name: "Chambres", href: "/app/rooms", icon: BedDouble, permission: "canViewRooms" },
   { name: "Réservations", href: "/app/bookings", icon: CalendarDays, permission: "canViewBookings" },
@@ -61,6 +66,14 @@ const navigation: NavItem[] = [
   { name: "Dépenses", href: "/app/expenses", icon: Receipt, permission: "canViewExpenses" },
   { name: "Statistiques", href: "/app/statistics", icon: BarChart3, permission: "canViewStatistics" },
   { name: "Paramètres", href: "/app/settings", icon: Settings, permission: "canViewSettings" },
+]
+
+// ============================================
+// Navigation SUPER ADMIN (interface d'administration)
+// ============================================
+const adminNavigation: NavItem[] = [
+  { name: "Maisons d'hôtes", href: "/app/admin/guesthouses", icon: Building2 },
+  { name: "Sauvegarde", href: "/app/admin/backup", icon: Database },
 ]
 
 interface Permissions {
@@ -77,14 +90,20 @@ interface Permissions {
   [key: string]: boolean | undefined
 }
 
+// ============================================
+// SIDEBAR CONTENT — switch automatique selon le rôle
+// ============================================
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const { theme, setTheme } = useTheme()
   const [permissions, setPermissions] = useState<Permissions | null>(null)
 
-  // Fetch user permissions
+  const isSuperAdmin = session?.user?.role === "super_admin"
+
+  // Fetch permissions uniquement pour les utilisateurs non-admin
   useEffect(() => {
+    if (isSuperAdmin) return
     const fetchPermissions = async () => {
       try {
         const response = await fetch("/api/permissions")
@@ -100,24 +119,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     if (session?.user) {
       fetchPermissions()
     }
-  }, [session])
+  }, [session, isSuperAdmin])
 
-  // Filter navigation based on permissions
+  // Filtrer la navigation selon les permissions
   const filteredNavigation = useMemo(() => {
-    // Super admin: afficher uniquement le menu admin
-    if (session?.user?.role === "super_admin") {
-      return []
-    }
-    if (!permissions) {
-      return navigation
-    }
-    return navigation.filter((item) => {
+    if (!permissions) return guestHouseNavigation
+    return guestHouseNavigation.filter((item) => {
       if (!item.permission) return true
       return permissions[item.permission] === true
     })
-  }, [permissions, session])
-
-  const isSuperAdmin = session?.user?.role === "super_admin"
+  }, [permissions])
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: "/login" })
@@ -129,39 +140,24 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     .join("")
     .toUpperCase() || "U"
 
-  return (
-    <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b">
-        <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center">
-          <Hotel className="w-5 h-5 text-white" />
+  // Rendu conditionnel : Super Admin vs Guest House
+  if (isSuperAdmin) {
+    return (
+      <div className="flex h-full flex-col">
+        {/* Logo Admin */}
+        <div className="flex h-16 items-center gap-2 px-6 border-b">
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
+            <Shield className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <h1 className="font-semibold text-lg leading-tight">PMS Admin</h1>
+            <p className="text-xs text-muted-foreground">Administration système</p>
+          </div>
         </div>
-        <div className="flex-1">
-          <h1 className="font-semibold text-lg leading-tight">PMS</h1>
-          <p className="text-xs text-muted-foreground">
-            {isSuperAdmin ? "Administration" : (session?.user?.guestHouseName || "Guest House")}
-          </p>
-        </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {isSuperAdmin ? (
-          <Link
-            href="/app/admin/guesthouses"
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              pathname.startsWith("/app/admin")
-                ? "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-100"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-            )}
-          >
-            <Building2 className="h-5 w-5" />
-            Maisons d'hôtes
-          </Link>
-        ) : (
-          filteredNavigation.map((item) => {
+        {/* Navigation Admin */}
+        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+          {adminNavigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             return (
               <Link
@@ -169,9 +165,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-100"
+                    ? "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-100"
                     : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
                 )}
               >
@@ -179,8 +175,96 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 {item.name}
               </Link>
             )
-          })
-        )}
+          })}
+        </nav>
+
+        {/* Badge Super Admin */}
+        <div className="mx-3 mb-3 p-3 rounded-lg bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-violet-600" />
+            <span className="text-xs font-medium text-violet-700 dark:text-violet-300">Mode Administrateur</span>
+          </div>
+          <p className="text-xs text-violet-500 mt-1">Accès global à toutes les maisons d'hôtes</p>
+        </div>
+
+        {/* User menu */}
+        <div className="border-t p-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-3 px-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-violet-100 text-violet-700 text-xs">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium truncate">{session?.user?.name}</p>
+                  <p className="text-xs text-violet-600 font-medium">Super Admin</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                {theme === "dark" ? (
+                  <><Sun className="mr-2 h-4 w-4" />Mode clair</>
+                ) : (
+                  <><Moon className="mr-2 h-4 w-4" />Mode sombre</>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+                <LogOut className="mr-2 h-4 w-4" />
+                Déconnexion
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    )
+  }
+
+  // ============================================
+  // SIDEBAR GUEST HOUSE (utilisateur normal)
+  // ============================================
+  return (
+    <div className="flex h-full flex-col">
+      {/* Logo Guest House */}
+      <div className="flex h-16 items-center gap-2 px-6 border-b">
+        <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center">
+          <Hotel className="w-5 h-5 text-white" />
+        </div>
+        <div className="flex-1">
+          <h1 className="font-semibold text-lg leading-tight">PMS</h1>
+          <p className="text-xs text-muted-foreground">
+            {session?.user?.guestHouseName || "Guest House"}
+          </p>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+        {filteredNavigation.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-100"
+                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.name}
+            </Link>
+          )
+        })}
       </nav>
 
       {/* User menu */}
@@ -196,7 +280,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium truncate">{session?.user?.name}</p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {session?.user?.role === "super_admin" ? "👤 Super Admin" : session?.user?.role}
+                  {session?.user?.role}
                 </p>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -213,15 +297,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
               {theme === "dark" ? (
-                <>
-                  <Sun className="mr-2 h-4 w-4" />
-                  Mode clair
-                </>
+                <><Sun className="mr-2 h-4 w-4" />Mode clair</>
               ) : (
-                <>
-                  <Moon className="mr-2 h-4 w-4" />
-                  Mode sombre
-                </>
+                <><Moon className="mr-2 h-4 w-4" />Mode sombre</>
               )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -263,27 +341,37 @@ export function Sidebar() {
   )
 }
 
+// ============================================
+// HEADER — adapté selon le rôle
+// ============================================
 export function Header() {
+  const { data: session } = useSession()
+  const isSuperAdmin = session?.user?.role === "super_admin"
+
   return (
     <header className="h-16 border-b bg-white dark:bg-gray-900 flex items-center justify-between px-4 lg:px-6">
       {/* Mobile spacer for menu button */}
       <div className="lg:hidden w-10" />
-      
-      {/* Breadcrumb or page title can go here */}
+
+      {/* Breadcrumb or page title */}
       <div className="flex-1" />
 
       {/* Right side actions */}
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </Button>
+        {/* Notifications — uniquement pour les gestionnaires de maison d'hôtes */}
+        {!isSuperAdmin && (
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+          </Button>
+        )}
 
-        {/* Quick actions */}
-        <Button className="bg-sky-600 hover:bg-sky-700 hidden sm:flex">
-          + Nouvelle réservation
-        </Button>
+        {/* Nouvelle réservation — uniquement pour les gestionnaires */}
+        {!isSuperAdmin && (
+          <Button className="bg-sky-600 hover:bg-sky-700 hidden sm:flex">
+            + Nouvelle réservation
+          </Button>
+        )}
       </div>
     </header>
   )

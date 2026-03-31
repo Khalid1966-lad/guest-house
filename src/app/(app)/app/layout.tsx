@@ -3,7 +3,7 @@
 import { Sidebar, Header } from "@/components/layout/sidebar"
 import { SessionProvider } from "next-auth/react"
 import { ThemeProvider } from "next-themes"
-import { APP_VERSION } from "@/lib/version"
+import { AppFooter } from "@/components/layout/footer"
 
 export default function AppLayout({
   children,
@@ -20,11 +20,7 @@ export default function AppLayout({
             <main className="p-4 lg:p-6 flex-1">
               {children}
             </main>
-            <footer className="py-3 px-4 lg:px-6 text-center text-xs text-gray-400 border-t bg-white dark:bg-gray-900 dark:border-gray-800">
-              <span className="font-mono">{APP_VERSION}</span>
-              <span className="mx-2">•</span>
-              <span>PMS Guest House</span>
-            </footer>
+            <AppFooter />
           </div>
         </div>
       </ThemeProvider>

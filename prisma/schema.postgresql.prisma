@@ -37,6 +37,8 @@ model GuestHouse {
   plan          String  @default("free")
   status        String  @default("pending") // pending, active, blocked, suspended
   trialEndsAt   DateTime?
+  subscriptionStartDate  DateTime?  // Début de l'abonnement
+  subscriptionEndDate    DateTime?  // Fin de l'abonnement
   
   users         User[]
   rooms         Room[]

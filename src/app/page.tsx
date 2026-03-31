@@ -4,7 +4,6 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  Hotel,
   CalendarDays,
   Users,
   CreditCard,
@@ -13,9 +12,10 @@ import {
   Shield,
   Clock,
   CheckCircle2,
+  Hotel,
   ArrowRight,
 } from "lucide-react"
-import { APP_VERSION, COPYRIGHT_YEAR } from "@/lib/version"
+import { LandingFooter } from "@/components/layout/footer"
 
 const features = [
   {
@@ -262,51 +262,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 bg-gray-900 text-gray-400">
-        <div className="container mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center">
-                  <Hotel className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-bold text-lg text-white">PMS Guest House</span>
-              </div>
-              <p className="text-sm">
-                La solution complète pour gérer votre maison d'hôtes.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Produit</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white">Fonctionnalités</a></li>
-                <li><a href="#" className="hover:text-white">Tarifs</a></li>
-                <li><a href="#" className="hover:text-white">Intégrations</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white">Centre d'aide</a></li>
-                <li><a href="#" className="hover:text-white">Documentation</a></li>
-                <li><a href="#" className="hover:text-white">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Légal</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white">Confidentialité</a></li>
-                <li><a href="#" className="hover:text-white">CGU</a></li>
-                <li><a href="#" className="hover:text-white">Mentions légales</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-gray-800 text-center text-sm">
-            <p>© {COPYRIGHT_YEAR} PMS Guest House. Tous droits réservés.</p>
-            <p className="mt-1 text-xs text-gray-500">{APP_VERSION}</p>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   )
 }

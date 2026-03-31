@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Hotel, Eye, EyeOff } from "lucide-react"
-import { APP_VERSION, COPYRIGHT_YEAR } from "@/lib/version"
+import { AuthFooter } from "@/components/layout/footer"
 
 function LoginForm() {
   const router = useRouter()
@@ -183,10 +183,7 @@ function LoginForm() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-500 dark:text-gray-400">
-          <p>© {COPYRIGHT_YEAR} PMS Guest House. Tous droits réservés.</p>
-          <p className="mt-1 text-xs text-gray-400">{APP_VERSION}</p>
-        </div>
+        <AuthFooter />
       </div>
     </div>
   )

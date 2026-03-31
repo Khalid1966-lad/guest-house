@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Hotel, Eye, EyeOff, CheckCircle2 } from "lucide-react"
-import { APP_VERSION, COPYRIGHT_YEAR } from "@/lib/version"
+import { AuthFooter } from "@/components/layout/footer"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -280,10 +280,7 @@ export default function RegisterPage() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-6 text-sm text-gray-500 dark:text-gray-400">
-          <p>En vous inscrivant, vous acceptez nos conditions d'utilisation</p>
-          <p className="mt-2 text-xs text-gray-400">© {COPYRIGHT_YEAR} PMS Guest House - {APP_VERSION}</p>
-        </div>
+        <AuthFooter />
       </div>
     </div>
   )

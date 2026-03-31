@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -128,6 +128,7 @@ const countLabels: Record<string, { label: string; icon: React.ComponentType<{ c
 export default function AdminGuestHousesPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
+  const dataLoadedRef = useRef(false)
 
   const [guestHouses, setGuestHouses] = useState<GuestHouseItem[]>([])
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -175,6 +176,7 @@ export default function AdminGuestHousesPage() {
     if (session?.user?.role === "super_admin") {
       fetchData()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, statusFilter, planFilter, search])
 
   // Action: Changer le statut
@@ -425,6 +427,14 @@ export default function AdminGuestHousesPage() {
                       onClick={() => setDeleteDialog(gh.id)}
                     >
                       <Trash2 className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={(e) => { e.stopPropagation(); router.push(`/app/admin/guesthouses/${gh.id}`) }}
+                    >
+                      <Eye className="w-4 h-4" />
                     </Button>
                     <Button size="icon" variant="ghost" className="h-8 w-8">
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
