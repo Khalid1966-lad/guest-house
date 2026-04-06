@@ -30,6 +30,9 @@ model GuestHouse {
   website       String?
   logo          String?
   coverImage    String?
+  ice           String?   // Identifiant Commun des Entreprises
+  taxId         String?   // Numéro d'Identification Fiscale (IF)
+  cnss          String?   // Numéro CNSS
   currency      String  @default("EUR")
   timezone      String  @default("Europe/Paris")
   taxRate       Float   @default(10.0)

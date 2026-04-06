@@ -44,6 +44,9 @@ interface GuestHouseSettings {
   phone: string | null
   email: string | null
   website: string | null
+  ice: string | null
+  taxId: string | null
+  cnss: string | null
   currency: string
   timezone: string
   taxRate: number
@@ -105,6 +108,9 @@ export default function EstablishmentSettingsPage() {
     phone: "",
     email: "",
     website: "",
+    ice: "",
+    taxId: "",
+    cnss: "",
     currency: "EUR",
     timezone: "Europe/Paris",
     taxRate: "10",
@@ -141,6 +147,9 @@ export default function EstablishmentSettingsPage() {
           phone: gh.phone || "",
           email: gh.email || "",
           website: gh.website || "",
+          ice: gh.ice || "",
+          taxId: gh.taxId || "",
+          cnss: gh.cnss || "",
           currency: gh.currency || "EUR",
           timezone: gh.timezone || "Europe/Paris",
           taxRate: gh.taxRate?.toString() || "10",
@@ -271,6 +280,9 @@ export default function EstablishmentSettingsPage() {
           phone: formData.phone,
           email: formData.email,
           website: formData.website,
+          ice: formData.ice || null,
+          taxId: formData.taxId || null,
+          cnss: formData.cnss || null,
           currency: formData.currency,
           timezone: formData.timezone,
           taxRate: formData.taxRate,
@@ -805,6 +817,61 @@ export default function EstablishmentSettingsPage() {
                 <p className="text-xs text-gray-500">
                   Pourcentage appliqué sur le montant total de la réservation
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Identifiants fiscaux et légaux</CardTitle>
+              <CardDescription>
+                Ces informations apparaîtront dans le pied de page de vos factures
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ice">ICE</Label>
+                  <Input
+                    id="ice"
+                    value={formData.ice}
+                    onChange={(e) =>
+                      setFormData({ ...formData, ice: e.target.value })
+                    }
+                    placeholder="00 000 000 0000 00"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Identifiant Commun des Entreprises
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="taxId">IF</Label>
+                  <Input
+                    id="taxId"
+                    value={formData.taxId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, taxId: e.target.value })
+                    }
+                    placeholder="00000000000"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Numéro d&apos;Identification Fiscale
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cnss">CNSS</Label>
+                  <Input
+                    id="cnss"
+                    value={formData.cnss}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cnss: e.target.value })
+                    }
+                    placeholder="00000000000"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Numéro de la Caisse Nationale de Sécurité Sociale
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

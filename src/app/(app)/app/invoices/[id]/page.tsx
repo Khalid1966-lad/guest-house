@@ -102,6 +102,9 @@ interface GuestHouseInfo {
   phone?: string | null
   email?: string | null
   logo?: string | null
+  ice?: string | null
+  taxId?: string | null
+  cnss?: string | null
 }
 
 // Status colors and labels
@@ -251,17 +254,24 @@ export default function InvoiceDetailPage() {
             padding-bottom: 1rem;
             border-bottom: 2px solid #0ea5e9;
           }
-          .logo { display: flex; align-items: center; gap: 0.5rem; }
+          .logo { display: flex; align-items: center; gap: 0.75rem; }
+          .logo-img { 
+            width: 80px; 
+            height: 80px; 
+            border-radius: 12px;
+            object-fit: cover;
+          }
           .logo-icon { 
-            width: 40px; 
-            height: 40px; 
+            width: 80px; 
+            height: 80px; 
             background: #0ea5e9; 
-            border-radius: 8px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: bold;
+            font-size: 1.5rem;
           }
           .logo-text { font-size: 1.5rem; font-weight: bold; }
           .invoice-info { text-align: right; }
@@ -325,6 +335,11 @@ export default function InvoiceDetailPage() {
             border-top: 1px solid #ddd;
             padding-top: 1rem;
           }
+          .legal-info {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: #888;
+          }
           @media print {
             body { padding: 0; }
             @page { size: A4; margin: 1.5cm; }
@@ -334,11 +349,9 @@ export default function InvoiceDetailPage() {
       <body>
         <div class="header">
           <div class="logo">
-            ${guestHouse?.logo ? `<img src="${guestHouse.logo}" alt="${guestHouse.name}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;">` : `<div class="logo-icon">GH</div>`}
+            ${guestHouse?.logo ? `<img src="${guestHouse.logo}" alt="${guestHouse.name}" class="logo-img">` : `<div class="logo-icon">GH</div>`}
             <div>
               <div class="logo-text">${guestHouse?.name || "Établissement"}</div>
-              ${guestHouse?.address ? `<div style="font-size: 0.8rem; color: #666;">${guestHouse.address}${guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}${guestHouse.city ? ` ${guestHouse.city}` : ""}</div>` : ""}
-              <div style="font-size: 0.75rem; color: #888;">${[guestHouse?.phone, guestHouse?.email].filter(Boolean).join(" • ")}</div>
             </div>
           </div>
           <div class="invoice-info">
@@ -433,9 +446,11 @@ export default function InvoiceDetailPage() {
         <div class="footer">
           <p>Merci pour votre confiance !</p>
           <p><strong>${guestHouse?.name || "Établissement"}</strong></p>
-          ${guestHouse?.address ? `<p style="font-size: 0.8rem;">${guestHouse.address}${guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}${guestHouse.city ? ` ${guestHouse.city}` : ""}${guestHouse.country ? ` — ${guestHouse.country}` : ""}</p>` : ""}
-          ${guestHouse?.phone ? `<p style="font-size: 0.8rem;">Tél : ${guestHouse.phone}</p>` : ""}
-          ${guestHouse?.email ? `<p style="font-size: 0.8rem;">${guestHouse.email}</p>` : ""}
+          <div class="legal-info">
+            ${guestHouse?.address ? `<span>${guestHouse.address}${guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}${guestHouse.city ? ` ${guestHouse.city}` : ""}</span>` : ""}
+            ${guestHouse?.phone || guestHouse?.email ? `<span> — ${[guestHouse?.phone, guestHouse?.email].filter(Boolean).join(" • ")}</span>` : ""}
+            ${(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) ? `<br>${[guestHouse?.ice ? `ICE : ${guestHouse.ice}` : null, guestHouse?.taxId ? `IF : ${guestHouse.taxId}` : null, guestHouse?.cnss ? `CNSS : ${guestHouse.cnss}` : null].filter(Boolean).join(" | ")}` : ""}
+          </div>
         </div>
       </body>
       </html>
@@ -538,25 +553,16 @@ export default function InvoiceDetailPage() {
           {/* Invoice Header */}
           <div className="flex justify-between items-start mb-8 print:mb-6">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-3 mb-2">
                 {guestHouse?.logo ? (
-                  <img src={guestHouse.logo} alt={guestHouse.name} className="w-10 h-10 rounded-lg object-cover" />
+                  <img src={guestHouse.logo} alt={guestHouse.name} className="w-16 h-16 rounded-xl object-cover print:w-16 print:h-16 print:rounded-xl" />
                 ) : (
-                  <div className="w-10 h-10 rounded-lg bg-sky-600 flex items-center justify-center print:bg-sky-600">
-                    <Building className="w-6 h-6 text-white" />
+                  <div className="w-16 h-16 rounded-xl bg-sky-600 flex items-center justify-center print:bg-sky-600">
+                    <Building className="w-8 h-8 text-white" />
                   </div>
                 )}
                 <div>
                   <span className="text-xl font-bold">{guestHouse?.name || session?.user?.guestHouseName || "Établissement"}</span>
-                  {guestHouse?.address && (
-                    <p className="text-gray-500 text-sm">
-                      {guestHouse.address}{guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}{guestHouse.city ? ` ${guestHouse.city}` : ""}
-                    </p>
-                  )}
-                  <div className="flex gap-4 text-xs text-gray-500">
-                    {guestHouse?.phone && <span>{guestHouse.phone}</span>}
-                    {guestHouse?.email && <span>{guestHouse.email}</span>}
-                  </div>
                 </div>
               </div>
             </div>
@@ -747,6 +753,13 @@ export default function InvoiceDetailPage() {
               {guestHouse?.phone && <span>Tél : {guestHouse.phone}</span>}
               {guestHouse?.email && <span>{guestHouse.email}</span>}
             </div>
+            {(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) && (
+              <div className="flex justify-center gap-3 text-xs text-gray-400 mt-2">
+                {guestHouse?.ice && <span>ICE : {guestHouse.ice}</span>}
+                {guestHouse?.taxId && <span>IF : {guestHouse.taxId}</span>}
+                {guestHouse?.cnss && <span>CNSS : {guestHouse.cnss}</span>}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
