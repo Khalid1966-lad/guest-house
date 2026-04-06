@@ -31,11 +31,16 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env*.local
+
+# database
+db/*.db
+db/*.db-journal
 
 # vercel
 .vercel
-
 
 # typescript
 *.tsbuildinfo
@@ -43,12 +48,18 @@ next-env.d.ts
 local-*
 .claude
 .z-ai-config
-*.log
 dev.log
-dev.out.log
 test
 prompt
 
 server.log
 # Skills directory
-/skills/
+/skills/guest-house/
+
+# Embedded repo
+guest-house/
+download/
+.zscripts/
+worklog.md
+examples/
+mini-services/
