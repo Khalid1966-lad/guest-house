@@ -160,14 +160,13 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      // On sign-in: populate token from user object (fetched from DB in authorize)
+      // On sign-in: populate base token fields from user object
       if (user) {
         token.id = user.id
         token.role = user.role
         token.guestHouseId = user.guestHouseId ?? null
         token.guestHouseSlug = user.guestHouseSlug ?? null
         token.guestHouseName = user.guestHouseName ?? null
-        token.guestHouseCurrency = user.guestHouseCurrency || "EUR"
       }
 
       // On session.update(): explicitly merge each field (avoid spread issues)
@@ -186,9 +185,12 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Safety net: if we have a guestHouseId, always refresh currency from DB
-      // This ensures that even if the JWT was stale, we get the latest value
-      if (token.guestHouseId && user) {
+      // ALWAYS refresh currency from DB when we have a guestHouseId.
+      // The `user` param is only truthy on the very first sign-in;
+      // on every subsequent JWT refresh it's undefined.
+      // This lightweight query (single field) ensures the currency
+      // is always in sync with the database.
+      if (token.guestHouseId) {
         try {
           const guestHouse = await db.guestHouse.findUnique({
             where: { id: token.guestHouseId as string },
@@ -200,6 +202,11 @@ export const authOptions: NextAuthOptions = {
         } catch {
           // Silently fail — keep existing token value
         }
+      }
+
+      // Final fallback
+      if (!token.guestHouseCurrency) {
+        token.guestHouseCurrency = "EUR"
       }
 
       return token
