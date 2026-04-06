@@ -51,25 +51,142 @@ import {
 import { useTheme } from "next-themes"
 import { useSidebarStore } from "@/stores/sidebar-store"
 
+// ─── Nav Item with color & animation ─────────────────────────────────────
+
 interface NavItem {
   name: string
   href: string
   icon: LucideIcon
   permission?: string
+  // Color palette — each icon gets a logical color
+  color: string          // e.g. "text-violet-500"
+  hoverBg: string        // e.g. "hover:bg-violet-50 dark:hover:bg-violet-950"
+  activeBg: string       // e.g. "bg-violet-100 dark:bg-violet-900/40"
+  activeText: string     // e.g. "text-violet-700 dark:text-violet-300"
+  animClass: string      // e.g. "icon-pop"
+  glowColor: string      // CSS color for tooltip border accent
 }
 
-// Navigation avec permissions requises
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard, permission: "canViewDashboard" },
-  { name: "Chambres", href: "/app/rooms", icon: BedDouble, permission: "canViewRooms" },
-  { name: "Réservations", href: "/app/bookings", icon: CalendarDays, permission: "canViewBookings" },
-  { name: "Clients", href: "/app/guests", icon: Users, permission: "canViewGuests" },
-  { name: "Facturation", href: "/app/invoices", icon: CreditCard, permission: "canViewInvoices" },
-  { name: "Restaurant", href: "/app/restaurant", icon: UtensilsCrossed, permission: "canViewRestaurant" },
-  { name: "Dépenses", href: "/app/expenses", icon: Receipt, permission: "canViewExpenses" },
-  { name: "Statistiques", href: "/app/statistics", icon: BarChart3, permission: "canViewStatistics" },
-  { name: "Guide", href: "/app/guide", icon: HelpCircle },
-  { name: "Paramètres", href: "/app/settings", icon: Settings, permission: "canViewSettings" },
+  {
+    name: "Dashboard",
+    href: "/app/dashboard",
+    icon: LayoutDashboard,
+    permission: "canViewDashboard",
+    color: "text-violet-500",
+    hoverBg: "hover:bg-violet-50 dark:hover:bg-violet-950/60",
+    activeBg: "bg-violet-100 dark:bg-violet-900/40",
+    activeText: "text-violet-700 dark:text-violet-300",
+    animClass: "icon-pop",
+    glowColor: "rgba(139, 92, 246, 0.25)",
+  },
+  {
+    name: "Chambres",
+    href: "/app/rooms",
+    icon: BedDouble,
+    permission: "canViewRooms",
+    color: "text-emerald-500",
+    hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-950/60",
+    activeBg: "bg-emerald-100 dark:bg-emerald-900/40",
+    activeText: "text-emerald-700 dark:text-emerald-300",
+    animClass: "icon-bounce",
+    glowColor: "rgba(16, 185, 129, 0.25)",
+  },
+  {
+    name: "Réservations",
+    href: "/app/bookings",
+    icon: CalendarDays,
+    permission: "canViewBookings",
+    color: "text-sky-500",
+    hoverBg: "hover:bg-sky-50 dark:hover:bg-sky-950/60",
+    activeBg: "bg-sky-100 dark:bg-sky-900/40",
+    activeText: "text-sky-700 dark:text-sky-300",
+    animClass: "icon-glow",
+    glowColor: "rgba(14, 165, 233, 0.25)",
+  },
+  {
+    name: "Clients",
+    href: "/app/guests",
+    icon: Users,
+    permission: "canViewGuests",
+    color: "text-amber-500",
+    hoverBg: "hover:bg-amber-50 dark:hover:bg-amber-950/60",
+    activeBg: "bg-amber-100 dark:bg-amber-900/40",
+    activeText: "text-amber-700 dark:text-amber-300",
+    animClass: "icon-slide",
+    glowColor: "rgba(245, 158, 11, 0.25)",
+  },
+  {
+    name: "Facturation",
+    href: "/app/invoices",
+    icon: CreditCard,
+    permission: "canViewInvoices",
+    color: "text-rose-500",
+    hoverBg: "hover:bg-rose-50 dark:hover:bg-rose-950/60",
+    activeBg: "bg-rose-100 dark:bg-rose-900/40",
+    activeText: "text-rose-700 dark:text-rose-300",
+    animClass: "icon-wiggle",
+    glowColor: "rgba(244, 63, 94, 0.25)",
+  },
+  {
+    name: "Restaurant",
+    href: "/app/restaurant",
+    icon: UtensilsCrossed,
+    permission: "canViewRestaurant",
+    color: "text-orange-500",
+    hoverBg: "hover:bg-orange-50 dark:hover:bg-orange-950/60",
+    activeBg: "bg-orange-100 dark:bg-orange-900/40",
+    activeText: "text-orange-700 dark:text-orange-300",
+    animClass: "icon-wiggle",
+    glowColor: "rgba(249, 115, 22, 0.25)",
+  },
+  {
+    name: "Dépenses",
+    href: "/app/expenses",
+    icon: Receipt,
+    permission: "canViewExpenses",
+    color: "text-red-500",
+    hoverBg: "hover:bg-red-50 dark:hover:bg-red-950/60",
+    activeBg: "bg-red-100 dark:bg-red-900/40",
+    activeText: "text-red-700 dark:text-red-300",
+    animClass: "icon-slide",
+    glowColor: "rgba(239, 68, 68, 0.25)",
+  },
+  {
+    name: "Statistiques",
+    href: "/app/statistics",
+    icon: BarChart3,
+    permission: "canViewStatistics",
+    color: "text-indigo-500",
+    hoverBg: "hover:bg-indigo-50 dark:hover:bg-indigo-950/60",
+    activeBg: "bg-indigo-100 dark:bg-indigo-900/40",
+    activeText: "text-indigo-700 dark:text-indigo-300",
+    animClass: "icon-pop",
+    glowColor: "rgba(99, 102, 241, 0.25)",
+  },
+  {
+    name: "Guide",
+    href: "/app/guide",
+    icon: HelpCircle,
+    color: "text-teal-500",
+    hoverBg: "hover:bg-teal-50 dark:hover:bg-teal-950/60",
+    activeBg: "bg-teal-100 dark:bg-teal-900/40",
+    activeText: "text-teal-700 dark:text-teal-300",
+    animClass: "icon-bounce",
+    glowColor: "rgba(20, 184, 166, 0.25)",
+  },
+  {
+    name: "Paramètres",
+    href: "/app/settings",
+    icon: Settings,
+    permission: "canViewSettings",
+    color: "text-slate-500",
+    hoverBg: "hover:bg-slate-100 dark:hover:bg-slate-800",
+    activeBg: "bg-slate-200 dark:bg-slate-700/50",
+    activeText: "text-slate-700 dark:text-slate-300",
+    animClass: "icon-glow",
+    glowColor: "rgba(100, 116, 139, 0.25)",
+  },
 ]
 
 interface Permissions {
@@ -86,13 +203,14 @@ interface Permissions {
   [key: string]: boolean | undefined
 }
 
+// ─── Sidebar Content ──────────────────────────────────────────────────────
+
 function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const { theme, setTheme } = useTheme()
   const [permissions, setPermissions] = useState<Permissions | null>(null)
 
-  // Fetch user permissions
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
@@ -105,20 +223,12 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
         console.error("Error fetching permissions:", error)
       }
     }
-
-    if (session?.user) {
-      fetchPermissions()
-    }
+    if (session?.user) fetchPermissions()
   }, [session])
 
-  // Filter navigation based on permissions
   const filteredNavigation = useMemo(() => {
-    if (session?.user?.role === "super_admin") {
-      return []
-    }
-    if (!permissions) {
-      return navigation
-    }
+    if (session?.user?.role === "super_admin") return []
+    if (!permissions) return navigation
     return navigation.filter((item) => {
       if (!item.permission) return true
       return permissions[item.permission] === true
@@ -144,12 +254,14 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
         "flex items-center border-b transition-all duration-300",
         collapsed ? "h-16 justify-center px-2" : "h-16 gap-2 px-4"
       )}>
-        <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-200 dark:shadow-sky-900/40">
           <Hotel className="w-5 h-5 text-white" />
         </div>
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-lg leading-tight">PMS</h1>
+            <h1 className="font-semibold text-lg leading-tight bg-gradient-to-r from-sky-600 to-sky-800 dark:from-sky-400 dark:to-sky-200 bg-clip-text text-transparent">
+              PMS
+            </h1>
             <p className="text-xs text-muted-foreground truncate">
               {isSuperAdmin ? "Administration" : (session?.user?.guestHouseName || "Guest House")}
             </p>
@@ -163,53 +275,76 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
           <Link
             href="/app/admin/guesthouses"
             onClick={onNavigate}
-            className={cn(
-              "flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              collapsed && "justify-center px-0",
-              pathname.startsWith("/app/admin")
-                ? "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-100"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-            )}
+            className="sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:bg-sky-950/60"
           >
-            <Building2 className="h-5 w-5 flex-shrink-0" />
+            <Building2 className="h-5 w-5 flex-shrink-0 text-sky-500 sidebar-icon icon-glow" />
             {!collapsed && <span className="ml-3">Maisons d&apos;hôtes</span>}
           </Link>
         ) : (
           filteredNavigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
 
-            const linkContent = (
+            const linkEl = (
               <Link
                 key={item.name}
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors w-full",
+                  "sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 w-full",
                   collapsed && "justify-center px-0",
-                  isActive
-                    ? "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-100"
-                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                  // Default state: muted icon color
+                  !isActive && cn(
+                    "text-gray-500 dark:text-gray-500",
+                    item.hoverBg
+                  ),
+                  // Active state: colorful
+                  isActive && cn(
+                    item.activeBg,
+                    item.activeText,
+                    "font-semibold",
+                    "shadow-sm"
+                  ),
                 )}
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span className="ml-3">{item.name}</span>}
+                <item.icon
+                  className={cn(
+                    "h-5 w-5 flex-shrink-0 sidebar-icon",
+                    item.animClass,
+                    // Always show the icon's own color when active or on hover via CSS
+                    isActive && item.color,
+                    !isActive && "text-gray-400 dark:text-gray-500"
+                  )}
+                />
+                {!collapsed && (
+                  <span className={cn(
+                    "ml-3 transition-colors duration-200",
+                    !isActive && "text-gray-600 dark:text-gray-400"
+                  )}>
+                    {item.name}
+                  </span>
+                )}
               </Link>
             )
 
+            // Collapsed: wrap with tooltip
             if (collapsed) {
               return (
                 <Tooltip key={item.name} delayDuration={0}>
                   <TooltipTrigger asChild>
-                    {linkContent}
+                    {linkEl}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium">
+                  <TooltipContent
+                    side="right"
+                    className="font-medium"
+                    style={{ borderLeft: `3px solid ${item.glowColor}` }}
+                  >
                     {item.name}
                   </TooltipContent>
                 </Tooltip>
               )
             }
 
-            return linkContent
+            return linkEl
           })
         )}
       </nav>
@@ -220,7 +355,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="w-full mx-auto">
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-8 w-8 ring-2 ring-sky-200 dark:ring-sky-800">
                   {session?.user?.avatar && <AvatarImage src={session.user.avatar} alt={session.user.name || ""} />}
                   <AvatarFallback className="bg-sky-100 text-sky-700 text-xs">
                     {initials}
@@ -261,7 +396,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start gap-3 px-2">
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-8 w-8 ring-2 ring-sky-200 dark:ring-sky-800">
                   {session?.user?.avatar && <AvatarImage src={session.user.avatar} alt={session.user.name || ""} />}
                   <AvatarFallback className="bg-sky-100 text-sky-700 text-xs">
                     {initials}
@@ -310,6 +445,8 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
   )
 }
 
+// ─── Sidebar (Desktop + Mobile) ───────────────────────────────────────────
+
 export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const collapsed = useSidebarStore((s) => s.collapsed)
@@ -317,7 +454,7 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
+      {/* Mobile */}
       <div className="lg:hidden fixed top-0 left-0 z-40 p-4">
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
@@ -331,21 +468,20 @@ export function Sidebar() {
         </Sheet>
       </div>
 
-      {/* Desktop sidebar */}
+      {/* Desktop */}
       <aside className={cn(
         "hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 bg-white dark:bg-gray-900 border-r transition-all duration-300 z-30",
         collapsed ? "lg:w-[68px]" : "lg:w-64"
       )}>
         <SidebarContent collapsed={collapsed} />
 
-        {/* Collapse toggle button */}
+        {/* Collapse toggle */}
         <button
           onClick={toggle}
           className={cn(
             "absolute -right-3 top-20 w-6 h-6 rounded-full border bg-white dark:bg-gray-900 dark:border-gray-700",
-            "flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
-            "transition-all duration-200 hover:scale-110 shadow-sm z-40",
-            collapsed ? "rotate-0" : "rotate-0"
+            "flex items-center justify-center text-gray-400 hover:text-sky-600 dark:hover:text-sky-400",
+            "transition-all duration-200 hover:scale-125 hover:bg-sky-50 dark:hover:bg-sky-950 shadow-sm z-40"
           )}
           title={collapsed ? "Développer le menu" : "Réduire le menu"}
         >
@@ -360,24 +496,18 @@ export function Sidebar() {
   )
 }
 
+// ─── Header ────────────────────────────────────────────────────────────────
+
 export function Header() {
   return (
     <header className="h-16 border-b bg-white dark:bg-gray-900 flex items-center justify-between px-4 lg:px-6">
-      {/* Mobile spacer for menu button */}
       <div className="lg:hidden w-10" />
-
-      {/* Breadcrumb or page title can go here */}
       <div className="flex-1" />
-
-      {/* Right side actions */}
       <div className="flex items-center gap-4">
-        {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
         </Button>
-
-        {/* Quick actions */}
         <Button className="bg-sky-600 hover:bg-sky-700 hidden sm:flex">
           + Nouvelle réservation
         </Button>
