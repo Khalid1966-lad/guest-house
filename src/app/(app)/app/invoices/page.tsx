@@ -315,11 +315,11 @@ export default function InvoicesPage() {
   // Handle form change
   const handleFormChange = (field: string, value: string) => {
     try {
-      setFormData((prev) => ({ ...prev, [field]: value }))
-      
-      // Reset booking when guest changes
       if (field === "guestId") {
-        setFormData(prev => ({ ...prev, bookingId: "", items: [{ ...defaultItemForm }] }))
+        // Reset booking AND set new guestId in a single update
+        setFormData(prev => ({ ...prev, guestId: value, bookingId: "", items: [{ ...defaultItemForm }] }))
+      } else {
+        setFormData((prev) => ({ ...prev, [field]: value }))
       }
     } catch (err) {
       console.error("Error in handleFormChange:", err)

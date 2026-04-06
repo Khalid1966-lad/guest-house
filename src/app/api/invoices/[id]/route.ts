@@ -140,6 +140,16 @@ export async function PUT(
     return NextResponse.json({ invoice })
   } catch (error) {
     console.error("Erreur mise à jour facture:", error)
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string }
+      if (prismaError.code === 'P2003') {
+        return NextResponse.json(
+          { error: "Référence invalide : le client sélectionné n'existe pas." },
+          { status: 400 }
+        )
+      }
+    }
+    console.error("Full invoice update error:", JSON.stringify(error, null, 2))
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
   }
 }
