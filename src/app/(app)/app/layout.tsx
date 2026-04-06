@@ -11,7 +11,7 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchOnWindowFocus={true} refetchInterval={5 * 60 * 1000}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
           <Sidebar />

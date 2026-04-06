@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, Suspense } from "react"
-import { signIn } from "next-auth/react"
+import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { APP_VERSION, COPYRIGHT_YEAR } from "@/lib/version"
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { update: updateSession } = useSession()
   const callbackUrl = searchParams.get("callbackUrl") || "/app/dashboard"
   const message = searchParams.get("message")
   
@@ -44,21 +45,23 @@ function LoginForm() {
         return
       }
 
-      // Connexion réussie - vérifier le rôle et rediriger
+      // Connexion réussie - force une session fraîche (évite le cache EUR)
+      await updateSession()
+
+      // Vérifier le rôle et rediriger
       const sessionRes = await fetch("/api/auth/session")
       const session = await sessionRes.json()
       
       if (session?.user?.role === "super_admin") {
         // Super admin → panneau d'administration
-        router.push("/app/admin/guesthouses")
+        window.location.href = "/app/admin/guesthouses"
       } else if (session?.user?.guestHouseId) {
         // L'utilisateur a une maison d'hôtes, rediriger vers le dashboard
-        router.push(callbackUrl)
+        window.location.href = callbackUrl
       } else {
         // L'utilisateur n'a pas de maison d'hôtes, rediriger vers l'onboarding
-        router.push("/onboarding")
+        window.location.href = "/onboarding"
       }
-      router.refresh()
     } catch (err) {
       setError("Une erreur inattendue s'est produite")
       setIsLoading(false)
