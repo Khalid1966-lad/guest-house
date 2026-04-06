@@ -288,3 +288,8 @@
 .sidebar-nav-item:hover .sidebar-icon.icon-pop {
   animation: sidebar-icon-pop 0.4s ease forwards;
 }
+
+/* ─── Sidebar Nav Label Hover Color ──────────────────────────────────── */
+.sidebar-nav-item:hover .nav-label {
+  color: var(--nav-hover-color);
+}

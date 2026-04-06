@@ -629,7 +629,8 @@ const guideSections: GuideSection[] = [
         type: "steps",
         title: "Comment le Propriétaire gère les utilisateurs",
         items: [
-          "Allez dans Paramètres > Utilisateurs",
+          "Cliquez sur « Utilisateurs » dans le menu latéral (visible uniquement par le Propriétaire)",
+          "Ou allez dans Paramètres > Utilisateurs",
           "Cliquez sur « Ajouter un utilisateur » pour créer un nouveau compte",
           "Remplissez le nom, prénom, email et choisissez un rôle",
           "Définissez un mot de passe temporaire (minimum 6 caractères)",

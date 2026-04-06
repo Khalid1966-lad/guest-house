@@ -46,6 +46,7 @@ import {
   Shield,
   Building2,
   HelpCircle,
+  UserCog,
   type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -65,6 +66,7 @@ interface NavItem {
   activeText: string     // e.g. "text-violet-700 dark:text-violet-300"
   animClass: string      // e.g. "icon-pop"
   glowColor: string      // CSS color for tooltip border accent
+  hoverTextColor: string // CSS color for title hover effect
 }
 
 const navigation: NavItem[] = [
@@ -79,6 +81,7 @@ const navigation: NavItem[] = [
     activeText: "text-violet-700 dark:text-violet-300",
     animClass: "icon-pop",
     glowColor: "rgba(139, 92, 246, 0.25)",
+    hoverTextColor: "#7c3aed",
   },
   {
     name: "Chambres",
@@ -91,6 +94,7 @@ const navigation: NavItem[] = [
     activeText: "text-emerald-700 dark:text-emerald-300",
     animClass: "icon-bounce",
     glowColor: "rgba(16, 185, 129, 0.25)",
+    hoverTextColor: "#059669",
   },
   {
     name: "Réservations",
@@ -103,6 +107,7 @@ const navigation: NavItem[] = [
     activeText: "text-sky-700 dark:text-sky-300",
     animClass: "icon-glow",
     glowColor: "rgba(14, 165, 233, 0.25)",
+    hoverTextColor: "#0284c7",
   },
   {
     name: "Clients",
@@ -115,6 +120,7 @@ const navigation: NavItem[] = [
     activeText: "text-amber-700 dark:text-amber-300",
     animClass: "icon-slide",
     glowColor: "rgba(245, 158, 11, 0.25)",
+    hoverTextColor: "#d97706",
   },
   {
     name: "Facturation",
@@ -127,6 +133,7 @@ const navigation: NavItem[] = [
     activeText: "text-rose-700 dark:text-rose-300",
     animClass: "icon-wiggle",
     glowColor: "rgba(244, 63, 94, 0.25)",
+    hoverTextColor: "#e11d48",
   },
   {
     name: "Restaurant",
@@ -139,6 +146,7 @@ const navigation: NavItem[] = [
     activeText: "text-orange-700 dark:text-orange-300",
     animClass: "icon-wiggle",
     glowColor: "rgba(249, 115, 22, 0.25)",
+    hoverTextColor: "#ea580c",
   },
   {
     name: "Dépenses",
@@ -151,6 +159,7 @@ const navigation: NavItem[] = [
     activeText: "text-red-700 dark:text-red-300",
     animClass: "icon-slide",
     glowColor: "rgba(239, 68, 68, 0.25)",
+    hoverTextColor: "#dc2626",
   },
   {
     name: "Statistiques",
@@ -163,6 +172,20 @@ const navigation: NavItem[] = [
     activeText: "text-indigo-700 dark:text-indigo-300",
     animClass: "icon-pop",
     glowColor: "rgba(99, 102, 241, 0.25)",
+    hoverTextColor: "#4f46e5",
+  },
+  {
+    name: "Utilisateurs",
+    href: "/app/settings/users",
+    icon: UserCog,
+    permission: "canViewUsers",
+    color: "text-purple-500",
+    hoverBg: "hover:bg-purple-50 dark:hover:bg-purple-950/60",
+    activeBg: "bg-purple-100 dark:bg-purple-900/40",
+    activeText: "text-purple-700 dark:text-purple-300",
+    animClass: "icon-glow",
+    glowColor: "rgba(168, 85, 247, 0.25)",
+    hoverTextColor: "#7c3aed",
   },
   {
     name: "Guide",
@@ -174,6 +197,7 @@ const navigation: NavItem[] = [
     activeText: "text-teal-700 dark:text-teal-300",
     animClass: "icon-bounce",
     glowColor: "rgba(20, 184, 166, 0.25)",
+    hoverTextColor: "#0d9488",
   },
   {
     name: "Paramètres",
@@ -186,6 +210,7 @@ const navigation: NavItem[] = [
     activeText: "text-slate-700 dark:text-slate-300",
     animClass: "icon-glow",
     glowColor: "rgba(100, 116, 139, 0.25)",
+    hoverTextColor: "#475569",
   },
 ]
 
@@ -282,7 +307,11 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
           </Link>
         ) : (
           filteredNavigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+            // Smart active check: exact match OR prefix match (but not if a more specific nav item matches)
+            const hasMoreSpecificMatch = filteredNavigation.some(
+              (other) => other.href !== item.href && pathname.startsWith(other.href) && other.href.length > item.href.length
+            )
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && !hasMoreSpecificMatch)
 
             const linkEl = (
               <Link
@@ -292,7 +321,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
                 className={cn(
                   "sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 w-full",
                   collapsed && "justify-center px-0",
-                  // Default state: muted icon color
+                  // Default state
                   !isActive && cn(
                     "text-gray-500 dark:text-gray-500",
                     item.hoverBg
@@ -305,19 +334,18 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
                     "shadow-sm"
                   ),
                 )}
+                style={{ '--nav-hover-color': item.hoverTextColor } as React.CSSProperties}
               >
                 <item.icon
                   className={cn(
                     "h-5 w-5 flex-shrink-0 sidebar-icon",
                     item.animClass,
-                    // Always show the icon's own color when active or on hover via CSS
-                    isActive && item.color,
-                    !isActive && "text-gray-400 dark:text-gray-500"
+                    item.color
                   )}
                 />
                 {!collapsed && (
                   <span className={cn(
-                    "ml-3 transition-colors duration-200",
+                    "ml-3 transition-colors duration-200 nav-label",
                     !isActive && "text-gray-600 dark:text-gray-400"
                   )}>
                     {item.name}
