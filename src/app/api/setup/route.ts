@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { Prisma } from "@prisma/client"
 
 // GET - Check database status
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "super_admin") {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
     // Try to count users to check if DB is initialized
     const userCount = await db.user.count()
     const guestHouseCount = await db.guestHouse.count()

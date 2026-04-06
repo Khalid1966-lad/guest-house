@@ -29,7 +29,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Receipt,
   Building,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -94,6 +93,17 @@ interface Invoice {
   remainingAmount: number
 }
 
+interface GuestHouseInfo {
+  name: string
+  address?: string | null
+  city?: string | null
+  postalCode?: string | null
+  country?: string | null
+  phone?: string | null
+  email?: string | null
+  logo?: string | null
+}
+
 // Status colors and labels
 const invoiceStatuses: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: "Brouillon", color: "text-gray-700", bg: "bg-gray-100" },
@@ -124,6 +134,7 @@ export default function InvoiceDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [guestHouse, setGuestHouse] = useState<GuestHouseInfo | null>(null)
 
   // Fetch invoice
   const fetchInvoice = async () => {
@@ -133,12 +144,19 @@ export default function InvoiceDetailPage() {
     }
 
     try {
-      const response = await fetch(`/api/invoices/${invoiceId}`)
-      if (response.ok) {
-        const data = await response.json()
+      const [invoiceRes, ghRes] = await Promise.all([
+        fetch(`/api/invoices/${invoiceId}`),
+        fetch(`/api/settings/establishment`)
+      ])
+      if (invoiceRes.ok) {
+        const data = await invoiceRes.json()
         setInvoice(data.invoice)
       } else {
         router.push("/app/invoices")
+      }
+      if (ghRes.ok) {
+        const ghData = await ghRes.json()
+        setGuestHouse(ghData.guestHouse)
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -316,8 +334,12 @@ export default function InvoiceDetailPage() {
       <body>
         <div class="header">
           <div class="logo">
-            <div class="logo-icon">GH</div>
-            <span class="logo-text">PMS Guest House</span>
+            ${guestHouse?.logo ? `<img src="${guestHouse.logo}" alt="${guestHouse.name}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;">` : `<div class="logo-icon">GH</div>`}
+            <div>
+              <div class="logo-text">${guestHouse?.name || "Établissement"}</div>
+              ${guestHouse?.address ? `<div style="font-size: 0.8rem; color: #666;">${guestHouse.address}${guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}${guestHouse.city ? ` ${guestHouse.city}` : ""}</div>` : ""}
+              <div style="font-size: 0.75rem; color: #888;">${[guestHouse?.phone, guestHouse?.email].filter(Boolean).join(" • ")}</div>
+            </div>
           </div>
           <div class="invoice-info">
             <div class="invoice-number">${invoice.invoiceNumber}</div>
@@ -410,7 +432,10 @@ export default function InvoiceDetailPage() {
 
         <div class="footer">
           <p>Merci pour votre confiance !</p>
-          <p>${session?.user?.guestHouseName || "PMS Guest House"}</p>
+          <p><strong>${guestHouse?.name || "Établissement"}</strong></p>
+          ${guestHouse?.address ? `<p style="font-size: 0.8rem;">${guestHouse.address}${guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}${guestHouse.city ? ` ${guestHouse.city}` : ""}${guestHouse.country ? ` — ${guestHouse.country}` : ""}</p>` : ""}
+          ${guestHouse?.phone ? `<p style="font-size: 0.8rem;">Tél : ${guestHouse.phone}</p>` : ""}
+          ${guestHouse?.email ? `<p style="font-size: 0.8rem;">${guestHouse.email}</p>` : ""}
         </div>
       </body>
       </html>
@@ -514,14 +539,26 @@ export default function InvoiceDetailPage() {
           <div className="flex justify-between items-start mb-8 print:mb-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-sky-600 flex items-center justify-center print:bg-sky-600">
-                  <Receipt className="w-6 h-6 text-white" />
+                {guestHouse?.logo ? (
+                  <img src={guestHouse.logo} alt={guestHouse.name} className="w-10 h-10 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-sky-600 flex items-center justify-center print:bg-sky-600">
+                    <Building className="w-6 h-6 text-white" />
+                  </div>
+                )}
+                <div>
+                  <span className="text-xl font-bold">{guestHouse?.name || session?.user?.guestHouseName || "Établissement"}</span>
+                  {guestHouse?.address && (
+                    <p className="text-gray-500 text-sm">
+                      {guestHouse.address}{guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}{guestHouse.city ? ` ${guestHouse.city}` : ""}
+                    </p>
+                  )}
+                  <div className="flex gap-4 text-xs text-gray-500">
+                    {guestHouse?.phone && <span>{guestHouse.phone}</span>}
+                    {guestHouse?.email && <span>{guestHouse.email}</span>}
+                  </div>
                 </div>
-                <span className="text-xl font-bold">PMS Guest House</span>
               </div>
-              <p className="text-gray-500 text-sm print:text-gray-600">
-                {session?.user?.guestHouseName || "Votre établissement"}
-              </p>
             </div>
             <div className="text-right">
               <h2 className="text-2xl font-bold text-sky-600 print:text-sky-600">{invoice.invoiceNumber}</h2>
@@ -700,7 +737,16 @@ export default function InvoiceDetailPage() {
           {/* Footer - Hidden on print */}
           <div className="mt-12 pt-6 border-t text-center text-gray-500 text-sm print:hidden">
             <p>Merci pour votre confiance !</p>
-            <p className="mt-1">{session?.user?.guestHouseName || "PMS Guest House"}</p>
+            <p className="mt-1"><strong>{guestHouse?.name || "Établissement"}</strong></p>
+            {guestHouse?.address && (
+              <p className="text-xs text-gray-400 mt-1">
+                {guestHouse.address}{guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}{guestHouse.city ? ` ${guestHouse.city}` : ""}{guestHouse.country ? ` — ${guestHouse.country}` : ""}
+              </p>
+            )}
+            <div className="flex justify-center gap-4 text-xs text-gray-400">
+              {guestHouse?.phone && <span>Tél : {guestHouse.phone}</span>}
+              {guestHouse?.email && <span>{guestHouse.email}</span>}
+            </div>
           </div>
         </CardContent>
       </Card>

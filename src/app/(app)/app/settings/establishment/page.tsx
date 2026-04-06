@@ -25,6 +25,9 @@ import {
   Save,
   Loader2,
   UtensilsCrossed,
+  Upload,
+  X,
+  ImageIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -81,6 +84,8 @@ export default function EstablishmentSettingsPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("general")
 
   const [formData, setFormData] = useState({
@@ -118,6 +123,7 @@ export default function EstablishmentSettingsPage() {
 
       if (response.ok) {
         const gh = data.guestHouse
+        setLogoUrl(gh.logo || null)
         setFormData({
           name: gh.name || "",
           description: gh.description || "",
@@ -145,6 +151,92 @@ export default function EstablishmentSettingsPage() {
       console.error("Error fetching settings:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate size (max 500KB)
+    if (file.size > 500 * 1024) {
+      toast({
+        title: "Erreur",
+        description: "Le fichier est trop volumineux. Maximum 500 Ko.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Erreur",
+        description: "Type de fichier non supporté. Utilisez JPG, PNG, WebP ou GIF.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setUploadingLogo(true)
+    try {
+      const formData = new FormData()
+      formData.append("logo", file)
+
+      const response = await fetch("/api/upload/logo", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setLogoUrl(data.logo)
+        toast({
+          title: "Succès",
+          description: "Logo mis à jour avec succès",
+        })
+      } else {
+        const data = await response.json()
+        toast({
+          title: "Erreur",
+          description: data.error || "Erreur lors du téléchargement",
+          variant: "destructive",
+        })
+      }
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de télécharger le logo",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingLogo(false)
+      // Reset the file input
+      e.target.value = ""
+    }
+  }
+
+  const handleLogoDelete = async () => {
+    setUploadingLogo(true)
+    try {
+      const response = await fetch("/api/upload/logo", { method: "DELETE" })
+
+      if (response.ok) {
+        setLogoUrl(null)
+        toast({
+          title: "Succès",
+          description: "Logo supprimé",
+        })
+      }
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le logo",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingLogo(false)
     }
   }
 
@@ -275,6 +367,68 @@ export default function EstablishmentSettingsPage() {
 
         {/* General Tab */}
         <TabsContent value="general" className="space-y-6 mt-6">
+          {/* Logo Upload */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Logo de l&apos;établissement</CardTitle>
+              <CardDescription>
+                Ce logo apparaîtra sur les factures et documents imprimés
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-900">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    id="logo-upload"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingLogo}
+                      onClick={() => document.getElementById("logo-upload")?.click()}
+                    >
+                      {uploadingLogo ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}
+                      {logoUrl ? "Changer" : "Télécharger"}
+                    </Button>
+                    {logoUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700"
+                        disabled={uploadingLogo}
+                        onClick={handleLogoDelete}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Supprimer
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    JPG, PNG, WebP ou GIF — Max 500 Ko
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Informations générales</CardTitle>

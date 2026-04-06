@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json()
-    const { email, firstName, lastName, role, password, guestHouseId } = data
+    const { email, firstName, lastName, role, password } = data
 
     // Validation
-    if (!email || !password || !guestHouseId) {
+    if (!email || !password) {
       return NextResponse.json(
-        { error: "Email, mot de passe et établissement requis" },
+        { error: "Email et mot de passe requis" },
         { status: 400 }
       )
     }
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         name: firstName && lastName ? `${firstName} ${lastName}` : null,
         password: hashedPassword,
         role: role || "staff",
-        guestHouseId,
+        guestHouseId: session.user.guestHouseId,
         isActive: true,
         emailVerified: new Date(),
       },

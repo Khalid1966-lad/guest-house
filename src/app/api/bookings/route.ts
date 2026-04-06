@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
     const conflictingBookings = await db.booking.findFirst({
       where: {
         roomId,
+        guestHouseId: session.user.guestHouseId,
         status: { notIn: ["cancelled", "no_show"] },
         OR: [
           {
