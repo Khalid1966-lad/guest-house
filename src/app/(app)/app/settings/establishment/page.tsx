@@ -835,14 +835,22 @@ export default function EstablishmentSettingsPage() {
                   <Input
                     id="ice"
                     value={formData.ice}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ice: e.target.value })
-                    }
-                    placeholder="00 000 000 0000 00"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\s/g, '').replace(/\D/g, '')
+                      setFormData({ ...formData, ice: val })
+                    }}
+                    maxLength={15}
+                    placeholder="000000000000000"
+                    className={formData.ice && formData.ice.length !== 15 ? "border-red-500 focus-visible:ring-red-500" : ""}
                   />
                   <p className="text-xs text-gray-500">
-                    Identifiant Commun des Entreprises
+                    Identifiant Commun des Entreprises (15 chiffres)
                   </p>
+                  {formData.ice && formData.ice.length !== 15 && (
+                    <p className="text-xs text-red-500">
+                      L'ICE doit comporter exactement 15 chiffres
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="taxId">IF</Label>

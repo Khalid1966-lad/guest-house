@@ -256,14 +256,14 @@ export default function InvoiceDetailPage() {
           }
           .logo { display: flex; align-items: center; gap: 0.75rem; }
           .logo-img { 
-            width: 80px; 
-            height: 80px; 
+            width: 120px; 
+            height: 120px; 
             border-radius: 12px;
             object-fit: cover;
           }
           .logo-icon { 
-            width: 80px; 
-            height: 80px; 
+            width: 120px; 
+            height: 120px; 
             background: #0ea5e9; 
             border-radius: 12px;
             display: flex;
@@ -271,7 +271,7 @@ export default function InvoiceDetailPage() {
             justify-content: center;
             color: white;
             font-weight: bold;
-            font-size: 1.5rem;
+            font-size: 2rem;
           }
           .logo-text { font-size: 1.5rem; font-weight: bold; }
           .invoice-info { text-align: right; }
@@ -336,9 +336,10 @@ export default function InvoiceDetailPage() {
             padding-top: 1rem;
           }
           .legal-info {
-            margin-top: 0.5rem;
-            font-size: 0.75rem;
-            color: #888;
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+            color: #555;
+            line-height: 1.6;
           }
           @media print {
             body { padding: 0; }
@@ -447,9 +448,7 @@ export default function InvoiceDetailPage() {
           <p>Merci pour votre confiance !</p>
           <p><strong>${guestHouse?.name || "Établissement"}</strong></p>
           <div class="legal-info">
-            ${guestHouse?.address ? `<span>${guestHouse.address}${guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}${guestHouse.city ? ` ${guestHouse.city}` : ""}</span>` : ""}
-            ${guestHouse?.phone || guestHouse?.email ? `<span> — ${[guestHouse?.phone, guestHouse?.email].filter(Boolean).join(" • ")}</span>` : ""}
-            ${(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) ? `<br>${[guestHouse?.ice ? `ICE : ${guestHouse.ice}` : null, guestHouse?.taxId ? `IF : ${guestHouse.taxId}` : null, guestHouse?.cnss ? `CNSS : ${guestHouse.cnss}` : null].filter(Boolean).join(" | ")}` : ""}
+            ${(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) ? [guestHouse?.ice ? `ICE : ${guestHouse.ice}` : null, guestHouse?.taxId ? `IF : ${guestHouse.taxId}` : null, guestHouse?.cnss ? `CNSS : ${guestHouse.cnss}` : null].filter(Boolean).join(" &nbsp;|&nbsp; ") : ""}
           </div>
         </div>
       </body>
@@ -553,16 +552,16 @@ export default function InvoiceDetailPage() {
           {/* Invoice Header */}
           <div className="flex justify-between items-start mb-8 print:mb-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-4 mb-2">
                 {guestHouse?.logo ? (
-                  <img src={guestHouse.logo} alt={guestHouse.name} className="w-16 h-16 rounded-xl object-cover print:w-16 print:h-16 print:rounded-xl" />
+                  <img src={guestHouse.logo} alt={guestHouse.name} className="w-24 h-24 rounded-xl object-cover print:w-[120px] print:h-[120px] print:rounded-xl" />
                 ) : (
-                  <div className="w-16 h-16 rounded-xl bg-sky-600 flex items-center justify-center print:bg-sky-600">
-                    <Building className="w-8 h-8 text-white" />
+                  <div className="w-24 h-24 rounded-xl bg-sky-600 flex items-center justify-center print:bg-sky-600">
+                    <Building className="w-12 h-12 text-white" />
                   </div>
                 )}
                 <div>
-                  <span className="text-xl font-bold">{guestHouse?.name || session?.user?.guestHouseName || "Établissement"}</span>
+                  <span className="text-2xl font-bold">{guestHouse?.name || session?.user?.guestHouseName || "Établissement"}</span>
                 </div>
               </div>
             </div>
@@ -740,21 +739,25 @@ export default function InvoiceDetailPage() {
             </div>
           )}
 
-          {/* Footer - Hidden on print */}
+          {/* Footer - Screen only */}
           <div className="mt-12 pt-6 border-t text-center text-gray-500 text-sm print:hidden">
             <p>Merci pour votre confiance !</p>
             <p className="mt-1"><strong>{guestHouse?.name || "Établissement"}</strong></p>
-            {guestHouse?.address && (
-              <p className="text-xs text-gray-400 mt-1">
-                {guestHouse.address}{guestHouse.postalCode ? `, ${guestHouse.postalCode}` : ""}{guestHouse.city ? ` ${guestHouse.city}` : ""}{guestHouse.country ? ` — ${guestHouse.country}` : ""}
-              </p>
-            )}
-            <div className="flex justify-center gap-4 text-xs text-gray-400">
-              {guestHouse?.phone && <span>Tél : {guestHouse.phone}</span>}
-              {guestHouse?.email && <span>{guestHouse.email}</span>}
-            </div>
             {(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) && (
               <div className="flex justify-center gap-3 text-xs text-gray-400 mt-2">
+                {guestHouse?.ice && <span>ICE : {guestHouse.ice}</span>}
+                {guestHouse?.taxId && <span>IF : {guestHouse.taxId}</span>}
+                {guestHouse?.cnss && <span>CNSS : {guestHouse.cnss}</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Footer - Print only */}
+          <div className="hidden print:block mt-12 pt-6 border-t border-gray-300 text-center text-gray-600 text-sm">
+            <p>Merci pour votre confiance !</p>
+            <p className="mt-1 font-semibold">{guestHouse?.name || "Établissement"}</p>
+            {(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) && (
+              <div className="flex justify-center gap-3 text-xs text-gray-500 mt-2">
                 {guestHouse?.ice && <span>ICE : {guestHouse.ice}</span>}
                 {guestHouse?.taxId && <span>IF : {guestHouse.taxId}</span>}
                 {guestHouse?.cnss && <span>CNSS : {guestHouse.cnss}</span>}
