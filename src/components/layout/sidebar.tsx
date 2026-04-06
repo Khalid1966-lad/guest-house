@@ -285,7 +285,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
         {!collapsed && (
           <div className="flex-1 min-w-0">
             <h1 className="font-semibold text-lg leading-tight bg-gradient-to-r from-sky-600 to-sky-800 dark:from-sky-400 dark:to-sky-200 bg-clip-text text-transparent">
-              PMS
+              PMS GUESTHOUSE
             </h1>
             <p className="text-xs text-muted-foreground truncate">
               {isSuperAdmin ? "Administration" : (session?.user?.guestHouseName || "Guest House")}
