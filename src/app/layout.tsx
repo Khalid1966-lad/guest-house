@@ -23,12 +23,18 @@ export const metadata: Metadata = {
   keywords: ["PMS", "maison d'hôtes", "gestion hôtelière", "réservations", "facturation", "SaaS"],
   authors: [{ name: "PMS Guest House Team" }],
   icons: {
-    icon: "/logo.svg",
+    icon: [
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "PMS Guest House - Gestion de Maisons d'Hôtes",
     description: "Solution SaaS complète pour la gestion de maisons d'hôtes",
     type: "website",
+    images: ["/android-chrome-512x512.png"],
   },
 };
 
