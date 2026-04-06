@@ -58,38 +58,13 @@ export default function MentionsLegalesPage() {
                   <strong>Coordonnées :</strong><br />
                   Email : contact@jazelwebagency.com<br />
                   Téléphone : +212 6 62 42 58 90<br />
-                  Site web : jazelwebagency.com<br />
-                  <br />
-                  <strong>Représentant légal :</strong> Khalid Belkhalfi
+                  Site web : jazelwebagency.com
                 </p>
               </div>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">2. Directeur de la Publication</h2>
-              <p className="text-gray-700">
-                Le directeur de la publication est <strong>Khalid Belkhalfi</strong>, en qualité de 
-                représentant légal de Jazel Web Agency.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">3. Hébergement</h2>
-              <p className="text-gray-700 mb-4">
-                Le site et l&apos;application sont hébergés par :
-              </p>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-700">
-                  <strong>Vercel Inc.</strong><br />
-                  340 S Lemon Ave #4133<br />
-                  Walnut, CA 91789, États-Unis<br />
-                  Site web : vercel.com
-                </p>
-              </div>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">4. Propriété Intellectuelle</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">2. Propriété Intellectuelle</h2>
               <p className="text-gray-700 mb-4">
                 L&apos;ensemble du contenu du site (textes, images, vidéos, logos, icônes, sons, logiciels, 
                 etc.) est la propriété exclusive de <strong>Jazel Web Agency</strong> ou de ses partenaires 
@@ -109,7 +84,7 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">5. Marques</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">3. Marques</h2>
               <p className="text-gray-700">
                 <strong>PMS Guest House</strong> et le logo associé sont des marques déposées par 
                 Jazel Web Agency. Toute utilisation non autorisée de ces marques est interdite.
@@ -117,7 +92,7 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">6. Protection des Données Personnelles</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">4. Protection des Données Personnelles</h2>
               <p className="text-gray-700 mb-4">
                 Conformément à la loi n° 09-08 relative à la protection des personnes physiques à 
                 l&apos;égard du traitement des données à caractère personnel, vous disposez d&apos;un droit 
@@ -135,7 +110,7 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">7. Cookies</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">5. Cookies</h2>
               <p className="text-gray-700 mb-4">
                 Le site utilise des cookies pour améliorer l&apos;expérience utilisateur et analyser le 
                 trafic. En continuant à naviguer sur ce site, vous acceptez l&apos;utilisation de cookies.
@@ -147,7 +122,7 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">8. Limitation de Responsabilité</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">6. Limitation de Responsabilité</h2>
               <p className="text-gray-700 mb-4">
                 Jazel Web Agency s&apos;efforce de fournir des informations aussi précises que possible. 
                 Toutefois, elle ne pourra être tenue responsable des omissions, des inexactitudes et 
@@ -163,15 +138,15 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">9. Liens Hypertextes</h2>
-              <h3 className="text-lg font-medium text-gray-800 mb-2">9.1 Liens sortants</h3>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">7. Liens Hypertextes</h2>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">7.1 Liens sortants</h3>
               <p className="text-gray-700 mb-4">
                 Le site peut contenir des liens vers d&apos;autres sites internet. Jazel Web Agency 
                 n&apos;exerce aucun contrôle sur ces sites et décline toute responsabilité quant à leur 
                 contenu.
               </p>
               
-              <h3 className="text-lg font-medium text-gray-800 mb-2">9.2 Liens entrants</h3>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">7.2 Liens entrants</h3>
               <p className="text-gray-700">
                 La mise en place d&apos;un lien hypertexte vers le site est soumise à l&apos;accord préalable 
                 de Jazel Web Agency. Toute demande de lien doit être adressée à : contact@jazelwebagency.com
@@ -179,7 +154,7 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">10. Droit Applicable</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">8. Droit Applicable</h2>
               <p className="text-gray-700">
                 Les présentes mentions légales sont régies par le droit marocain. En cas de litige, 
                 les tribunaux marocains seront seuls compétents.
@@ -187,7 +162,7 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">11. Contact</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">9. Contact</h2>
               <p className="text-gray-700 mb-4">
                 Pour toute question concernant les présentes mentions légales, vous pouvez nous contacter :
               </p>
@@ -203,12 +178,10 @@ export default function MentionsLegalesPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">12. Crédits</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">10. Crédits</h2>
               <p className="text-gray-700">
                 <strong>Conception et développement :</strong> Jazel Web Agency<br />
-                <strong>Design :</strong> Jazel Web Agency<br />
-                <strong>Icônes :</strong> Lucide Icons<br />
-                <strong>Framework :</strong> Next.js
+                <strong>Design :</strong> Jazel Web Agency
               </p>
             </section>
           </div>
