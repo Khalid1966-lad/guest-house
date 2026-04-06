@@ -67,17 +67,21 @@ export async function PUT(request: NextRequest) {
 
     const data = await request.json()
 
+    // Build update data dynamically - only include provided fields
+    const updateData: Record<string, unknown> = {}
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.firstName !== undefined) updateData.firstName = data.firstName
+    if (data.lastName !== undefined) updateData.lastName = data.lastName
+    if (data.phone !== undefined) updateData.phone = data.phone
+    if (data.language !== undefined) updateData.language = data.language
+    if (data.theme !== undefined) updateData.theme = data.theme
+    // Allow avatar deletion (null) or keep existing
+    if (data.avatar !== undefined) updateData.avatar = data.avatar
+
     // Update user
     const user = await db.user.update({
       where: { id: session.user.id },
-      data: {
-        name: data.name,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        language: data.language,
-        theme: data.theme,
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,
@@ -85,6 +89,7 @@ export async function PUT(request: NextRequest) {
         firstName: true,
         lastName: true,
         phone: true,
+        avatar: true,
         role: true,
         language: true,
         theme: true,

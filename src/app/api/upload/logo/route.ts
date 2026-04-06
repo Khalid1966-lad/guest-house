@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { compressImage, compressToDataUrl, formatBytes, isValidImageType, convertGifToStatic } from "@/lib/image-compress"
 
-// POST - Upload guesthouse logo (base64)
+// POST - Upload guesthouse logo (with automatic compression)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -27,28 +28,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
-    if (!allowedTypes.includes(file.type)) {
+    if (!isValidImageType(file.type)) {
       return NextResponse.json(
         { error: "Type de fichier non supporté. Utilisez JPG, PNG, WebP ou GIF." },
         { status: 400 }
       )
     }
 
-    // Validate file size (max 500KB)
-    const maxSize = 500 * 1024
-    if (file.size > maxSize) {
+    // Max input size: 10MB (we'll compress it down)
+    const maxInputSize = 10 * 1024 * 1024
+    if (file.size > maxInputSize) {
       return NextResponse.json(
-        { error: "Fichier trop volumineux. Maximum 500 Ko." },
+        { error: "Fichier trop volumineux. Maximum 10 Mo." },
         { status: 400 }
       )
     }
 
-    // Convert to base64 data URL
+    // Read file bytes
     const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    const base64 = buffer.toString("base64")
-    const dataUrl = `data:${file.type};base64,${base64}`
+    const originalSize = bytes.byteLength
+
+    // Handle GIF files - convert to static image
+    let imageBuffer = Buffer.from(bytes)
+    if (file.type === "image/gif") {
+      imageBuffer = await convertGifToStatic(imageBuffer)
+    }
+
+    // Compress the image using sharp
+    const compressResult = await compressImage(imageBuffer, "logo")
+    const dataUrl = compressToDataUrl(compressResult)
 
     // Save to database
     const guestHouse = await db.guestHouse.update({
@@ -60,6 +68,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       logo: guestHouse.logo,
       message: "Logo mis à jour avec succès",
+      compression: {
+        originalSize: formatBytes(originalSize),
+        compressedSize: formatBytes(compressResult.size),
+        compressionRatio: compressResult.compressionRatio,
+        dimensions: `${compressResult.width}×${compressResult.height}`,
+        format: compressResult.format,
+      },
     })
   } catch (error) {
     console.error("Error uploading logo:", error)

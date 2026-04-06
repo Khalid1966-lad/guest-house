@@ -26,12 +26,12 @@ import {
   ArrowLeft,
   User,
   Lock,
-  Bell,
   Palette,
-  Globe,
   Save,
   Loader2,
   CheckCircle,
+  Upload,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -85,6 +85,8 @@ export default function ProfileSettingsPage() {
   })
   const [passwordError, setPasswordError] = useState("")
   const [changingPassword, setChangingPassword] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProfile()
@@ -147,6 +149,103 @@ export default function ProfileSettingsPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate size (max 10MB - will be compressed server-side)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Erreur",
+        description: "Le fichier est trop volumineux. Maximum 10 Mo.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Erreur",
+        description: "Type de fichier non supporté. Utilisez JPG, PNG, WebP ou GIF.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append("image", file)
+      formData.append("type", "avatar")
+      formData.append("target", "user")
+      formData.append("targetId", profile?.id || "")
+
+      const response = await fetch("/api/upload/image", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAvatarUrl(data.image)
+        toast({
+          title: "Succès",
+          description: data.compression
+            ? `Photo compressée : ${data.compression.originalSize} → ${data.compression.compressedSize} (-${data.compression.compressionRatio}%)`
+            : "Photo de profil mise à jour",
+        })
+        // Refresh profile
+        await fetchProfile()
+      } else {
+        const data = await response.json()
+        toast({
+          title: "Erreur",
+          description: data.error || "Erreur lors du téléchargement",
+          variant: "destructive",
+        })
+      }
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de télécharger la photo",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingAvatar(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleAvatarDelete = async () => {
+    setUploadingAvatar(true)
+    try {
+      const response = await fetch("/api/settings/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar: null }),
+      })
+
+      if (response.ok) {
+        setAvatarUrl(null)
+        toast({
+          title: "Succès",
+          description: "Photo de profil supprimée",
+        })
+        await fetchProfile()
+      }
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la photo",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -265,15 +364,56 @@ export default function ProfileSettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-sky-600 flex items-center justify-center text-white text-2xl font-bold">
-                  {profile?.name?.charAt(0) || profile?.email?.charAt(0).toUpperCase() || "U"}
+                <div className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-900">
+                  {avatarUrl || profile?.avatar ? (
+                    <img
+                      src={avatarUrl || profile?.avatar || undefined}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-8 h-8 text-gray-400" />
+                  )}
                 </div>
-                <div>
-                  <Button variant="outline" disabled>
-                    Changer la photo
-                  </Button>
-                  <p className="text-xs text-gray-500 mt-2">
-                    JPG, GIF ou PNG. Max 2MB.
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    id="avatar-upload"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingAvatar}
+                      onClick={() => document.getElementById("avatar-upload")?.click()}
+                    >
+                      {uploadingAvatar ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}
+                      {avatarUrl || profile?.avatar ? "Changer" : "Télécharger"}
+                    </Button>
+                    {avatarUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700"
+                        disabled={uploadingAvatar}
+                        onClick={handleAvatarDelete}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Supprimer
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    JPG, PNG, WebP ou GIF — Max 10 Mo (compression auto)
                   </p>
                 </div>
               </div>

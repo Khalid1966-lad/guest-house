@@ -86,6 +86,13 @@ export default function EstablishmentSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoCompression, setLogoCompression] = useState<{
+    originalSize: string
+    compressedSize: string
+    compressionRatio: number
+    dimensions: string
+    format: string
+  } | null>(null)
   const [activeTab, setActiveTab] = useState("general")
 
   const [formData, setFormData] = useState({
@@ -158,11 +165,11 @@ export default function EstablishmentSettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate size (max 500KB)
-    if (file.size > 500 * 1024) {
+    // Validate size (max 10MB - will be compressed server-side)
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "Erreur",
-        description: "Le fichier est trop volumineux. Maximum 500 Ko.",
+        description: "Le fichier est trop volumineux. Maximum 10 Mo.",
         variant: "destructive",
       })
       return
@@ -180,6 +187,7 @@ export default function EstablishmentSettingsPage() {
     }
 
     setUploadingLogo(true)
+    setLogoCompression(null)
     try {
       const formData = new FormData()
       formData.append("logo", file)
@@ -192,9 +200,15 @@ export default function EstablishmentSettingsPage() {
       if (response.ok) {
         const data = await response.json()
         setLogoUrl(data.logo)
+        // Show compression info
+        if (data.compression) {
+          setLogoCompression(data.compression)
+        }
         toast({
           title: "Succès",
-          description: "Logo mis à jour avec succès",
+          description: data.compression
+            ? `Logo compressé : ${data.compression.originalSize} → ${data.compression.compressedSize} (-${data.compression.compressionRatio}%)`
+            : "Logo mis à jour avec succès",
         })
       } else {
         const data = await response.json()
@@ -224,6 +238,7 @@ export default function EstablishmentSettingsPage() {
 
       if (response.ok) {
         setLogoUrl(null)
+        setLogoCompression(null)
         toast({
           title: "Succès",
           description: "Logo supprimé",
@@ -422,8 +437,13 @@ export default function EstablishmentSettingsPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500">
-                    JPG, PNG, WebP ou GIF — Max 500 Ko
+                    JPG, PNG, WebP ou GIF — Max 10 Mo (compression auto)
                   </p>
+                  {logoCompression && (
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      {logoCompression.dimensions} {logoCompression.format.toUpperCase()} — {logoCompression.originalSize} → {logoCompression.compressedSize} (-{logoCompression.compressionRatio}%)
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
