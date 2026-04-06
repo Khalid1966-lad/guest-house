@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useSession } from "next-auth/react"
+import { useCurrency } from "@/hooks/use-currency"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -162,8 +163,7 @@ const defaultMenuItemForm = {
 export default function RestaurantPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const currency = session?.user?.guestHouseCurrency || "EUR"
-  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
+  const { formatAmount } = useCurrency()
   
   // State
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])

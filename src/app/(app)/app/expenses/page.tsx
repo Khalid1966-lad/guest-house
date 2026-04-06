@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
+import { useCurrency } from "@/hooks/use-currency"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -117,7 +118,7 @@ interface Stats {
 
 export default function ExpensesPage() {
   const { data: session } = useSession()
-  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const { formatAmount } = useCurrency()
   const { toast } = useToast()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -369,9 +370,10 @@ export default function ExpensesPage() {
   }
 
   const formatCurrency = (amount: number, cur?: string) => {
+    if (!cur) return formatAmount(amount)
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: cur || currency,
+      currency: cur,
     }).format(amount)
   }
 

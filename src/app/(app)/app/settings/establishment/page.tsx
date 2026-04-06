@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
+import { useCurrency } from "@/hooks/use-currency"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -76,7 +77,7 @@ const TIMEZONES = [
 ]
 
 export default function EstablishmentSettingsPage() {
-  const { data: session } = useSession()
+  const { data: session, update } = useSession()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -182,6 +183,10 @@ export default function EstablishmentSettingsPage() {
       const data = await response.json()
 
       if (response.ok) {
+        // Mettre à jour la session avec la nouvelle devise
+        if (formData.currency) {
+          await update({ guestHouseCurrency: formData.currency })
+        }
         toast({
           title: "Succès",
           description: "Paramètres mis à jour avec succès",

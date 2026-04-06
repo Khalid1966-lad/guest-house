@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
+import { useCurrency } from "@/hooks/use-currency"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -140,8 +141,7 @@ const defaultAmenities = [
 
 export default function RoomsPage() {
   const { data: session, status } = useSession()
-  const currency = session?.user?.guestHouseCurrency || "EUR"
-  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
+  const { formatAmount } = useCurrency()
   const [rooms, setRooms] = useState<Room[]>([])
   const [amenities, setAmenities] = useState<Amenity[]>([])
   const [isLoading, setIsLoading] = useState(true)

@@ -65,6 +65,7 @@ import {
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
 import { fr } from "date-fns/locale"
+import { useCurrency } from "@/hooks/use-currency"
 
 // Types
 interface Guest {
@@ -140,11 +141,7 @@ const defaultItemForm = {
 
 export default function InvoicesPage() {
   const { data: session, status } = useSession()
-  const currency = session?.user?.guestHouseCurrency || "EUR"
-  const currencySymbol = new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(0).replace(/[\d\s.,]+/, "").trim()
-  const formatAmount = (amount: number): string => {
-    return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
-  }
+  const { currency, symbol, formatAmount } = useCurrency()
   const router = useRouter()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
@@ -1073,7 +1070,7 @@ export default function InvoicesPage() {
                 </div>
                 {formData.touristTax && touristTaxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span>Taxe de séjour ({formData.touristTaxNights} nuits × {formData.touristTaxPerNight}{currencySymbol})</span>
+                    <span>Taxe de séjour ({formData.touristTaxNights} nuits × {formData.touristTaxPerNight}{symbol})</span>
                     <span>{formatAmount(touristTaxAmount)}</span>
                   </div>
                 )}
@@ -1114,7 +1111,7 @@ export default function InvoicesPage() {
               {formData.touristTax && (
                 <div className="grid grid-cols-3 gap-4 pt-2">
                   <div className="space-y-2">
-                    <Label className="text-xs">Tarif/nuit/personne ({currencySymbol})</Label>
+                    <Label className="text-xs">Tarif/nuit/personne ({symbol})</Label>
                     <Input
                       type="number"
                       step="0.01"

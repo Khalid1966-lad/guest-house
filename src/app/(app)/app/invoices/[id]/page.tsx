@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
 import { fr } from "date-fns/locale"
+import { useCurrency } from "@/hooks/use-currency"
 
 // Types
 interface InvoiceItem {
@@ -113,11 +114,7 @@ const paymentMethods: Record<string, string> = {
 
 export default function InvoiceDetailPage() {
   const { data: session, status } = useSession()
-  const currency = session?.user?.guestHouseCurrency || "EUR"
-  const currencySymbol = new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(0).replace(/[\d\s.,]+/, "").trim()
-  const formatAmount = (amount: number): string => {
-    return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
-  }
+  const { currency, symbol, formatAmount } = useCurrency()
   const router = useRouter()
   const params = useParams()
   const invoiceId = params.id as string
@@ -362,8 +359,8 @@ export default function InvoiceDetailPage() {
                   ${item.taxRate > 0 ? `<br><small style="color: #666;">TVA: ${item.taxRate}%</small>` : ""}
                 </td>
                 <td class="text-center">${item.quantity}</td>
-                <td class="text-right">${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(item.unitPrice)}</td>
-                <td class="text-right"><strong>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(item.total)}</strong></td>
+                <td class="text-right">${item.unitPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
+                <td class="text-right"><strong>${item.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</strong></td>
               </tr>
             `).join("")}
           </tbody>
@@ -372,33 +369,33 @@ export default function InvoiceDetailPage() {
         <div class="totals">
           <div class="total-row">
             <span>Sous-total</span>
-            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.subtotal)}</span>
+            <span>${invoice.subtotal.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
           ${invoice.taxes > 0 ? `
           <div class="total-row">
             <span>TVA</span>
-            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.taxes)}</span>
+            <span>${invoice.taxes.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
           ` : ""}
           ${invoice.discount > 0 ? `
           <div class="total-row">
             <span>Remise</span>
-            <span style="color: #16a34a;">-${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.discount)}</span>
+            <span style="color: #16a34a;">-${invoice.discount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
           ` : ""}
           <div class="total-row main">
             <span>Total</span>
-            <span class="amount">${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.total)}</span>
+            <span class="amount">${invoice.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
           ${invoice.paidAmount > 0 ? `
           <div class="total-row paid">
             <span>Payé</span>
-            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.paidAmount)}</span>
+            <span>${invoice.paidAmount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
           ${invoice.remainingAmount > 0 ? `
           <div class="total-row remaining">
             <span>Reste à payer</span>
-            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.remainingAmount)}</span>
+            <span>${invoice.remainingAmount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
           ` : ""}
           ` : ""}
