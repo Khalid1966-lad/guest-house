@@ -97,3 +97,27 @@ Stage Summary:
 - Layout smoothly adapts main content area
 - User guide covers: Bienvenue, Dashboard, Chambres, Réservations, Clients, Facturation, Restaurant, Dépenses, Statistiques, Paramètres, Interface, Glossaire
 - Lint passes with no errors
+
+---
+## Task ID: 3 - Rewrite users management page
+### Work Task
+Comprehensive rewrite of `/home/z/my-project/src/app/(app)/app/settings/users/page.tsx` with a modern user management interface for the Guest House PMS application.
+
+### Work Summary
+- Rewrote the entire users management page with the following features:
+  - **Owner-only access guard**: Non-owner users see a locked warning card with Shield icon explaining only the owner can manage users
+  - **5 Roles with colors and icons**: owner (Crown/purple), manager (Briefcase/blue), receptionist (Headset/emerald), accountant (Calculator/amber), housekeeping (Sparkles/rose)
+  - **Stats summary cards**: Total users, active (green), blocked (red) counts with role breakdown badges
+  - **User cards** in responsive grid (1 col mobile, 2 col desktop) with: avatar circle colored by role, full name + email, role badge with icon, status badge (Actif/Bloqué), French creation date, "Vous" badge for current user
+  - **Actions dropdown menu**: Edit (disabled for self), Block/Unblock toggle, Reset Password, Delete (disabled for self and last owner)
+  - **Add/Edit user dialog**: First/last name, email (disabled on edit), password (create only, min 6 chars), role select with all 5 roles
+  - **Reset Password dialog**: Shows user info, new password + confirm fields, password strength indicator (weak/medium/strong), validation for match and min length
+  - **Delete confirmation dialog**: Uses AlertDialog component (not browser confirm()), shows user info, warning about permanent deletion, disabled when can't delete
+  - **Dark mode support** throughout all components
+  - **French date formatting** (e.g., "15 mars 2026")
+  - **Loading states** with Loader2 spinner
+  - All API calls handle errors gracefully with toast notifications
+  - Blocked users get visual opacity reduction
+  - Uses shadcn/ui components (Card, Dialog, AlertDialog, DropdownMenu, Badge, Select, Input, Label, Progress, Button)
+  - Uses emerald as primary color (no blue/indigo)
+  - Lint passes with 0 errors and 0 warnings

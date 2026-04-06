@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import bcrypt from "bcryptjs"
 
 interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// GET - Get a single user
+// GET - Get a single user (owner only)
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,6 +16,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     if (!session?.user?.guestHouseId) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    if (session.user.role !== "owner") {
+      return NextResponse.json({ error: "Permissions insuffisantes" }, { status: 403 })
     }
 
     const user = await db.user.findFirst({
@@ -54,7 +59,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// PUT - Update a user
+// PUT - Update a user (owner only)
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
@@ -64,10 +69,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
-    // Only owner and manager can update users
-    if (!["owner", "manager"].includes(session.user.role)) {
+    // Only owner can update users
+    if (session.user.role !== "owner") {
       return NextResponse.json(
-        { error: "Permissions insuffisantes" },
+        { error: "Seul le propriétaire peut modifier des utilisateurs" },
         { status: 403 }
       )
     }
@@ -87,6 +92,14 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         { error: "Utilisateur non trouvé" },
         { status: 404 }
       )
+    }
+
+    // Validate role if changing
+    if (data.role) {
+      const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping"]
+      if (!validRoles.includes(data.role)) {
+        return NextResponse.json({ error: "Rôle invalide" }, { status: 400 })
+      }
     }
 
     // Don't allow changing the last owner's role
@@ -139,7 +152,109 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// DELETE - Delete a user
+// PATCH - Block/unblock user or reset password (owner only)
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authOptions)
+    const { id } = await params
+
+    if (!session?.user?.guestHouseId) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    // Only owner can block/reset
+    if (session.user.role !== "owner") {
+      return NextResponse.json(
+        { error: "Seul le propriétaire peut effectuer cette action" },
+        { status: 403 }
+      )
+    }
+
+    const data = await request.json()
+    const { action } = data
+
+    // Verify user belongs to same guest house
+    const existingUser = await db.user.findFirst({
+      where: {
+        id,
+        guestHouseId: session.user.guestHouseId,
+      },
+    })
+
+    if (!existingUser) {
+      return NextResponse.json(
+        { error: "Utilisateur non trouvé" },
+        { status: 404 }
+      )
+    }
+
+    // Can't block/reset yourself
+    if (id === session.user.id) {
+      return NextResponse.json(
+        { error: "Vous ne pouvez pas effectuer cette action sur votre propre compte" },
+        { status: 400 }
+      )
+    }
+
+    if (action === "toggleBlock") {
+      // Block/unblock user
+      const user = await db.user.update({
+        where: { id },
+        data: { isActive: !existingUser.isActive },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      })
+
+      return NextResponse.json({
+        user,
+        message: user.isActive ? "Utilisateur débloqué" : "Utilisateur bloqué",
+      })
+    }
+
+    if (action === "resetPassword") {
+      const { newPassword } = data
+
+      if (!newPassword || newPassword.length < 6) {
+        return NextResponse.json(
+          { error: "Le mot de passe doit contenir au moins 6 caractères" },
+          { status: 400 }
+        )
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+      await db.user.update({
+        where: { id },
+        data: { password: hashedPassword },
+      })
+
+      return NextResponse.json({
+        message: "Mot de passe réinitialisé avec succès",
+      })
+    }
+
+    return NextResponse.json(
+      { error: "Action non reconnue" },
+      { status: 400 }
+    )
+  } catch (error) {
+    console.error("Error in PATCH /api/users/[id]:", error)
+    return NextResponse.json(
+      { error: "Erreur lors de l'action sur l'utilisateur" },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Delete a user (owner only)
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)

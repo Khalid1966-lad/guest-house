@@ -4,13 +4,21 @@ import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 
-// GET - List users in the guest house
+// GET - List users in the guest house (owner only)
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 
     if (!session?.user?.guestHouseId) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    // Only owner can view users list
+    if (session.user.role !== "owner") {
+      return NextResponse.json(
+        { error: "Permissions insuffisantes. Seul le propriétaire peut gérer les utilisateurs." },
+        { status: 403 }
+      )
     }
 
     const users = await db.user.findMany({
@@ -23,6 +31,7 @@ export async function GET() {
         name: true,
         firstName: true,
         lastName: true,
+        phone: true,
         role: true,
         isActive: true,
         createdAt: true,
@@ -40,7 +49,7 @@ export async function GET() {
   }
 }
 
-// POST - Create a new user
+// POST - Create a new user (owner only)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -49,10 +58,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
-    // Only owner and manager can create users
-    if (!["owner", "manager"].includes(session.user.role)) {
+    // Only owner can create users
+    if (session.user.role !== "owner") {
       return NextResponse.json(
-        { error: "Permissions insuffisantes" },
+        { error: "Seul le propriétaire peut créer des utilisateurs" },
         { status: 403 }
       )
     }
@@ -64,6 +73,13 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email et mot de passe requis" },
+        { status: 400 }
+      )
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: "Le mot de passe doit contenir au moins 6 caractères" },
         { status: 400 }
       )
     }
@@ -80,6 +96,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate role
+    const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping"]
+    const userRole = role || "receptionist"
+    if (!validRoles.includes(userRole)) {
+      return NextResponse.json(
+        { error: "Rôle invalide" },
+        { status: 400 }
+      )
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
@@ -91,7 +117,7 @@ export async function POST(request: NextRequest) {
         lastName: lastName || null,
         name: firstName && lastName ? `${firstName} ${lastName}` : null,
         password: hashedPassword,
-        role: role || "staff",
+        role: userRole,
         guestHouseId: session.user.guestHouseId,
         isActive: true,
         emailVerified: new Date(),

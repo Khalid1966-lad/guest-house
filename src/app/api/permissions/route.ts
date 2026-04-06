@@ -31,8 +31,7 @@ export async function GET() {
 
     // If no role record exists, return default permissions based on role name
     if (!role) {
-      // Default permissions based on role
-      const defaultPermissions = {
+      const defaultPermissions: Record<string, Record<string, boolean>> = {
         owner: {
           canViewDashboard: true,
           canViewRooms: true,
@@ -85,6 +84,85 @@ export async function GET() {
           canApplyDiscounts: true,
           canRefundPayments: false,
         },
+        receptionist: {
+          canViewDashboard: true,
+          canViewRooms: true,
+          canViewBookings: true,
+          canViewGuests: true,
+          canViewInvoices: true,
+          canViewRestaurant: false,
+          canViewExpenses: false,
+          canViewStatistics: false,
+          canViewSettings: false,
+          canViewUsers: false,
+          canCreateBookings: true,
+          canEditBookings: true,
+          canDeleteBookings: false,
+          canCreateInvoices: true,
+          canEditInvoices: false,
+          canDeleteInvoices: false,
+          canManageRooms: false,
+          canManageGuests: true,
+          canManageExpenses: false,
+          canManageUsers: false,
+          canManageSettings: false,
+          canViewRevenue: false,
+          canApplyDiscounts: false,
+          canRefundPayments: false,
+        },
+        accountant: {
+          canViewDashboard: true,
+          canViewRooms: false,
+          canViewBookings: true,
+          canViewGuests: true,
+          canViewInvoices: true,
+          canViewRestaurant: true,
+          canViewExpenses: true,
+          canViewStatistics: true,
+          canViewSettings: false,
+          canViewUsers: false,
+          canCreateBookings: false,
+          canEditBookings: false,
+          canDeleteBookings: false,
+          canCreateInvoices: true,
+          canEditInvoices: true,
+          canDeleteInvoices: true,
+          canManageRooms: false,
+          canManageGuests: false,
+          canManageExpenses: true,
+          canManageUsers: false,
+          canManageSettings: false,
+          canViewRevenue: true,
+          canApplyDiscounts: true,
+          canRefundPayments: false,
+        },
+        housekeeping: {
+          canViewDashboard: false,
+          canViewRooms: true,
+          canViewBookings: true,
+          canViewGuests: false,
+          canViewInvoices: false,
+          canViewRestaurant: true,
+          canViewExpenses: false,
+          canViewStatistics: false,
+          canViewSettings: false,
+          canViewUsers: false,
+          canCreateBookings: false,
+          canEditBookings: false,
+          canDeleteBookings: false,
+          canCreateInvoices: false,
+          canEditInvoices: false,
+          canDeleteInvoices: false,
+          canManageRooms: true,
+          canManageGuests: false,
+          canManageExpenses: false,
+          canManageUsers: false,
+          canManageSettings: false,
+          canViewRevenue: false,
+          canApplyDiscounts: false,
+          canRefundPayments: false,
+        },
+        // Legacy fallback for old "staff" role
         staff: {
           canViewDashboard: true,
           canViewRooms: true,
@@ -113,7 +191,7 @@ export async function GET() {
         },
       }
 
-      const permissions = defaultPermissions[session.user.role as keyof typeof defaultPermissions] || defaultPermissions.staff
+      const permissions = defaultPermissions[session.user.role] || defaultPermissions.staff
 
       return NextResponse.json({ permissions })
     }
