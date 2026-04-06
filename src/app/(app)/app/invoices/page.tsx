@@ -131,11 +131,6 @@ const invoiceStatuses: Record<string, { label: string; color: string; bg: string
   cancelled: { label: "Annulée", color: "text-red-700", bg: "bg-red-100" },
 }
 
-// Format amount with 2 decimal places
-const formatAmount = (amount: number): string => {
-  return amount.toFixed(2) + " €"
-}
-
 const defaultItemForm = {
   description: "",
   quantity: "1",
@@ -145,6 +140,11 @@ const defaultItemForm = {
 
 export default function InvoicesPage() {
   const { data: session, status } = useSession()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const currencySymbol = new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(0).replace(/[\d\s.,]+/, "").trim()
+  const formatAmount = (amount: number): string => {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
+  }
   const router = useRouter()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
@@ -1073,7 +1073,7 @@ export default function InvoicesPage() {
                 </div>
                 {formData.touristTax && touristTaxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span>Taxe de séjour ({formData.touristTaxNights} nuits × {formData.touristTaxPerNight}€)</span>
+                    <span>Taxe de séjour ({formData.touristTaxNights} nuits × {formData.touristTaxPerNight}{currencySymbol})</span>
                     <span>{formatAmount(touristTaxAmount)}</span>
                   </div>
                 )}
@@ -1114,7 +1114,7 @@ export default function InvoicesPage() {
               {formData.touristTax && (
                 <div className="grid grid-cols-3 gap-4 pt-2">
                   <div className="space-y-2">
-                    <Label className="text-xs">Tarif/nuit/personne (€)</Label>
+                    <Label className="text-xs">Tarif/nuit/personne ({currencySymbol})</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -1135,7 +1135,7 @@ export default function InvoicesPage() {
                   <div className="space-y-2">
                     <Label className="text-xs">Montant</Label>
                     <div className="p-2 bg-white dark:bg-gray-800 rounded border text-sm font-medium text-sky-600">
-                      {touristTaxAmount.toFixed(2)} €
+                      {formatAmount(touristTaxAmount)}
                     </div>
                   </div>
                 </div>

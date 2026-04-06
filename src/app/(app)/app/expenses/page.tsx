@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -115,6 +116,8 @@ interface Stats {
 }
 
 export default function ExpensesPage() {
+  const { data: session } = useSession()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
   const { toast } = useToast()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -365,10 +368,10 @@ export default function ExpensesPage() {
     )
   }
 
-  const formatCurrency = (amount: number, currency: string = "EUR") => {
+  const formatCurrency = (amount: number, cur?: string) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency,
+      currency: cur || currency,
     }).format(amount)
   }
 
@@ -745,7 +748,7 @@ export default function ExpensesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="amount">Montant (€) *</Label>
+                <Label htmlFor="amount">Montant *</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -944,7 +947,7 @@ export default function ExpensesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-amount">Montant (€) *</Label>
+                <Label htmlFor="edit-amount">Montant *</Label>
                 <Input
                   id="edit-amount"
                   type="number"

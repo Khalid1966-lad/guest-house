@@ -162,6 +162,8 @@ const defaultMenuItemForm = {
 export default function RestaurantPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
   
   // State
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -569,7 +571,7 @@ export default function RestaurantPage() {
                         <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
                       )}
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="font-semibold text-sky-600">{item.price.toLocaleString("fr-FR")} €</span>
+                        <span className="font-semibold text-sky-600">{formatAmount(item.price)}</span>
                         {item.preparationTime && (
                           <span className="text-xs text-gray-500 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
@@ -681,7 +683,7 @@ export default function RestaurantPage() {
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between mb-1">
                   <DollarSign className="w-4 h-4 text-sky-600" />
-                  <span className="text-2xl font-bold">{orderStats.todayRevenue.toLocaleString("fr-FR")} €</span>
+                  <span className="text-2xl font-bold">{formatAmount(orderStats.todayRevenue)}</span>
                 </div>
                 <p className="text-sm text-gray-500">Revenus aujourd'hui</p>
               </CardContent>
@@ -763,7 +765,7 @@ export default function RestaurantPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-right hidden sm:block">
-                            <p className="font-semibold">{order.total.toLocaleString("fr-FR")} €</p>
+                            <p className="font-semibold">{formatAmount(order.total)}</p>
                             <div className="flex gap-1">
                               <Badge className={cn(statusInfo.bg, statusInfo.color, "border-0 text-xs")}>
                                 {statusInfo.label}
@@ -877,7 +879,7 @@ export default function RestaurantPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price">Prix (€) *</Label>
+                <Label htmlFor="price">Prix *</Label>
                 <Input
                   id="price"
                   type="number"
@@ -1033,7 +1035,7 @@ export default function RestaurantPage() {
                   {selectedOrder.items.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
                       <span>{item.quantity}x {item.menuItem.name}</span>
-                      <span>{item.total.toLocaleString("fr-FR")} €</span>
+                      <span>{formatAmount(item.total)}</span>
                     </div>
                   ))}
                 </div>
@@ -1043,7 +1045,7 @@ export default function RestaurantPage() {
               <div className="p-4 bg-sky-50 dark:bg-sky-950 rounded-lg">
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span className="text-sky-600">{selectedOrder.total.toLocaleString("fr-FR")} €</span>
+                  <span className="text-sky-600">{formatAmount(selectedOrder.total)}</span>
                 </div>
               </div>
 

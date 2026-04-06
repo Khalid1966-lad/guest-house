@@ -108,6 +108,8 @@ export default function GuestDetailPage() {
   const { data: session, status } = useSession()
   const params = useParams()
   const router = useRouter()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
   const guestId = params.id as string
 
   const [guest, setGuest] = useState<Guest | null>(null)
@@ -277,7 +279,7 @@ export default function GuestDetailPage() {
                 <Euro className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{guest.totalSpent} €</p>
+                <p className="text-2xl font-bold">{formatAmount(guest.totalSpent)}</p>
                 <p className="text-sm text-gray-500">Total dépensé</p>
               </div>
             </div>
@@ -421,7 +423,7 @@ export default function GuestDetailPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">{booking.totalPrice} €</p>
+                          <p className="font-semibold">{formatAmount(booking.totalPrice)}</p>
                           <Badge className={cn(status.bg, status.color, "border-0")}>
                             {status.label}
                           </Badge>

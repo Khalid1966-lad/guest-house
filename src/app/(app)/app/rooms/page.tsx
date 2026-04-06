@@ -140,6 +140,8 @@ const defaultAmenities = [
 
 export default function RoomsPage() {
   const { data: session, status } = useSession()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
   const [rooms, setRooms] = useState<Room[]>([])
   const [amenities, setAmenities] = useState<Amenity[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -516,7 +518,7 @@ export default function RoomsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-semibold text-sky-600">
-                    {room.basePrice} €<span className="text-sm font-normal text-gray-500">/nuit</span>
+                    {formatAmount(room.basePrice)}<span className="text-sm font-normal text-gray-500">/nuit</span>
                   </span>
                   {room._count && (
                     <span className="text-xs text-gray-400">
@@ -568,19 +570,19 @@ export default function RoomsPage() {
                       <div className="flex items-center gap-2">
                         {room.maxExtraBeds > 0 && (
                           <Badge variant="outline" className="text-xs">
-                            +{room.maxExtraBeds} lit(s) ({room.extraBedPrice}€)
+                            +{room.maxExtraBeds} lit(s) ({formatAmount(room.extraBedPrice)})
                           </Badge>
                         )}
                         {room.babyBedAvailable && (
                           <Badge variant="outline" className="text-xs text-pink-600">
                             <Baby className="w-3 h-3 mr-1" />
-                            {room.babyBedPrice > 0 ? `${room.babyBedPrice}€` : "Gratuit"}
+                            {room.babyBedPrice > 0 ? formatAmount(room.babyBedPrice) : "Gratuit"}
                           </Badge>
                         )}
                         {!room.maxExtraBeds && !room.babyBedAvailable && "-"}
                       </div>
                     </td>
-                    <td className="p-4 font-medium">{room.basePrice} €</td>
+                    <td className="p-4 font-medium">{formatAmount(room.basePrice)}</td>
                     <td className="p-4">{getStatusBadge(room.status)}</td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-2">
@@ -751,7 +753,7 @@ export default function RoomsPage() {
               <h3 className="font-medium">Tarification</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="basePrice">Prix de base (€) *</Label>
+                  <Label htmlFor="basePrice">Prix de base *</Label>
                   <Input
                     id="basePrice"
                     type="number"
@@ -762,7 +764,7 @@ export default function RoomsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="weekendPrice">Prix weekend (€)</Label>
+                  <Label htmlFor="weekendPrice">Prix weekend</Label>
                   <Input
                     id="weekendPrice"
                     type="number"
@@ -782,7 +784,7 @@ export default function RoomsPage() {
                     <Label>Supplément lit supplémentaire</Label>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="extraBedPrice">Prix par lit supplémentaire (€/nuit)</Label>
+                    <Label htmlFor="extraBedPrice">Prix par lit supplémentaire (/nuit)</Label>
                     <Input
                       id="extraBedPrice"
                       type="number"
@@ -810,7 +812,7 @@ export default function RoomsPage() {
               </div>
               {formData.babyBedAvailable && (
                 <div className="space-y-2">
-                  <Label htmlFor="babyBedPrice">Supplément lit bébé (€/nuit)</Label>
+                  <Label htmlFor="babyBedPrice">Supplément lit bébé (/nuit)</Label>
                   <Input
                     id="babyBedPrice"
                     type="number"

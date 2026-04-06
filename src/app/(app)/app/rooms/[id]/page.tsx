@@ -145,6 +145,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export default function RoomDetailsPage() {
   const { data: session } = useSession()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
   const params = useParams()
   const router = useRouter()
   const roomId = params.id as string
@@ -412,7 +414,7 @@ export default function RoomDetailsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-semibold text-sky-600">{price.price} €</span>
+                        <span className="font-semibold text-sky-600">{formatAmount(price.price)}</span>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -442,12 +444,12 @@ export default function RoomDetailsPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Prix de base</span>
-                <span className="text-xl font-bold text-sky-600">{room.basePrice} €</span>
+                <span className="text-xl font-bold text-sky-600">{formatAmount(room.basePrice)}</span>
               </div>
               {room.weekendPrice && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Prix weekend</span>
-                  <span className="font-semibold">{room.weekendPrice} €</span>
+                  <span className="font-semibold">{formatAmount(room.weekendPrice)}</span>
                 </div>
               )}
               <p className="text-xs text-gray-400">Par nuit</p>
@@ -462,7 +464,7 @@ export default function RoomDetailsPage() {
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-gray-400">Max {room.maxExtraBeds} lit(s)</span>
                     <span className="font-medium text-sky-600">
-                      {room.extraBedPrice > 0 ? `+${room.extraBedPrice} €/nuit` : "Gratuit"}
+                      {room.extraBedPrice > 0 ? `+${formatAmount(room.extraBedPrice)}/nuit` : "Gratuit"}
                     </span>
                   </div>
                 </div>
@@ -478,7 +480,7 @@ export default function RoomDetailsPage() {
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-gray-400">Sur demande</span>
                     <span className="font-medium text-pink-600">
-                      {room.babyBedPrice > 0 ? `+${room.babyBedPrice} €/nuit` : "Gratuit"}
+                      {room.babyBedPrice > 0 ? `+${formatAmount(room.babyBedPrice)}/nuit` : "Gratuit"}
                     </span>
                   </div>
                 </div>
@@ -550,7 +552,7 @@ export default function RoomDetailsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="priceAmount">Prix par nuit (€)</Label>
+              <Label htmlFor="priceAmount">Prix par nuit</Label>
               <Input
                 id="priceAmount"
                 type="number"

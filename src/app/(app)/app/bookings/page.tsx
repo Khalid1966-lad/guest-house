@@ -162,6 +162,8 @@ const defaultFormData = {
 export default function BookingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
@@ -841,7 +843,7 @@ export default function BookingsPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
-                          <p className="font-semibold">{booking.totalPrice} €</p>
+                          <p className="font-semibold">{formatAmount(booking.totalPrice)}</p>
                           <Badge className={cn(statusInfo.bg, statusInfo.color, "border-0")}>
                             {statusInfo.label}
                           </Badge>
@@ -972,7 +974,7 @@ export default function BookingsPage() {
               {selectedBooking.extraBeds > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Lits supplémentaires</span>
-                  <span>{selectedBooking.extraBeds} lit{selectedBooking.extraBeds > 1 ? "s" : ""} ({selectedBooking.extraBedPrice}€/nuit)</span>
+                  <span>{selectedBooking.extraBeds} lit{selectedBooking.extraBeds > 1 ? "s" : ""} ({formatAmount(selectedBooking.extraBedPrice)}/nuit)</span>
                 </div>
               )}
 
@@ -983,7 +985,7 @@ export default function BookingsPage() {
                     <Baby className="w-3 h-3" />
                     Lit bébé
                   </span>
-                  <span>{selectedBooking.babyBedPrice > 0 ? `${selectedBooking.babyBedPrice}€/nuit` : "Gratuit"}</span>
+                  <span>{selectedBooking.babyBedPrice > 0 ? `${formatAmount(selectedBooking.babyBedPrice)}/nuit` : "Gratuit"}</span>
                 </div>
               )}
 
@@ -991,11 +993,11 @@ export default function BookingsPage() {
               <div className="p-4 bg-sky-50 dark:bg-sky-950 rounded-lg">
                 <div className="flex justify-between text-sm mb-2">
                   <span>Prix/nuit</span>
-                  <span>{selectedBooking.nightlyRate} €</span>
+                  <span>{formatAmount(selectedBooking.nightlyRate)}</span>
                 </div>
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span className="text-sky-600">{selectedBooking.totalPrice} €</span>
+                  <span className="text-sky-600">{formatAmount(selectedBooking.totalPrice)}</span>
                 </div>
               </div>
 
@@ -1190,7 +1192,7 @@ export default function BookingsPage() {
                 <SelectContent>
                   {rooms.map((room) => (
                     <SelectItem key={room.id} value={room.id}>
-                      Chambre {room.number} - {roomTypes[room.type] || room.type} ({room.capacity} pers.) - {room.basePrice}€/nuit
+                      Chambre {room.number} - {roomTypes[room.type] || room.type} ({room.capacity} pers.) - {formatAmount(room.basePrice)}/nuit
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1268,7 +1270,7 @@ export default function BookingsPage() {
                     <div className="space-y-1">
                       <Label htmlFor="extraBeds">Lit supplémentaire</Label>
                       <p className="text-xs text-gray-500">
-                        {rooms.find(r => r.id === formData.roomId)?.extraBedPrice}€/nuit (max: {rooms.find(r => r.id === formData.roomId)?.maxExtraBeds})
+                        {formatAmount(rooms.find(r => r.id === formData.roomId)?.extraBedPrice || 0)}/nuit (max: {rooms.find(r => r.id === formData.roomId)?.maxExtraBeds})
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1305,7 +1307,7 @@ export default function BookingsPage() {
                       </div>
                       <p className="text-xs text-gray-500">
                         {rooms.find(r => r.id === formData.roomId)?.babyBedPrice > 0 
-                          ? `${rooms.find(r => r.id === formData.roomId)?.babyBedPrice}€/nuit` 
+                          ? `${formatAmount(rooms.find(r => r.id === formData.roomId)?.babyBedPrice || 0)}/nuit` 
                           : "Gratuit"}
                       </p>
                     </div>
@@ -1324,7 +1326,7 @@ export default function BookingsPage() {
               <h3 className="font-medium">Tarification</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nightlyRate">Prix par nuit (€)</Label>
+                  <Label htmlFor="nightlyRate">Prix par nuit</Label>
                   <Input
                     id="nightlyRate"
                     type="number"
@@ -1352,24 +1354,24 @@ export default function BookingsPage() {
               {calculateTotal() > 0 && (
                 <div className="p-3 bg-sky-50 dark:bg-sky-950 rounded-lg space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Hébergement ({calculateNights()} nuits × {formData.nightlyRate}€)</span>
-                    <span>{calculateNights() * (parseFloat(formData.nightlyRate) || 0)}€</span>
+                    <span>Hébergement ({calculateNights()} nuits × {formData.nightlyRate})</span>
+                    <span>{formatAmount(calculateNights() * (parseFloat(formData.nightlyRate) || 0))}</span>
                   </div>
                   {parseInt(formData.extraBeds || "0") > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span>Lit(s) supplémentaire(s) ({formData.extraBeds} × {rooms.find(r => r.id === formData.roomId)?.extraBedPrice}€ × {calculateNights()} nuits)</span>
-                      <span>{parseInt(formData.extraBeds || "0") * (rooms.find(r => r.id === formData.roomId)?.extraBedPrice || 0) * calculateNights()}€</span>
+                      <span>Lit(s) supplémentaire(s) ({formData.extraBeds} × {rooms.find(r => r.id === formData.roomId)?.extraBedPrice} × {calculateNights()} nuits)</span>
+                      <span>{formatAmount(parseInt(formData.extraBeds || "0") * (rooms.find(r => r.id === formData.roomId)?.extraBedPrice || 0) * calculateNights())}</span>
                     </div>
                   )}
                   {formData.babyBed && (rooms.find(r => r.id === formData.roomId)?.babyBedPrice || 0) > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span>Lit bébé ({rooms.find(r => r.id === formData.roomId)?.babyBedPrice}€ × {calculateNights()} nuits)</span>
-                      <span>{(rooms.find(r => r.id === formData.roomId)?.babyBedPrice || 0) * calculateNights()}€</span>
+                      <span>Lit bébé ({rooms.find(r => r.id === formData.roomId)?.babyBedPrice} × {calculateNights()} nuits)</span>
+                      <span>{formatAmount((rooms.find(r => r.id === formData.roomId)?.babyBedPrice || 0) * calculateNights())}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-sky-600 border-t pt-2">
                     <span>Total</span>
-                    <span>{calculateTotal()} €</span>
+                    <span>{formatAmount(calculateTotal())}</span>
                   </div>
                 </div>
               )}

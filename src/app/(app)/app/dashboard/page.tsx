@@ -83,6 +83,7 @@ interface Statistics {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
   const [stats, setStats] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("month")
@@ -110,7 +111,7 @@ export default function DashboardPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "EUR",
+      currency: currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount)

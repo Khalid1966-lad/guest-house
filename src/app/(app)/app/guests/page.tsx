@@ -90,6 +90,8 @@ const defaultFormData = {
 export default function GuestsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const formatAmount = (amount: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
   const [guests, setGuests] = useState<Guest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -449,7 +451,7 @@ export default function GuestsPage() {
                     </div>
                     <div className="text-center">
                       <p className="font-semibold text-sky-600">
-                        {guest.totalSpent > 0 ? `${guest.totalSpent} €` : "-"}
+                        {guest.totalSpent > 0 ? formatAmount(guest.totalSpent) : "-"}
                       </p>
                       <p className="text-xs text-gray-500">Total</p>
                     </div>

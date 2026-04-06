@@ -22,6 +22,7 @@ declare module "next-auth" {
       guestHouseId: string | null
       guestHouseSlug: string | null
       guestHouseName: string | null
+      guestHouseCurrency: string
     }
   }
   interface User {
@@ -30,6 +31,7 @@ declare module "next-auth" {
     guestHouseId: string | null
     guestHouseSlug?: string | null
     guestHouseName?: string | null
+    guestHouseCurrency?: string
   }
 }
 
@@ -40,6 +42,7 @@ declare module "next-auth/jwt" {
     guestHouseId: string | null
     guestHouseSlug?: string | null
     guestHouseName?: string | null
+    guestHouseCurrency?: string
   }
 }
 
@@ -71,6 +74,7 @@ export const authOptions: NextAuthOptions = {
             guestHouseId: null,
             guestHouseSlug: null,
             guestHouseName: null,
+            guestHouseCurrency: "EUR",
           }
         }
 
@@ -118,6 +122,7 @@ export const authOptions: NextAuthOptions = {
             guestHouseId: null,
             guestHouseSlug: null,
             guestHouseName: null,
+            guestHouseCurrency: "EUR",
           }
         }
 
@@ -135,6 +140,7 @@ export const authOptions: NextAuthOptions = {
           guestHouseId: user.guestHouseId,
           guestHouseSlug: user.guestHouse.slug,
           guestHouseName: user.guestHouse.name,
+          guestHouseCurrency: user.guestHouse.currency || "EUR",
         }
       }
     })
@@ -160,6 +166,7 @@ export const authOptions: NextAuthOptions = {
         token.guestHouseId = user.guestHouseId ?? null
         token.guestHouseSlug = user.guestHouseSlug ?? null
         token.guestHouseName = user.guestHouseName ?? null
+        token.guestHouseCurrency = user.guestHouseCurrency || "EUR"
       }
 
       if (trigger === "update" && session) {
@@ -176,6 +183,7 @@ export const authOptions: NextAuthOptions = {
         session.user.guestHouseId = token.guestHouseId ?? null
         session.user.guestHouseSlug = token.guestHouseSlug ?? null
         session.user.guestHouseName = token.guestHouseName ?? null
+        session.user.guestHouseCurrency = token.guestHouseCurrency || "EUR"
       }
       return session
     }

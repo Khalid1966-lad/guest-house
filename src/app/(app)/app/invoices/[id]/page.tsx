@@ -113,6 +113,11 @@ const paymentMethods: Record<string, string> = {
 
 export default function InvoiceDetailPage() {
   const { data: session, status } = useSession()
+  const currency = session?.user?.guestHouseCurrency || "EUR"
+  const currencySymbol = new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(0).replace(/[\d\s.,]+/, "").trim()
+  const formatAmount = (amount: number): string => {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(amount)
+  }
   const router = useRouter()
   const params = useParams()
   const invoiceId = params.id as string
@@ -357,8 +362,8 @@ export default function InvoiceDetailPage() {
                   ${item.taxRate > 0 ? `<br><small style="color: #666;">TVA: ${item.taxRate}%</small>` : ""}
                 </td>
                 <td class="text-center">${item.quantity}</td>
-                <td class="text-right">${item.unitPrice.toLocaleString("fr-FR")} €</td>
-                <td class="text-right"><strong>${item.total.toLocaleString("fr-FR")} €</strong></td>
+                <td class="text-right">${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(item.unitPrice)}</td>
+                <td class="text-right"><strong>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(item.total)}</strong></td>
               </tr>
             `).join("")}
           </tbody>
@@ -367,33 +372,33 @@ export default function InvoiceDetailPage() {
         <div class="totals">
           <div class="total-row">
             <span>Sous-total</span>
-            <span>${invoice.subtotal.toLocaleString("fr-FR")} €</span>
+            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.subtotal)}</span>
           </div>
           ${invoice.taxes > 0 ? `
           <div class="total-row">
             <span>TVA</span>
-            <span>${invoice.taxes.toLocaleString("fr-FR")} €</span>
+            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.taxes)}</span>
           </div>
           ` : ""}
           ${invoice.discount > 0 ? `
           <div class="total-row">
             <span>Remise</span>
-            <span style="color: #16a34a;">-${invoice.discount.toLocaleString("fr-FR")} €</span>
+            <span style="color: #16a34a;">-${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.discount)}</span>
           </div>
           ` : ""}
           <div class="total-row main">
             <span>Total</span>
-            <span class="amount">${invoice.total.toLocaleString("fr-FR")} €</span>
+            <span class="amount">${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.total)}</span>
           </div>
           ${invoice.paidAmount > 0 ? `
           <div class="total-row paid">
             <span>Payé</span>
-            <span>${invoice.paidAmount.toLocaleString("fr-FR")} €</span>
+            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.paidAmount)}</span>
           </div>
           ${invoice.remainingAmount > 0 ? `
           <div class="total-row remaining">
             <span>Reste à payer</span>
-            <span>${invoice.remainingAmount.toLocaleString("fr-FR")} €</span>
+            <span>${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "${currency}" }).format(invoice.remainingAmount)}</span>
           </div>
           ` : ""}
           ` : ""}
@@ -605,8 +610,8 @@ export default function InvoiceDetailPage() {
                       )}
                     </td>
                     <td className="p-3 text-center print:text-black">{item.quantity}</td>
-                    <td className="p-3 text-right print:text-black">{item.unitPrice.toLocaleString("fr-FR")} €</td>
-                    <td className="p-3 text-right font-medium print:text-black">{item.total.toLocaleString("fr-FR")} €</td>
+                    <td className="p-3 text-right print:text-black">{formatAmount(item.unitPrice)}</td>
+                    <td className="p-3 text-right font-medium print:text-black">{formatAmount(item.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -618,24 +623,24 @@ export default function InvoiceDetailPage() {
             <div className="w-72 space-y-2">
               <div className="flex justify-between print:text-black">
                 <span className="text-gray-500 print:text-gray-600">Sous-total</span>
-                <span>{invoice.subtotal.toLocaleString("fr-FR")} €</span>
+                <span>{formatAmount(invoice.subtotal)}</span>
               </div>
               {invoice.taxes > 0 && (
                 <div className="flex justify-between print:text-black">
                   <span className="text-gray-500 print:text-gray-600">TVA</span>
-                  <span>{invoice.taxes.toLocaleString("fr-FR")} €</span>
+                  <span>{formatAmount(invoice.taxes)}</span>
                 </div>
               )}
               {invoice.discount > 0 && (
                 <div className="flex justify-between text-green-600 print:text-green-700">
                   <span>Remise</span>
-                  <span>-{invoice.discount.toLocaleString("fr-FR")} €</span>
+                  <span>-{formatAmount(invoice.discount)}</span>
                 </div>
               )}
               <Separator className="print:border-gray-300" />
               <div className="flex justify-between text-lg font-bold print:text-black">
                 <span>Total</span>
-                <span className="text-sky-600 print:text-sky-600">{invoice.total.toLocaleString("fr-FR")} €</span>
+                <span className="text-sky-600 print:text-sky-600">{formatAmount(invoice.total)}</span>
               </div>
 
               {/* Payment Status */}
@@ -644,12 +649,12 @@ export default function InvoiceDetailPage() {
                   <Separator className="print:border-gray-300" />
                   <div className="flex justify-between text-green-600 print:text-green-700">
                     <span>Payé</span>
-                    <span>{invoice.paidAmount.toLocaleString("fr-FR")} €</span>
+                    <span>{formatAmount(invoice.paidAmount)}</span>
                   </div>
                   {invoice.remainingAmount > 0 && (
                     <div className="flex justify-between text-orange-600 print:text-orange-700">
                       <span>Reste à payer</span>
-                      <span>{invoice.remainingAmount.toLocaleString("fr-FR")} €</span>
+                      <span>{formatAmount(invoice.remainingAmount)}</span>
                     </div>
                   )}
                 </>
@@ -673,7 +678,7 @@ export default function InvoiceDetailPage() {
                 {invoice.payments.map((payment) => (
                   <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div>
-                      <p className="font-medium">{payment.amount.toLocaleString("fr-FR")} €</p>
+                      <p className="font-medium">{formatAmount(payment.amount)}</p>
                       <p className="text-sm text-gray-500">
                         {paymentMethods[payment.method] || payment.method}
                         {payment.transactionId && ` - ${payment.transactionId}`}
