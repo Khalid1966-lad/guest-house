@@ -160,6 +160,7 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      // On sign-in: populate token from user object (fetched from DB in authorize)
       if (user) {
         token.id = user.id
         token.role = user.role
@@ -169,8 +170,36 @@ export const authOptions: NextAuthOptions = {
         token.guestHouseCurrency = user.guestHouseCurrency || "EUR"
       }
 
+      // On session.update(): explicitly merge each field (avoid spread issues)
       if (trigger === "update" && session) {
-        token = { ...token, ...session }
+        if (session.guestHouseCurrency !== undefined) {
+          token.guestHouseCurrency = session.guestHouseCurrency
+        }
+        if (session.guestHouseId !== undefined) {
+          token.guestHouseId = session.guestHouseId
+        }
+        if (session.guestHouseSlug !== undefined) {
+          token.guestHouseSlug = session.guestHouseSlug
+        }
+        if (session.guestHouseName !== undefined) {
+          token.guestHouseName = session.guestHouseName
+        }
+      }
+
+      // Safety net: if we have a guestHouseId, always refresh currency from DB
+      // This ensures that even if the JWT was stale, we get the latest value
+      if (token.guestHouseId && user) {
+        try {
+          const guestHouse = await db.guestHouse.findUnique({
+            where: { id: token.guestHouseId as string },
+            select: { currency: true },
+          })
+          if (guestHouse?.currency) {
+            token.guestHouseCurrency = guestHouse.currency
+          }
+        } catch {
+          // Silently fail — keep existing token value
+        }
       }
 
       return token
@@ -178,12 +207,12 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id
-        session.user.role = token.role
-        session.user.guestHouseId = token.guestHouseId ?? null
-        session.user.guestHouseSlug = token.guestHouseSlug ?? null
-        session.user.guestHouseName = token.guestHouseName ?? null
-        session.user.guestHouseCurrency = token.guestHouseCurrency || "EUR"
+        session.user.id = token.id as string
+        session.user.role = token.role as string
+        session.user.guestHouseId = token.guestHouseId as string | null
+        session.user.guestHouseSlug = token.guestHouseSlug as string | null
+        session.user.guestHouseName = token.guestHouseName as string | null
+        session.user.guestHouseCurrency = (token.guestHouseCurrency as string) || "EUR"
       }
       return session
     }

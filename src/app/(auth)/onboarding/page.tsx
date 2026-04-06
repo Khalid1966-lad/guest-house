@@ -152,6 +152,7 @@ function OnboardingForm() {
         guestHouseId: data.guestHouse.id,
         guestHouseSlug: data.guestHouse.slug,
         guestHouseName: data.guestHouse.name,
+        guestHouseCurrency: formData.currency || "EUR",
       })
 
       setIsSuccess(true)
