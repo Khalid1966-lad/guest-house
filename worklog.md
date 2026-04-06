@@ -48,3 +48,52 @@ Stage Summary:
 - GIF files are converted to static WebP images
 - Lint passes with no errors
 - Sharp v0.34.5 verified working in environment
+
+---
+Task ID: 2
+Agent: Main
+Task: Invoice layout changes - enlarge logo, remove header contact info, add legal footer fields
+
+Work Log:
+- Fixed ICE input in establishment settings: 15 digits only, no spaces, validation with red border
+- Enlarged logo in invoice detail page: 64px → 96px on screen, 80px → 120px in print template
+- Removed address, phone, email from invoice footer (both screen view and print template)
+- Added print-only footer with legal info (ICE, IF, CNSS) for direct Ctrl+P printing
+- Legal info styling improved in print template
+
+Stage Summary:
+- ICE field: auto-strips spaces/non-digits, maxLength 15, red border if != 15 digits
+- Invoice logo: enlarged to 96px (screen) / 120px (print)
+- Invoice footer: only shows guesthouse name + ICE/IF/CNSS (no more address/phone/email)
+- Both print template (new window) and direct print (Ctrl+P) updated
+
+---
+Task ID: 3
+Agent: Main
+Task: Collapsible sidebar + comprehensive user guide
+
+Work Log:
+- Created zustand sidebar store (`src/stores/sidebar-store.ts`) for shared collapsed state
+- Rewrote sidebar component with collapsible functionality:
+  - Toggle button (chevron) on the sidebar edge to collapse/expand
+  - When collapsed: shows only icons with tooltips on hover
+  - Smooth CSS transitions (300ms) for width animation
+  - User menu adapts: avatar-only in collapsed, full info when expanded
+- Updated app layout to use dynamic padding based on collapsed state
+- Added "Guide" entry to sidebar navigation with HelpCircle icon
+- Created comprehensive user guide page (`/app/guide/page.tsx`) with:
+  - 11 sections covering all app features
+  - Modern accordion design with color-coded section icons
+  - Full-text search across all guide content
+  - Quick navigation chips at the top
+  - Step-by-step instructions for key workflows
+  - Tips, warnings, and feature lists
+  - Glossary of technical terms
+  - Written in clear, beginner-friendly French
+
+Stage Summary:
+- Sidebar collapses to 68px icons-only mode with tooltips
+- Toggle via floating chevron button on sidebar edge
+- Layout smoothly adapts main content area
+- User guide covers: Bienvenue, Dashboard, Chambres, Réservations, Clients, Facturation, Restaurant, Dépenses, Statistiques, Paramètres, Interface, Glossaire
+- Lint passes with no errors
