@@ -76,3 +76,21 @@ Stage Summary:
 - Bell icon in header now shows unread count and opens dropdown with notification list
 - Users can mark individual or all notifications as read, and delete notifications
 - Time displayed in French using date-fns locale
+
+---
+Task ID: v2.2.0-release
+Agent: Main
+Task: Create version v2.2.0 and update all instances including footers
+
+Work Log:
+- Updated `src/lib/version.ts`: version v1.9.2 → v2.2.0, date 2026-07-04, COPYRIGHT_YEAR → 2026
+- Updated `src/app/(app)/app/layout.tsx`: replaced inline footer with `AppFooter` component from `src/components/layout/footer.tsx`
+- AppFooter now displays: version monospace, "PMS Guest House", Jazel Web Agency credit, copyright © 2026
+- Ran lint check — passed
+- Committed and pushed to origin/main (bf63df1)
+
+Stage Summary:
+- Version v2.2.0 created and pushed
+- All three footers (Landing, Auth, App/Dashboard) now use the same version constants
+- COPYRIGHT_YEAR updated to 2026 across all footers
+- Dashboard footer upgraded from simple inline to full AppFooter with Jazel Web Agency credits
