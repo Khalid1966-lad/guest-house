@@ -53,3 +53,26 @@ Stage Summary:
 - All RBAC infrastructure was already built in previous sessions
 - No additional backend or frontend pages needed to be created
 - Only sidebar entry and guide update were needed
+
+---
+Task ID: notification-system
+Agent: Main
+Task: Implement in-app notification system (Option A)
+
+Work Log:
+- Added Notification model to Prisma schema (schema.prisma, schema.sqlite.prisma, schema.postgresql.prisma)
+- Pushed schema to local SQLite DB successfully
+- Created notification service at src/lib/notifications.ts with helper functions for all event types
+- Created API routes: GET/POST /api/notifications, PATCH/DELETE /api/notifications/[id], POST /api/notifications/mark-all-read
+- Built NotificationBell component with dropdown, unread count badge, notification list, mark-as-read, delete
+- Replaced dead bell icon in Header with functional NotificationBell component
+- Wired notification triggers into: bookings (create, check-in, check-out, cancel), invoices (create), restaurant-orders (create)
+- Polling every 30 seconds when popover is closed
+- All lint checks pass
+
+Stage Summary:
+- Full in-app notification system implemented
+- Notifications fire automatically on: new booking, check-in, check-out, booking cancellation, new invoice, new restaurant order
+- Bell icon in header now shows unread count and opens dropdown with notification list
+- Users can mark individual or all notifications as read, and delete notifications
+- Time displayed in French using date-fns locale

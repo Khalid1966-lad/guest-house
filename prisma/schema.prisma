@@ -54,6 +54,7 @@ model GuestHouse {
   auditLogs      AuditLog[]
   settings       GuestHouseSetting?
   roles          Role[]
+  notifications  Notification[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -120,6 +121,7 @@ model User {
   bookingsCreated Booking[] @relation("BookingsCreatedBy")
   checkIns      Booking[] @relation("CheckInsBy")
   checkOuts     Booking[] @relation("CheckOutsBy")
+  notifications Notification[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -591,6 +593,33 @@ model Expense {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+model Notification {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  userId        String?
+  user          User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type          String   // new_booking, check_in, check_out, cancelled, new_invoice, payment_received, etc.
+  title         String
+  message       String
+  
+  entityType    String?  // booking, invoice, guest, room, etc.
+  entityId      String?
+  
+  isRead        Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([guestHouseId, isRead])
+  @@index([userId, isRead])
+  @@index([createdAt])
 }
 
 // ============================================

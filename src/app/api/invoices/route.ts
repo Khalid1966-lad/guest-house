@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { Prisma } from "@prisma/client"
+import { notifyNewInvoice } from "@/lib/notifications"
 
 // GET - Récupérer toutes les factures de la maison d'hôtes
 export async function GET(request: NextRequest) {
@@ -297,6 +298,16 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Trigger notification (fire-and-forget)
+    notifyNewInvoice({
+      guestHouseId: session.user.guestHouseId,
+      userId: session.user.id,
+      invoiceNumber: invoice.invoiceNumber,
+      guestName: `${invoice.guest.firstName} ${invoice.guest.lastName}`,
+      total: invoice.total,
+      invoiceId: invoice.id,
+    }).catch(console.error)
 
     return NextResponse.json({ invoice }, { status: 201 })
   } catch (error) {

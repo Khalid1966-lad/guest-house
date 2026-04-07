@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { notifyCheckIn, notifyCheckOut, notifyBookingCancelled } from "@/lib/notifications"
 
 // GET - Get a single booking
 export async function GET(
@@ -256,6 +257,23 @@ export async function PATCH(
         room: true,
       },
     })
+
+    // Trigger notifications based on status change (fire-and-forget)
+    const guestName = `${booking.guest.firstName} ${booking.guest.lastName}`
+    const roomNumber = booking.room.number
+    const notifParams = {
+      guestHouseId: session.user.guestHouseId,
+      userId: session.user.id,
+      bookingId: booking.id,
+    }
+
+    if (status === "checked_in") {
+      notifyCheckIn({ ...notifParams, guestName, roomNumber }).catch(console.error)
+    } else if (status === "checked_out") {
+      notifyCheckOut({ ...notifParams, guestName, roomNumber }).catch(console.error)
+    } else if (status === "cancelled") {
+      notifyBookingCancelled({ ...notifParams, guestName, roomNumber, reason: body.reason }).catch(console.error)
+    }
 
     return NextResponse.json({ booking })
   } catch (error) {

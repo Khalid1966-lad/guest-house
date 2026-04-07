@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { Prisma } from "@prisma/client"
+import { notifyNewRestaurantOrder } from "@/lib/notifications"
 
 // GET - Récupérer toutes les commandes restaurant de la maison d'hôtes
 export async function GET(request: NextRequest) {
@@ -177,6 +178,17 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // Trigger notification (fire-and-forget)
+    notifyNewRestaurantOrder({
+      guestHouseId: session.user.guestHouseId,
+      userId: session.user.id,
+      orderType: order.orderType,
+      guestName: order.guestName || undefined,
+      roomNumber: order.tableNumber || undefined,
+      total: order.total,
+      orderId: order.id,
+    }).catch(console.error)
 
     return NextResponse.json({ order }, { status: 201 })
   } catch (error) {

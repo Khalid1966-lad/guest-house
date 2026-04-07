@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { Prisma } from "@prisma/client"
+import { notifyNewBooking } from "@/lib/notifications"
 
 // GET - Récupérer toutes les réservations de la maison d'hôtes
 export async function GET(request: NextRequest) {
@@ -287,6 +288,17 @@ export async function POST(request: NextRequest) {
         room: true,
       },
     })
+
+    // Trigger notification (fire-and-forget)
+    notifyNewBooking({
+      guestHouseId: session.user.guestHouseId,
+      userId: session.user.id,
+      guestName: `${booking.guest.firstName} ${booking.guest.lastName}`,
+      roomNumber: booking.room.number,
+      checkIn: booking.checkIn.toLocaleDateString("fr-FR"),
+      checkOut: booking.checkOut.toLocaleDateString("fr-FR"),
+      bookingId: booking.id,
+    }).catch(console.error)
 
     return NextResponse.json({ booking }, { status: 201 })
   } catch (error) {

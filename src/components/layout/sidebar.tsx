@@ -40,7 +40,6 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
-  Bell,
   Moon,
   Sun,
   Shield,
@@ -51,6 +50,7 @@ import {
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useSidebarStore } from "@/stores/sidebar-store"
+import { NotificationBell } from "@/components/notification-bell"
 
 // ─── Nav Item with color & animation ─────────────────────────────────────
 
@@ -531,11 +531,8 @@ export function Header() {
     <header className="h-16 border-b bg-white dark:bg-gray-900 flex items-center justify-between px-4 lg:px-6">
       <div className="lg:hidden w-10" />
       <div className="flex-1" />
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </Button>
+      <div className="flex items-center gap-2">
+        <NotificationBell />
       </div>
     </header>
   )
