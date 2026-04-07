@@ -247,6 +247,13 @@ export default function InvoiceDetailPage() {
             color: #000;
             padding: 2cm;
           }
+          @media print {
+            body { padding: 2cm; }
+            @page { 
+              size: A4; 
+              margin: 0; 
+            }
+          }
           .header { 
             display: flex; 
             justify-content: space-between; 
@@ -347,10 +354,6 @@ export default function InvoiceDetailPage() {
             font-size: 0.8rem;
             color: #555;
             line-height: 1.6;
-          }
-          @media print {
-            body { padding: 0; }
-            @page { size: A4; margin: 1.5cm; }
           }
         </style>
       </head>

@@ -207,10 +207,10 @@
     page-break-inside: avoid;
   }
 
-  /* A4 paper size */
+  /* A4 paper size — margin 0 removes browser header/footer */
   @page {
     size: A4;
-    margin: 1.5cm;
+    margin: 0;
   }
 
   /* Links */
