@@ -94,3 +94,30 @@ Stage Summary:
 - All three footers (Landing, Auth, App/Dashboard) now use the same version constants
 - COPYRIGHT_YEAR updated to 2026 across all footers
 - Dashboard footer upgraded from simple inline to full AppFooter with Jazel Web Agency credits
+
+---
+Task ID: restaurant-order-creation
+Agent: Main + full-stack-developer
+Task: Add order creation UI to restaurant page - link orders to rooms/clients
+
+Work Log:
+- Analyzed existing restaurant page: menu CRUD existed, order listing existed, but NO order creation UI
+- API endpoint POST /api/restaurant-orders already existed with full support for roomId, bookingId, guestName, items
+- Added ActiveBooking interface for type-safe booking data
+- Added 13 new state variables for the order creation form
+- Added 3 computed useMemo values (availableMenuItems, newOrderTotal, selectedBooking)
+- Added 7 handler functions (handleOpenNewOrder, handleBookingSelect, handleAddOrderItem, handleRemoveOrderItem, handleUpdateItemQuantity, handleSaveNewOrder)
+- Created full New Order dialog with 3 order types: Room Service, Dine-in, Takeaway
+- Room Service: fetches checked_in bookings, select by room → auto-fills guest name
+- Dine-in: enter table number + optional guest name
+- Takeaway: enter guest name
+- Menu item browser with search, category filter, quantity +/-
+- Order summary with running total
+- Added "Nouvelle commande" button in Orders tab header and empty state
+- All lint checks pass
+
+Stage Summary:
+- Restaurant orders can now be created directly from the dashboard
+- Orders are linked to rooms/bookings (room service) or tables/guests
+- When a booking is selected, guest name is auto-filled from booking data
+- Only available menu items are shown in the order form

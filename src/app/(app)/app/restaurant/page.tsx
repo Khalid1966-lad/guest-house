@@ -64,7 +64,12 @@ import {
   ShoppingCart,
   Play,
   Pause,
+  BedDouble,
+  DoorOpen,
+  ShoppingBag,
+  Minus,
 } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -119,6 +124,28 @@ interface RestaurantOrder {
   readyAt: string | null
   deliveredAt: string | null
   items: OrderItem[]
+}
+
+interface ActiveBooking {
+  id: string
+  roomId: string
+  guestId: string
+  checkIn: string
+  checkOut: string
+  status: string
+  guest: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    phone: string | null
+  }
+  room: {
+    id: string
+    number: string
+    name: string | null
+    type: string
+  }
 }
 
 // Categories
@@ -190,6 +217,21 @@ export default function RestaurantPage() {
   const [selectedOrder, setSelectedOrder] = useState<RestaurantOrder | null>(null)
   const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false)
 
+  // New order form state
+  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false)
+  const [activeBookings, setActiveBookings] = useState<ActiveBooking[]>([])
+  const [isBookingsLoading, setIsBookingsLoading] = useState(false)
+  const [newOrderType, setNewOrderType] = useState<"room" | "table" | "takeaway">("room")
+  const [selectedBookingId, setSelectedBookingId] = useState("")
+  const [newOrderGuestName, setNewOrderGuestName] = useState("")
+  const [newOrderTableNumber, setNewOrderTableNumber] = useState("")
+  const [newOrderNotes, setNewOrderNotes] = useState("")
+  const [newOrderItems, setNewOrderItems] = useState<{ menuItemId: string; quantity: number; notes: string }[]>([])
+  const [orderMenuSearch, setOrderMenuSearch] = useState("")
+  const [orderMenuCategory, setOrderMenuCategory] = useState("all")
+  const [isNewOrderSaving, setIsNewOrderSaving] = useState(false)
+  const [newOrderError, setNewOrderError] = useState("")
+
   // Filtered menu items
   const filteredMenuItems = useMemo(() => {
     return menuItems.filter((item) => {
@@ -227,6 +269,27 @@ export default function RestaurantPage() {
       .filter((o) => format(parseISO(o.orderDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd"))
       .reduce((sum, o) => sum + o.total, 0),
   }), [orders])
+
+  // Available menu items for order
+  const availableMenuItems = useMemo(() => {
+    return menuItems
+      .filter((item) => item.isAvailable)
+      .filter((item) => orderMenuCategory === "all" || item.category === orderMenuCategory)
+      .filter((item) => !orderMenuSearch || item.name.toLowerCase().includes(orderMenuSearch.toLowerCase()))
+  }, [menuItems, orderMenuCategory, orderMenuSearch])
+
+  // New order total
+  const newOrderTotal = useMemo(() => {
+    return newOrderItems.reduce((sum, item) => {
+      const menuItem = menuItems.find((m) => m.id === item.menuItemId)
+      return sum + (menuItem ? menuItem.price * item.quantity : 0)
+    }, 0)
+  }, [newOrderItems, menuItems])
+
+  // Selected booking info
+  const selectedBooking = useMemo(() => {
+    return activeBookings.find((b) => b.id === selectedBookingId) || null
+  }, [activeBookings, selectedBookingId])
 
   // Fetch data
   const fetchData = async () => {
@@ -395,6 +458,130 @@ export default function RestaurantPage() {
   const handleViewOrder = (order: RestaurantOrder) => {
     setSelectedOrder(order)
     setIsOrderDetailOpen(true)
+  }
+
+  // New order handlers
+  const handleOpenNewOrder = async () => {
+    setNewOrderType("room")
+    setSelectedBookingId("")
+    setNewOrderGuestName("")
+    setNewOrderTableNumber("")
+    setNewOrderNotes("")
+    setNewOrderItems([])
+    setOrderMenuSearch("")
+    setOrderMenuCategory("all")
+    setNewOrderError("")
+    setIsNewOrderOpen(true)
+    
+    // Fetch active bookings (checked_in)
+    setIsBookingsLoading(true)
+    try {
+      const res = await fetch("/api/bookings?status=checked_in")
+      if (res.ok) {
+        const data = await res.json()
+        setActiveBookings(data.bookings || [])
+      }
+    } catch (err) {
+      console.error("Erreur chargement réservations:", err)
+    } finally {
+      setIsBookingsLoading(false)
+    }
+  }
+
+  const handleBookingSelect = (bookingId: string) => {
+    setSelectedBookingId(bookingId)
+    const booking = activeBookings.find((b) => b.id === bookingId)
+    if (booking) {
+      setNewOrderGuestName(`${booking.guest.firstName} ${booking.guest.lastName}`)
+    }
+  }
+
+  const handleAddOrderItem = (menuItemId: string) => {
+    const existing = newOrderItems.find((item) => item.menuItemId === menuItemId)
+    if (existing) {
+      setNewOrderItems(newOrderItems.map((item) =>
+        item.menuItemId === menuItemId ? { ...item, quantity: item.quantity + 1 } : item
+      ))
+    } else {
+      setNewOrderItems([...newOrderItems, { menuItemId, quantity: 1, notes: "" }])
+    }
+  }
+
+  const handleRemoveOrderItem = (menuItemId: string) => {
+    setNewOrderItems(newOrderItems.filter((item) => item.menuItemId !== menuItemId))
+  }
+
+  const handleUpdateItemQuantity = (menuItemId: string, quantity: number) => {
+    if (quantity <= 0) {
+      handleRemoveOrderItem(menuItemId)
+      return
+    }
+    setNewOrderItems(newOrderItems.map((item) =>
+      item.menuItemId === menuItemId ? { ...item, quantity } : item
+    ))
+  }
+
+  const handleSaveNewOrder = async () => {
+    setNewOrderError("")
+
+    if (newOrderItems.length === 0) {
+      setNewOrderError("Ajoutez au moins un article à la commande")
+      return
+    }
+
+    if (newOrderType === "room" && !selectedBookingId) {
+      setNewOrderError("Sélectionnez une réservation (chambre)")
+      return
+    }
+
+    if (newOrderType === "table" && !newOrderTableNumber) {
+      setNewOrderError("Indiquez le numéro de table")
+      return
+    }
+
+    if (newOrderType === "takeaway" && !newOrderGuestName) {
+      setNewOrderError("Indiquez le nom du client")
+      return
+    }
+
+    setIsNewOrderSaving(true)
+
+    try {
+      const booking = activeBookings.find((b) => b.id === selectedBookingId)
+      
+      const response = await fetch("/api/restaurant-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderType: newOrderType,
+          roomId: booking?.roomId || null,
+          bookingId: booking?.id || null,
+          tableNumber: newOrderType === "table" ? newOrderTableNumber : null,
+          guestName: newOrderGuestName || null,
+          notes: newOrderNotes || null,
+          items: newOrderItems.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            notes: item.notes || null,
+          })),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        setNewOrderError(errorData.error || "Erreur lors de la création de la commande")
+        setIsNewOrderSaving(false)
+        return
+      }
+
+      setIsNewOrderOpen(false)
+      setIsNewOrderSaving(false)
+      setActiveTab("orders")
+      fetchData()
+    } catch (err) {
+      setNewOrderError("Une erreur inattendue s'est produite")
+      setIsNewOrderSaving(false)
+    }
   }
 
   if (status === "loading" || isLoading) {
@@ -718,22 +905,34 @@ export default function RestaurantPage() {
 
           {/* Orders List */}
           <Card>
-            <CardHeader>
-              <CardTitle>Commandes</CardTitle>
-              <CardDescription>
-                {filteredOrders.length} commande{filteredOrders.length > 1 ? "s" : ""}
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle>Commandes</CardTitle>
+                <CardDescription>
+                  {filteredOrders.length} commande{filteredOrders.length > 1 ? "s" : ""}
+                </CardDescription>
+              </div>
+              <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleOpenNewOrder}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nouvelle commande
+              </Button>
             </CardHeader>
             <CardContent>
               {filteredOrders.length === 0 ? (
                 <div className="text-center py-12">
                   <ShoppingCart className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                   <h3 className="text-lg font-medium">Aucune commande</h3>
-                  <p className="text-gray-500">
+                  <p className="text-gray-500 mb-4">
                     {orderStatusFilter !== "all"
                       ? "Aucune commande avec ce statut"
-                      : "Les nouvelles commandes apparaîtront ici"}
+                      : "Créez votre première commande restaurant"}
                   </p>
+                  {orderStatusFilter === "all" && (
+                    <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleOpenNewOrder}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nouvelle commande
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1100,6 +1299,255 @@ export default function RestaurantPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* New Order Dialog */}
+      <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-orange-600" />
+              Nouvelle commande
+            </DialogTitle>
+            <DialogDescription>
+              Créez une commande pour un client ou une chambre
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-5 py-4">
+            {newOrderError && (
+              <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-950 rounded-lg">
+                {newOrderError}
+              </div>
+            )}
+
+            {/* Order Type Selection */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: "room" as const, label: "Service en chambre", icon: BedDouble, desc: "Commande livrée à la chambre" },
+                { value: "table" as const, label: "Sur place", icon: UtensilsCrossed, desc: "Commande à table" },
+                { value: "takeaway" as const, label: "À emporter", icon: DoorOpen, desc: "Commande à emporter" },
+              ].map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => { setNewOrderType(type.value) }}
+                  className={cn(
+                    "p-4 rounded-lg border-2 text-left transition-all",
+                    newOrderType === type.value
+                      ? "border-orange-500 bg-orange-50 dark:bg-orange-950"
+                      : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                  )}
+                >
+                  <type.icon className={cn("w-6 h-6 mb-2", newOrderType === type.value ? "text-orange-600" : "text-gray-400")} />
+                  <p className={cn("font-medium text-sm", newOrderType === type.value ? "text-orange-700" : "")}>{type.label}</p>
+                  <p className="text-xs text-gray-500 mt-1">{type.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Room/Booking Selection (for room service) */}
+            {newOrderType === "room" && (
+              <div className="space-y-2">
+                <Label>Chambre / Réservation *</Label>
+                {isBookingsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Chargement des réservations...
+                  </div>
+                ) : activeBookings.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-2">Aucun client enregistré (check-in) trouvé</p>
+                ) : (
+                  <Select value={selectedBookingId} onValueChange={handleBookingSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez une chambre..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeBookings.map((booking) => (
+                        <SelectItem key={booking.id} value={booking.id}>
+                          Ch. {booking.room.number}{booking.room.name ? ` - ${booking.room.name}` : ""} — {booking.guest.firstName} {booking.guest.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {selectedBooking && (
+                  <div className="p-3 bg-sky-50 dark:bg-sky-950 rounded-lg text-sm">
+                    <p className="font-medium">{selectedBooking.guest.firstName} {selectedBooking.guest.lastName}</p>
+                    <p className="text-gray-500">Chambre {selectedBooking.room.number} • {selectedBooking.room.type}</p>
+                    {selectedBooking.guest.phone && <p className="text-gray-500">{selectedBooking.guest.phone}</p>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Table Number (for dine-in) */}
+            {newOrderType === "table" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Numéro de table *</Label>
+                  <Input
+                    placeholder="Ex: 1, 5, Terrasse..."
+                    value={newOrderTableNumber}
+                    onChange={(e) => setNewOrderTableNumber(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom du client</Label>
+                  <Input
+                    placeholder="Optionnel"
+                    value={newOrderGuestName}
+                    onChange={(e) => setNewOrderGuestName(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Guest Name (for takeaway) */}
+            {newOrderType === "takeaway" && (
+              <div className="space-y-2">
+                <Label>Nom du client *</Label>
+                <Input
+                  placeholder="Nom du client"
+                  value={newOrderGuestName}
+                  onChange={(e) => setNewOrderGuestName(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Notes ou instructions spéciales..."
+                value={newOrderNotes}
+                onChange={(e) => setNewOrderNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            {/* Menu Items Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Articles</Label>
+                {newOrderItems.length > 0 && (
+                  <Badge variant="secondary">{newOrderItems.length} article{newOrderItems.length > 1 ? "s" : ""}</Badge>
+                )}
+              </div>
+
+              {/* Menu search/filter */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Rechercher un article..."
+                    value={orderMenuSearch}
+                    onChange={(e) => setOrderMenuSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={orderMenuCategory} onValueChange={setOrderMenuCategory}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Available menu items */}
+              <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg p-2">
+                {availableMenuItems.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">Aucun article disponible</p>
+                ) : (
+                  availableMenuItems.map((item) => {
+                    const inOrder = newOrderItems.find((oi) => oi.menuItemId === item.id)
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-900 rounded">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.name}</p>
+                          <p className="text-xs text-gray-500">{formatAmount(item.price)}</p>
+                        </div>
+                        {inOrder ? (
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleUpdateItemQuantity(item.id, inOrder.quantity - 1)}>
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="w-6 text-center text-sm font-medium">{inOrder.quantity}</span>
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleUpdateItemQuantity(item.id, inOrder.quantity + 1)}>
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleAddOrderItem(item.id)}>
+                            <Plus className="w-3 h-3 mr-1" />
+                            Ajouter
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Selected items summary */}
+              {newOrderItems.length > 0 && (
+                <div className="border rounded-lg p-3 space-y-2 bg-gray-50 dark:bg-gray-900">
+                  <p className="text-sm font-medium text-gray-500">Récapitulatif</p>
+                  {newOrderItems.map((item) => {
+                    const menuItem = menuItems.find((m) => m.id === item.menuItemId)
+                    if (!menuItem) return null
+                    return (
+                      <div key={item.menuItemId} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-gray-500">{item.quantity}x</span>
+                          <span className="truncate">{menuItem.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{formatAmount(menuItem.price * item.quantity)}</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-red-600" onClick={() => handleRemoveOrderItem(item.menuItemId)}>
+                            <XCircle className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between pt-2 border-t font-semibold">
+                    <span>Total</span>
+                    <span className="text-orange-600">{formatAmount(newOrderTotal)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={handleSaveNewOrder}
+              disabled={isNewOrderSaving || newOrderItems.length === 0}
+            >
+              {isNewOrderSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Création...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Créer la commande
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
