@@ -60,7 +60,7 @@ interface NavItem {
   icon: LucideIcon
   permission?: string
   // Color palette — each icon gets a logical color
-  color: string          // e.g. "text-violet-500"
+  iconColor: string       // CSS color for icon — applied via inline style
   hoverBg: string        // e.g. "hover:bg-violet-50 dark:hover:bg-violet-950"
   activeBg: string       // e.g. "bg-violet-100 dark:bg-violet-900/40"
   activeText: string     // e.g. "text-violet-700 dark:text-violet-300"
@@ -75,7 +75,7 @@ const navigation: NavItem[] = [
     href: "/app/dashboard",
     icon: LayoutDashboard,
     permission: "canViewDashboard",
-    color: "text-violet-500",
+    iconColor: "#8b5cf6",
     hoverBg: "hover:bg-violet-50 dark:hover:bg-violet-950/60",
     activeBg: "bg-violet-100 dark:bg-violet-900/40",
     activeText: "text-violet-700 dark:text-violet-300",
@@ -88,7 +88,7 @@ const navigation: NavItem[] = [
     href: "/app/rooms",
     icon: BedDouble,
     permission: "canViewRooms",
-    color: "text-emerald-500",
+    iconColor: "#10b981",
     hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-950/60",
     activeBg: "bg-emerald-100 dark:bg-emerald-900/40",
     activeText: "text-emerald-700 dark:text-emerald-300",
@@ -101,7 +101,7 @@ const navigation: NavItem[] = [
     href: "/app/bookings",
     icon: CalendarDays,
     permission: "canViewBookings",
-    color: "text-sky-500",
+    iconColor: "#0ea5e9",
     hoverBg: "hover:bg-sky-50 dark:hover:bg-sky-950/60",
     activeBg: "bg-sky-100 dark:bg-sky-900/40",
     activeText: "text-sky-700 dark:text-sky-300",
@@ -114,7 +114,7 @@ const navigation: NavItem[] = [
     href: "/app/guests",
     icon: Users,
     permission: "canViewGuests",
-    color: "text-amber-500",
+    iconColor: "#f59e0b",
     hoverBg: "hover:bg-amber-50 dark:hover:bg-amber-950/60",
     activeBg: "bg-amber-100 dark:bg-amber-900/40",
     activeText: "text-amber-700 dark:text-amber-300",
@@ -127,7 +127,7 @@ const navigation: NavItem[] = [
     href: "/app/invoices",
     icon: CreditCard,
     permission: "canViewInvoices",
-    color: "text-rose-500",
+    iconColor: "#f43f5e",
     hoverBg: "hover:bg-rose-50 dark:hover:bg-rose-950/60",
     activeBg: "bg-rose-100 dark:bg-rose-900/40",
     activeText: "text-rose-700 dark:text-rose-300",
@@ -140,7 +140,7 @@ const navigation: NavItem[] = [
     href: "/app/restaurant",
     icon: UtensilsCrossed,
     permission: "canViewRestaurant",
-    color: "text-orange-500",
+    iconColor: "#f97316",
     hoverBg: "hover:bg-orange-50 dark:hover:bg-orange-950/60",
     activeBg: "bg-orange-100 dark:bg-orange-900/40",
     activeText: "text-orange-700 dark:text-orange-300",
@@ -153,7 +153,7 @@ const navigation: NavItem[] = [
     href: "/app/expenses",
     icon: Receipt,
     permission: "canViewExpenses",
-    color: "text-red-500",
+    iconColor: "#ef4444",
     hoverBg: "hover:bg-red-50 dark:hover:bg-red-950/60",
     activeBg: "bg-red-100 dark:bg-red-900/40",
     activeText: "text-red-700 dark:text-red-300",
@@ -166,7 +166,7 @@ const navigation: NavItem[] = [
     href: "/app/statistics",
     icon: BarChart3,
     permission: "canViewStatistics",
-    color: "text-indigo-500",
+    iconColor: "#6366f1",
     hoverBg: "hover:bg-indigo-50 dark:hover:bg-indigo-950/60",
     activeBg: "bg-indigo-100 dark:bg-indigo-900/40",
     activeText: "text-indigo-700 dark:text-indigo-300",
@@ -179,7 +179,7 @@ const navigation: NavItem[] = [
     href: "/app/settings/users",
     icon: UserCog,
     permission: "canViewUsers",
-    color: "text-purple-500",
+    iconColor: "#a855f7",
     hoverBg: "hover:bg-purple-50 dark:hover:bg-purple-950/60",
     activeBg: "bg-purple-100 dark:bg-purple-900/40",
     activeText: "text-purple-700 dark:text-purple-300",
@@ -191,7 +191,7 @@ const navigation: NavItem[] = [
     name: "Guide",
     href: "/app/guide",
     icon: HelpCircle,
-    color: "text-teal-500",
+    iconColor: "#14b8a6",
     hoverBg: "hover:bg-teal-50 dark:hover:bg-teal-950/60",
     activeBg: "bg-teal-100 dark:bg-teal-900/40",
     activeText: "text-teal-700 dark:text-teal-300",
@@ -204,7 +204,7 @@ const navigation: NavItem[] = [
     href: "/app/settings",
     icon: Settings,
     permission: "canViewSettings",
-    color: "text-slate-500",
+    iconColor: "#64748b",
     hoverBg: "hover:bg-slate-100 dark:hover:bg-slate-800",
     activeBg: "bg-slate-200 dark:bg-slate-700/50",
     activeText: "text-slate-700 dark:text-slate-300",
@@ -339,9 +339,9 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
                 <item.icon
                   className={cn(
                     "h-5 w-5 flex-shrink-0 sidebar-icon",
-                    item.animClass,
-                    item.color
+                    item.animClass
                   )}
+                  style={{ color: item.iconColor }}
                 />
                 {!collapsed && (
                   <span className={cn(
@@ -535,9 +535,6 @@ export function Header() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </Button>
-        <Button className="bg-sky-600 hover:bg-sky-700 hidden sm:flex">
-          + Nouvelle réservation
         </Button>
       </div>
     </header>

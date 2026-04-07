@@ -150,23 +150,102 @@ export async function POST(request: NextRequest) {
     }
 
     // Générer le numéro de facture de manière atomique
-    // Utilise une transaction pour éviter les doublons en cas de concurrence
     const year = new Date().getFullYear()
     const prefix = `FAC-${year}-`
 
     let invoice: any
     try {
       invoice = await db.$transaction(async (tx) => {
-        // Compter les factures existantes pour cette année et ce guest house
-        const invoiceCount = await tx.invoice.count({
+        // Trouver le dernier numéro de facture pour cette année et ce guest house
+        const lastInvoice = await tx.invoice.findFirst({
           where: {
             guestHouseId: session.user.guestHouseId,
             invoiceNumber: { startsWith: prefix },
           },
+          orderBy: { invoiceNumber: "desc" },
+          select: { invoiceNumber: true },
         })
-        const invoiceNumber = `${prefix}${String(invoiceCount + 1).padStart(5, "0")}`
 
-        // Créer la facture avec ses items
+        let nextNum = 1
+        if (lastInvoice) {
+          // Extraire le numéro depuis FAC-2026-XXXXX
+          const parts = lastInvoice.invoiceNumber.split("-")
+          const lastNum = parseInt(parts[parts.length - 1], 10)
+          nextNum = isNaN(lastNum) ? 1 : lastNum + 1
+        }
+
+        const invoiceNumber = `${prefix}${String(nextNum).padStart(5, "0")}`
+
+        // Vérifier que ce numéro n'existe pas déjà
+        const existing = await tx.invoice.findUnique({
+          where: { invoiceNumber },
+        })
+        if (existing) {
+          // Retrouver un numéro libre en cherchant le max
+          const allNumbers = await tx.invoice.findMany({
+            where: {
+              guestHouseId: session.user.guestHouseId,
+              invoiceNumber: { startsWith: prefix },
+            },
+            select: { invoiceNumber: true },
+          })
+          const usedNums = new Set(
+            allNumbers
+              .map((inv) => {
+                const p = inv.invoiceNumber.split("-")
+                return parseInt(p[p.length - 1], 10)
+              })
+              .filter((n) => !isNaN(n))
+          )
+          nextNum = 1
+          while (usedNums.has(nextNum)) nextNum++
+          const fallbackNumber = `${prefix}${String(nextNum).padStart(5, "0")}`
+
+          return tx.invoice.create({
+            data: {
+              guestHouseId: session.user.guestHouseId,
+              invoiceNumber: fallbackNumber,
+              guestId,
+              bookingId: bookingId || null,
+              subtotal: typeof subtotal === 'number' ? subtotal : parseFloat(subtotal) || 0,
+              taxes: typeof taxes === 'number' ? taxes : parseFloat(taxes) || 0,
+              discount: typeof discount === 'number' ? discount : parseFloat(discount) || 0,
+              total: typeof total === 'number' ? total : parseFloat(total) || 0,
+              dueDate: dueDate ? new Date(dueDate) : null,
+              notes: notes || null,
+              terms: terms || null,
+              status: "draft",
+              touristTaxApplied: touristTaxApplied || false,
+              touristTaxPerNight: parseFloat(touristTaxPerNight) || 0,
+              touristTaxNights: parseInt(touristTaxNights) || 0,
+              touristTaxAmount: parseFloat(touristTaxAmount) || 0,
+              items: {
+                create: items.map((item: {
+                  description: string
+                  quantity: number
+                  unitPrice: number
+                  total: number
+                  taxRate: number
+                  itemType: string
+                  referenceId: string
+                }) => ({
+                  description: item.description,
+                  quantity: item.quantity || 1,
+                  unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0,
+                  total: typeof item.total === 'number' ? item.total : parseFloat(item.total) || 0,
+                  taxRate: typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate) || 0,
+                  itemType: item.itemType || null,
+                  referenceId: item.referenceId || null,
+                })),
+              },
+            },
+            include: {
+              guest: true,
+              items: true,
+            },
+          })
+        }
+
         return tx.invoice.create({
           data: {
             guestHouseId: session.user.guestHouseId,
@@ -212,57 +291,11 @@ export async function POST(request: NextRequest) {
         })
       })
     } catch (txError) {
-      // If transaction fails due to unique constraint on invoiceNumber,
-      // retry once with a slightly different approach
-      console.error("Transaction error, retrying with fallback:", txError)
-      const invoiceCount = await db.invoice.count({
-        where: { guestHouseId: session.user.guestHouseId },
-      })
-      const fallbackNumber = `${prefix}${String(invoiceCount + 1).padStart(5, "0")}-${Date.now().toString(36).slice(-3)}`
-
-      invoice = await db.invoice.create({
-        data: {
-          guestHouseId: session.user.guestHouseId,
-          invoiceNumber: fallbackNumber,
-          guestId,
-          bookingId: bookingId || null,
-          subtotal: typeof subtotal === 'number' ? subtotal : parseFloat(subtotal) || 0,
-          taxes: typeof taxes === 'number' ? taxes : parseFloat(taxes) || 0,
-          discount: typeof discount === 'number' ? discount : parseFloat(discount) || 0,
-          total: typeof total === 'number' ? total : parseFloat(total) || 0,
-          dueDate: dueDate ? new Date(dueDate) : null,
-          notes: notes || null,
-          terms: terms || null,
-          status: "draft",
-          touristTaxApplied: touristTaxApplied || false,
-          touristTaxPerNight: parseFloat(touristTaxPerNight) || 0,
-          touristTaxNights: parseInt(touristTaxNights) || 0,
-          touristTaxAmount: parseFloat(touristTaxAmount) || 0,
-          items: {
-            create: items.map((item: {
-              description: string
-              quantity: number
-              unitPrice: number
-              total: number
-              taxRate: number
-              itemType: string
-              referenceId: string
-            }) => ({
-              description: item.description,
-              quantity: item.quantity || 1,
-              unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0,
-              total: typeof item.total === 'number' ? item.total : parseFloat(item.total) || 0,
-              taxRate: typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate) || 0,
-              itemType: item.itemType || null,
-              referenceId: item.referenceId || null,
-            })),
-          },
-        },
-        include: {
-          guest: true,
-          items: true,
-        },
-      })
+      console.error("Transaction error:", txError)
+      return NextResponse.json(
+        { error: "Erreur lors de la création de la facture. Veuillez réessayer." },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ invoice }, { status: 201 })
