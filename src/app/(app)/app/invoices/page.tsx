@@ -61,11 +61,14 @@ import {
   RotateCcw,
   AlertCircle,
   ArrowRightLeft,
+  Printer,
+  FileSpreadsheet,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
 import { fr } from "date-fns/locale"
 import { useCurrency } from "@/hooks/use-currency"
+import * as XLSX from "xlsx"
 
 // Types
 interface Guest {
@@ -161,6 +164,8 @@ export default function InvoicesPage() {
   const [invoiceToUpdate, setInvoiceToUpdate] = useState<Invoice | null>(null)
   const [newStatus, setNewStatus] = useState("")
   const [selectedBookingId, setSelectedBookingId] = useState<string>("")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
 
   // Form state
   const [formData, setFormData] = useState({
@@ -183,9 +188,12 @@ export default function InvoicesPage() {
         !searchQuery ||
         invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${invoice.guest.firstName} ${invoice.guest.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchesStatus && matchesSearch
+      const invDate = new Date(invoice.invoiceDate)
+      const matchesDateFrom = !dateFrom || invDate >= new Date(dateFrom)
+      const matchesDateTo = !dateTo || invDate <= new Date(dateTo + "T23:59:59")
+      return matchesStatus && matchesSearch && matchesDateFrom && matchesDateTo
     })
-  }, [invoices, statusFilter, searchQuery])
+  }, [invoices, statusFilter, searchQuery, dateFrom, dateTo])
 
   // Get available bookings for selected guest (not yet invoiced)
   const availableBookings = useMemo(() => {
@@ -538,6 +546,167 @@ export default function InvoicesPage() {
     }
   }
 
+  // ─── Print invoices list ─────────────────────────────────────────────────
+  const handlePrintList = () => {
+    const data = filteredInvoices
+    if (data.length === 0) return
+
+    const dateRangeLabel = dateFrom || dateTo
+      ? ` (${dateFrom ? format(new Date(dateFrom), "dd/MM/yyyy", { locale: fr }) : "..." } — ${dateTo ? format(new Date(dateTo), "dd/MM/yyyy", { locale: fr }) : "..." })`
+      : ""
+
+    const totalFiltered = data.reduce((s, i) => s + i.total, 0)
+    const paidFiltered = data.reduce((s, i) => s + i.paidAmount, 0)
+    const remainingFiltered = totalFiltered - paidFiltered
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Liste des factures${dateRangeLabel}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10pt; color: #000; padding: 1.5cm; }
+    @page { size: A4 landscape; margin: 0; }
+    @media print { body { padding: 1.5cm; } }
+    h1 { font-size: 16pt; margin-bottom: 0.25rem; }
+    .subtitle { color: #555; font-size: 9pt; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 9pt; }
+    th { background: #f5f5f5; font-weight: 600; text-transform: uppercase; font-size: 8pt; color: #555; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .totals-row { font-weight: 700; background: #f0f9ff; }
+    .status-draft { color: #666; }
+    .status-sent { color: #0369a1; }
+    .status-paid { color: #15803d; }
+    .status-partial { color: #a16207; }
+    .status-refunded { color: #c2410c; }
+    .status-cancelled { color: #dc2626; }
+    .footer { margin-top: 1rem; display: flex; justify-content: flex-end; gap: 2rem; font-size: 9pt; }
+    .footer-item { text-align: right; }
+    .footer-item .label { color: #555; }
+    .footer-item .value { font-weight: 700; font-size: 11pt; }
+  </style>
+</head>
+<body>
+  <h1>Liste des factures${dateRangeLabel}</h1>
+  <p class="subtitle">${session?.user?.guestHouseName || "Établissement"} — ${data.length} facture${data.length > 1 ? "s" : ""} — Imprimé le ${format(new Date(), "dd/MM/yyyy à HH:mm", { locale: fr })}</p>
+  <table>
+    <thead>
+      <tr>
+        <th class="text-center">N°</th>
+        <th>Date</th>
+        <th>Client</th>
+        <th>Chambre</th>
+        <th class="text-right">Sous-total</th>
+        <th class="text-right">TVA</th>
+        <th class="text-right">Total</th>
+        <th class="text-right">Payé</th>
+        <th class="text-right">Reste</th>
+        <th class="text-center">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.map((inv, i) => {
+        const st = invoiceStatuses[inv.status] || invoiceStatuses.draft
+        const room = inv.booking?.room?.number || "—"
+        return `<tr>
+          <td class="text-center">${inv.invoiceNumber}</td>
+          <td>${format(parseISO(inv.invoiceDate), "dd/MM/yyyy", { locale: fr })}</td>
+          <td>${inv.guest.firstName} ${inv.guest.lastName}</td>
+          <td>${room}</td>
+          <td class="text-right">${inv.subtotal.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
+          <td class="text-right">${inv.taxes.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
+          <td class="text-right" style="font-weight:600">${inv.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
+          <td class="text-right" style="color:#15803d">${inv.paidAmount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
+          <td class="text-right" style="color:${inv.remainingAmount > 0 ? "#c2410c" : "#15803d"}">${inv.remainingAmount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
+          <td class="text-center status-${inv.status}">${st.label}</td>
+        </tr>`
+      }).join("")}
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="footer-item"><span class="label">Total facturé</span><br><span class="value">${totalFiltered.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span></div>
+    <div class="footer-item"><span class="label">Total encaissé</span><br><span class="value" style="color:#15803d">${paidFiltered.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span></div>
+    <div class="footer-item"><span class="label">Reste à encaisser</span><br><span class="value" style="color:${remainingFiltered > 0 ? "#c2410c" : "#15803d"}">${remainingFiltered.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span></div>
+  </div>
+</body>
+</html>`
+
+    const w = window.open("", "_blank")
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 250)
+  }
+
+  // ─── Export to Excel ─────────────────────────────────────────────────────
+  const handleExportExcel = () => {
+    const data = filteredInvoices
+    if (data.length === 0) return
+
+    const rows = data.map((inv, i) => ({
+      "N° Facture": inv.invoiceNumber,
+      "Date": format(parseISO(inv.invoiceDate), "dd/MM/yyyy", { locale: fr }),
+      "Client": `${inv.guest.firstName} ${inv.guest.lastName}`,
+      "Email": inv.guest.email || "",
+      "Chambre": inv.booking?.room?.number || "",
+      "Sous-total": inv.subtotal,
+      "TVA": inv.taxes,
+      "Total TTC": inv.total,
+      "Payé": inv.paidAmount,
+      "Reste": inv.remainingAmount,
+      "Statut": (invoiceStatuses[inv.status] || invoiceStatuses.draft).label,
+      "Échéance": inv.dueDate ? format(parseISO(inv.dueDate), "dd/MM/yyyy", { locale: fr }) : "",
+    }))
+
+    // Add totals row
+    const totalFiltered = data.reduce((s, i) => s + i.total, 0)
+    const paidFiltered = data.reduce((s, i) => s + i.paidAmount, 0)
+    rows.push({
+      "N° Facture": "",
+      "Date": "",
+      "Client": "",
+      "Email": "",
+      "Chambre": "TOTAL",
+      "Sous-total": data.reduce((s, i) => s + i.subtotal, 0),
+      "TVA": data.reduce((s, i) => s + i.taxes, 0),
+      "Total TTC": totalFiltered,
+      "Payé": paidFiltered,
+      "Reste": totalFiltered - paidFiltered,
+      "Statut": "",
+      "Échéance": "",
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+
+    // Set column widths
+    ws["!cols"] = [
+      { wch: 20 }, // N° Facture
+      { wch: 12 }, // Date
+      { wch: 22 }, // Client
+      { wch: 26 }, // Email
+      { wch: 10 }, // Chambre
+      { wch: 12 }, // Sous-total
+      { wch: 10 }, // TVA
+      { wch: 12 }, // Total TTC
+      { wch: 12 }, // Payé
+      { wch: 12 }, // Reste
+      { wch: 12 }, // Statut
+      { wch: 12 }, // Échéance
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Factures")
+
+    const dateLabel = dateFrom || dateTo
+      ? `_du-${dateFrom || "debut"}_au-${dateTo || "fin"}`
+      : ""
+    XLSX.writeFile(wb, `factures${dateLabel}.xlsx`)
+  }
+
   // Stats
   const stats = useMemo(() => {
     const totalAmount = invoices.reduce((sum, inv) => sum + inv.total, 0)
@@ -647,7 +816,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
@@ -657,6 +826,20 @@ export default function InvoicesPage() {
             className="pl-10"
           />
         </div>
+        <Input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          placeholder="Du"
+          className="w-full sm:w-40"
+        />
+        <Input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          placeholder="Au"
+          className="w-full sm:w-40"
+        />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filtrer par statut" />
@@ -670,6 +853,50 @@ export default function InvoicesPage() {
             ))}
           </SelectContent>
         </Select>
+        {(dateFrom || dateTo) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-400 hover:text-gray-600"
+            onClick={() => { setDateFrom(""); setDateTo("") }}
+            title="Réinitialiser les dates"
+          >
+            <XCircle className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Date filter active indicator + action buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {(dateFrom || dateTo) && (
+          <p className="text-sm text-gray-500">
+            <CalendarDays className="w-4 h-4 inline mr-1" />
+            Période : {dateFrom ? format(new Date(dateFrom), "dd MMM yyyy", { locale: fr }) : "..."} — {dateTo ? format(new Date(dateTo), "dd MMM yyyy", { locale: fr }) : "..."}
+            <span className="ml-2 font-medium text-gray-700">({filteredInvoices.length} facture{filteredInvoices.length > 1 ? "s" : ""})</span>
+          </p>
+        )}
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrintList}
+            disabled={filteredInvoices.length === 0}
+            className="gap-2"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimer la liste
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={filteredInvoices.length === 0}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Exporter Excel
+          </Button>
+        </div>
       </div>
 
       {/* Status filter chips */}
