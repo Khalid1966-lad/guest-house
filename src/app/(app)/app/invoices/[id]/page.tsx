@@ -101,6 +101,7 @@ interface GuestHouseInfo {
   country?: string | null
   phone?: string | null
   email?: string | null
+  website?: string | null
   logo?: string | null
   ice?: string | null
   taxId?: string | null
@@ -335,6 +336,12 @@ export default function InvoiceDetailPage() {
             border-top: 1px solid #ddd;
             padding-top: 1rem;
           }
+          .contact-info {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #555;
+            line-height: 1.8;
+          }
           .legal-info {
             margin-top: 0.75rem;
             font-size: 0.8rem;
@@ -447,6 +454,10 @@ export default function InvoiceDetailPage() {
         <div class="footer">
           <p>Merci pour votre confiance !</p>
           <p><strong>${guestHouse?.name || "Établissement"}</strong></p>
+          <div class="contact-info">
+            ${[guestHouse?.address, guestHouse?.postalCode, guestHouse?.city, guestHouse?.country].filter(Boolean).join(", ") ? `<div>${[guestHouse?.address, guestHouse?.postalCode, guestHouse?.city, guestHouse?.country].filter(Boolean).join(", ")}</div>` : ""}
+            ${[guestHouse?.phone, guestHouse?.email, guestHouse?.website].filter(Boolean).map(info => `<div>${info}</div>`).join("")}
+          </div>
           <div class="legal-info">
             ${(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) ? [guestHouse?.ice ? `ICE : ${guestHouse.ice}` : null, guestHouse?.taxId ? `IF : ${guestHouse.taxId}` : null, guestHouse?.cnss ? `CNSS : ${guestHouse.cnss}` : null].filter(Boolean).join(" &nbsp;|&nbsp; ") : ""}
           </div>
@@ -743,6 +754,16 @@ export default function InvoiceDetailPage() {
           <div className="mt-12 pt-6 border-t text-center text-gray-500 text-sm print:hidden">
             <p>Merci pour votre confiance !</p>
             <p className="mt-1"><strong>{guestHouse?.name || "Établissement"}</strong></p>
+            {[guestHouse?.address, guestHouse?.postalCode, guestHouse?.city, guestHouse?.country].filter(Boolean).length > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                {[guestHouse?.address, guestHouse?.postalCode, guestHouse?.city, guestHouse?.country].filter(Boolean).join(", ")}
+              </p>
+            )}
+            <div className="flex justify-center gap-3 text-xs text-gray-400 mt-1">
+              {guestHouse?.phone && <span>{guestHouse.phone}</span>}
+              {guestHouse?.email && <span>{guestHouse.email}</span>}
+              {guestHouse?.website && <span>{guestHouse.website}</span>}
+            </div>
             {(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) && (
               <div className="flex justify-center gap-3 text-xs text-gray-400 mt-2">
                 {guestHouse?.ice && <span>ICE : {guestHouse.ice}</span>}
@@ -756,6 +777,16 @@ export default function InvoiceDetailPage() {
           <div className="hidden print:block mt-12 pt-6 border-t border-gray-300 text-center text-gray-600 text-sm">
             <p>Merci pour votre confiance !</p>
             <p className="mt-1 font-semibold">{guestHouse?.name || "Établissement"}</p>
+            {[guestHouse?.address, guestHouse?.postalCode, guestHouse?.city, guestHouse?.country].filter(Boolean).length > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                {[guestHouse?.address, guestHouse?.postalCode, guestHouse?.city, guestHouse?.country].filter(Boolean).join(", ")}
+              </p>
+            )}
+            <div className="flex justify-center gap-3 text-xs text-gray-500 mt-1">
+              {guestHouse?.phone && <span>{guestHouse.phone}</span>}
+              {guestHouse?.email && <span>{guestHouse.email}</span>}
+              {guestHouse?.website && <span>{guestHouse.website}</span>}
+            </div>
             {(guestHouse?.ice || guestHouse?.taxId || guestHouse?.cnss) && (
               <div className="flex justify-center gap-3 text-xs text-gray-500 mt-2">
                 {guestHouse?.ice && <span>ICE : {guestHouse.ice}</span>}
