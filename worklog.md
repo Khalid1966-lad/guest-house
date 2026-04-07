@@ -121,3 +121,27 @@ Stage Summary:
 - Orders are linked to rooms/bookings (room service) or tables/guests
 - When a booking is selected, guest name is auto-filled from booking data
 - Only available menu items are shown in the order form
+
+---
+Task ID: restaurant-orders-on-invoice
+Agent: Main + full-stack-developer
+Task: Add restaurant orders as invoice line items during invoicing
+
+Work Log:
+- Added RestaurantOrderForInvoice type for type-safe order data
+- Updated defaultItemForm to include itemType and referenceId fields
+- Added restaurantOrders state, fetched alongside invoices/guests/bookings
+- Added availableRestaurantOrders computed value (filters pending, non-cancelled orders)
+- Created handleAddRestaurantOrder handler: converts order items into invoice line items with header
+- Updated handleSaveInvoice to pass itemType="restaurant_order" and referenceId for each restaurant item
+- Added post-save logic: marks restaurant orders as "billed_to_room" via PATCH after invoice creation
+- Added orange-themed UI section in invoice dialog showing unbilled restaurant orders
+- Section shows: order type emoji, guest name, item count, date, item summary, and price
+- Click on an order → adds all its items as invoice line items with the order total as header
+- All lint checks pass
+
+Stage Summary:
+- When creating an invoice, unbilled restaurant orders appear in an orange section
+- Clicking an order adds its items (with prices) to the invoice
+- After saving, orders are automatically marked as "billed_to_room"
+- itemType/referenceId fields on InvoiceItem are now utilized for restaurant order tracing

@@ -63,6 +63,7 @@ import {
   ArrowRightLeft,
   Printer,
   FileSpreadsheet,
+  UtensilsCrossed,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
@@ -107,6 +108,30 @@ interface InvoiceItem {
   taxRate: number
 }
 
+interface RestaurantOrderForInvoice {
+  id: string
+  guestName: string | null
+  orderType: string
+  total: number
+  status: string
+  paymentStatus: string
+  orderDate: string
+  items: {
+    id: string
+    menuItemId: string
+    quantity: number
+    unitPrice: number
+    total: number
+    notes: string | null
+    menuItem: {
+      id: string
+      name: string
+      price: number
+      category: string
+    }
+  }[]
+}
+
 interface Invoice {
   id: string
   invoiceNumber: string
@@ -140,6 +165,8 @@ const defaultItemForm = {
   quantity: "1",
   unitPrice: "",
   taxRate: "0",
+  itemType: null as string | null,
+  referenceId: null as string | null,
 }
 
 export default function InvoicesPage() {
@@ -166,6 +193,7 @@ export default function InvoicesPage() {
   const [selectedBookingId, setSelectedBookingId] = useState<string>("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [restaurantOrders, setRestaurantOrders] = useState<RestaurantOrderForInvoice[]>([])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -206,6 +234,16 @@ export default function InvoicesPage() {
     }
   }, [bookings, formData.guestId])
 
+  // Get unbilled restaurant orders for selected guest
+  const availableRestaurantOrders = useMemo(() => {
+    if (!formData.guestId || !restaurantOrders || restaurantOrders.length === 0) return []
+    return restaurantOrders.filter(o =>
+      o.guestName &&
+      o.paymentStatus === "pending" &&
+      o.status !== "cancelled"
+    )
+  }, [restaurantOrders, formData.guestId])
+
   // Calculate totals
   const calculateTotals = () => {
     const items = formData.items.map((item) => ({
@@ -239,10 +277,11 @@ export default function InvoicesPage() {
 
     try {
       setError(null)
-      const [invoicesRes, guestsRes, bookingsRes] = await Promise.all([
+      const [invoicesRes, guestsRes, bookingsRes, ordersRes] = await Promise.all([
         fetch("/api/invoices"),
         fetch("/api/guests"),
         fetch("/api/bookings"),
+        fetch("/api/restaurant-orders"),
       ])
 
       if (invoicesRes.ok) {
@@ -264,6 +303,13 @@ export default function InvoicesPage() {
         setBookings(Array.isArray(data.bookings) ? data.bookings : [])
       } else {
         console.error("Failed to fetch bookings:", bookingsRes.status)
+      }
+
+      if (ordersRes.ok) {
+        const data = await ordersRes.json()
+        setRestaurantOrders(Array.isArray(data.orders) ? data.orders : [])
+      } else {
+        console.error("Failed to fetch restaurant orders:", ordersRes.status)
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -399,6 +445,38 @@ export default function InvoicesPage() {
     }))
   }
 
+  // Add restaurant order items to invoice
+  const handleAddRestaurantOrder = (order: RestaurantOrderForInvoice) => {
+    const orderLabel = order.orderType === "room" ? "Service en chambre"
+      : order.orderType === "table" ? "Restaurant (sur place)"
+      : "Restaurant (à emporter)"
+    const orderDate = format(parseISO(order.orderDate), "d MMM yyyy, HH:mm", { locale: fr })
+
+    const newItems = order.items.map((item) => ({
+      description: `${orderLabel} - ${item.menuItem.name}${item.notes ? ` (${item.notes})` : ""}`,
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString(),
+      taxRate: "0",
+      itemType: "restaurant_order" as string | null,
+      referenceId: order.id as string | null,
+    }))
+
+    // Add a header line for the order
+    const headerItem = {
+      description: `${orderLabel} — ${order.guestName || "Client"} — ${orderDate}`,
+      quantity: "1",
+      unitPrice: order.total.toString(),
+      taxRate: "0",
+      itemType: "restaurant_order" as string | null,
+      referenceId: order.id as string | null,
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      items: [...prev.items.filter(i => i.description), headerItem, ...newItems],
+    }))
+  }
+
   // Save invoice
   const handleSaveInvoice = async () => {
     setFormError("")
@@ -453,6 +531,8 @@ export default function InvoicesPage() {
             unitPrice: parseFloat(item.unitPrice) || 0,
             total: (parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0),
             taxRate: parseFloat(item.taxRate) || 0,
+            itemType: (item as any).itemType || null,
+            referenceId: (item as any).referenceId || null,
           })),
         }),
       })
@@ -462,6 +542,25 @@ export default function InvoicesPage() {
         setFormError(errorData.error || "Erreur lors de la sauvegarde")
         setIsSaving(false)
         return
+      }
+
+      // Mark restaurant orders as billed_to_room
+      const restaurantOrderIds = formData.items
+        .map((item, idx) => ({ refId: (item as any).referenceId, type: (item as any).itemType }))
+        .filter((entry) => entry.refId && entry.type === "restaurant_order")
+        .map((entry) => entry.refId)
+      
+      const uniqueOrderIds = [...new Set(restaurantOrderIds)]
+      if (uniqueOrderIds.length > 0) {
+        Promise.allSettled(
+          uniqueOrderIds.map((id) =>
+            fetch(`/api/restaurant-orders/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ paymentStatus: "billed_to_room" }),
+            })
+          )
+        )
       }
 
       setIsDialogOpen(false)
@@ -1218,6 +1317,43 @@ export default function InvoicesPage() {
             {!editingInvoice && formData.guestId && availableBookings.length === 0 && (
               <div className="p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-700 dark:text-yellow-300">
                 Aucun séjour sans facture disponible pour ce client.
+              </div>
+            )}
+
+            {/* Import Restaurant Orders */}
+            {formData.guestId && availableRestaurantOrders.length > 0 && (
+              <div className="space-y-2 p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                <div className="flex items-center gap-2 text-sm font-semibold text-orange-700 dark:text-orange-400">
+                  <UtensilsCrossed className="w-4 h-4" />
+                  Commandes restaurant ({availableRestaurantOrders.length} non facturée{availableRestaurantOrders.length > 1 ? "s" : ""})
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {availableRestaurantOrders.map((order) => (
+                    <button
+                      key={order.id}
+                      type="button"
+                      onClick={() => handleAddRestaurantOrder(order)}
+                      className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border hover:border-orange-300 dark:hover:border-orange-600 transition-colors text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {order.orderType === "room" ? "🛏️" : order.orderType === "table" ? "🍽️" : "🥡"}{" "}
+                          {order.guestName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {order.items.length} article{order.items.length > 1 ? "s" : ""} • {format(parseISO(order.orderDate), "d MMM, HH:mm", { locale: fr })}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {order.items.map(i => `${i.quantity}x ${i.menuItem.name}`).join(", ")}
+                        </p>
+                      </div>
+                      <div className="text-right ml-4 flex-shrink-0">
+                        <p className="font-semibold text-sm">{formatAmount(order.total)}</p>
+                        <Plus className="w-4 h-4 mx-auto mt-1 text-gray-400" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
