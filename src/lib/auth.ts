@@ -4,6 +4,41 @@ import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 
 // ============================================
+// Menu order for default redirect
+// ============================================
+const MENU_ORDER = [
+  { key: "dashboard", path: "/app/dashboard" },
+  { key: "rooms", path: "/app/rooms" },
+  { key: "housekeeping", path: "/app/housekeeping" },
+  { key: "bookings", path: "/app/bookings" },
+  { key: "guests", path: "/app/guests" },
+  { key: "invoices", path: "/app/invoices" },
+  { key: "restaurant", path: "/app/restaurant" },
+  { key: "expenses", path: "/app/expenses" },
+  { key: "statistics", path: "/app/statistics" },
+  { key: "users", path: "/app/settings/users" },
+  { key: "settings", path: "/app/settings" },
+]
+
+// Housekeeping roles always go to housekeeping
+const HOUSEKEEPING_ROLES = ["femmeDeMenage", "gouvernant", "gouvernante"]
+
+function computeDefaultMenu(role: string, menuAccess?: Record<string, boolean> | null): string {
+  // Owners always get dashboard
+  if (role === "owner" || role === "super_admin") return "/app/dashboard"
+
+  // Housekeeping roles always go to housekeeping
+  if (HOUSEKEEPING_ROLES.includes(role)) return "/app/housekeeping"
+
+  // If no menuAccess or empty, fall back to dashboard
+  if (!menuAccess) return "/app/dashboard"
+
+  // Find first allowed menu
+  const firstAllowed = MENU_ORDER.find((m) => menuAccess[m.key] === true)
+  return firstAllowed?.path || "/app/dashboard"
+}
+
+// ============================================
 // SUPER ADMIN — Identifiants hardcodés
 // ============================================
 const SUPER_ADMIN_EMAIL = "contact@jazelwebagency.com"
@@ -32,6 +67,7 @@ declare module "next-auth" {
     guestHouseSlug?: string | null
     guestHouseName?: string | null
     guestHouseCurrency?: string
+    menuAccess?: Record<string, boolean> | null
   }
 }
 
@@ -43,6 +79,7 @@ declare module "next-auth/jwt" {
     guestHouseSlug?: string | null
     guestHouseName?: string | null
     guestHouseCurrency?: string
+    defaultMenu?: string
   }
 }
 
@@ -112,6 +149,17 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
+        // Parse menuAccess
+        let menuAccess: Record<string, boolean> | null = null
+        if ((user as Record<string, unknown>).menuAccess) {
+          const raw = (user as Record<string, unknown>).menuAccess
+          if (typeof raw === "string") {
+            try { menuAccess = JSON.parse(raw) } catch { menuAccess = null }
+          } else if (typeof raw === "object" && raw !== null) {
+            menuAccess = raw as Record<string, boolean>
+          }
+        }
+
         // Vérifier si l'utilisateur a une maison d'hôtes
         if (!user.guestHouseId || !user.guestHouse) {
           return {
@@ -123,6 +171,7 @@ export const authOptions: NextAuthOptions = {
             guestHouseSlug: null,
             guestHouseName: null,
             guestHouseCurrency: "EUR",
+            menuAccess,
           }
         }
 
@@ -141,6 +190,7 @@ export const authOptions: NextAuthOptions = {
           guestHouseSlug: user.guestHouse.slug,
           guestHouseName: user.guestHouse.name,
           guestHouseCurrency: user.guestHouse.currency || "EUR",
+          menuAccess,
         }
       }
     })
@@ -167,6 +217,9 @@ export const authOptions: NextAuthOptions = {
         token.guestHouseId = user.guestHouseId ?? null
         token.guestHouseSlug = user.guestHouseSlug ?? null
         token.guestHouseName = user.guestHouseName ?? null
+
+        // Compute first allowed menu for redirect
+        token.defaultMenu = computeDefaultMenu(user.role as string, user.menuAccess as Record<string, boolean> | undefined)
       }
 
       // On session.update(): explicitly merge each field (avoid spread issues)
