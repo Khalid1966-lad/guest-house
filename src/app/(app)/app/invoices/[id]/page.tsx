@@ -70,6 +70,7 @@ interface Invoice {
   status: string
   notes: string | null
   paidAt: string | null
+  paymentMethod: string | null
   guest: {
     id: string
     firstName: string
@@ -123,10 +124,12 @@ const invoiceStatuses: Record<string, { label: string; color: string; bg: string
 // Payment methods
 const paymentMethods: Record<string, string> = {
   cash: "Espèces",
-  card: "Carte bancaire",
-  transfer: "Virement",
+  credit_card: "Carte bancaire",
+  bank_transfer: "Virement bancaire",
   check: "Chèque",
-  online: "En ligne",
+  mobile_money: "Mobile Money",
+  online: "Paiement en ligne",
+  other: "Autre",
 }
 
 export default function InvoiceDetailPage() {
@@ -374,6 +377,7 @@ export default function InvoiceDetailPage() {
             <div class="invoice-number">${invoice.invoiceNumber}</div>
             <div class="invoice-date">Date: ${format(parseISO(invoice.invoiceDate), "d MMMM yyyy", { locale: fr })}</div>
             ${invoice.dueDate ? `<div class="invoice-date">Échéance: ${format(parseISO(invoice.dueDate), "d MMMM yyyy", { locale: fr })}</div>` : ""}
+            ${invoice.paymentMethod ? `<div class="invoice-date" style="margin-top:0.5rem;font-weight:600;color:#7c3aed;">💳 Mode de paiement : ${paymentMethods[invoice.paymentMethod] || invoice.paymentMethod}</div>` : ""}
           </div>
         </div>
 
@@ -525,6 +529,11 @@ export default function InvoiceDetailPage() {
         <Badge className={cn(statusInfo.bg, statusInfo.color, "text-base px-4 py-1")}>
           {statusInfo.label}
         </Badge>
+        {invoice.paymentMethod && (
+          <Badge className="bg-purple-100 text-purple-700 border-0 text-sm px-3 py-1">
+            💳 {paymentMethods[invoice.paymentMethod] || invoice.paymentMethod}
+          </Badge>
+        )}
       </div>
 
       {/* Actions - Hidden on print */}

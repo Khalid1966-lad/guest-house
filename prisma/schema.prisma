@@ -163,6 +163,7 @@ model Role {
   canManageExpenses  Boolean @default(false)
   canManageUsers     Boolean @default(false)
   canManageSettings  Boolean @default(false)
+  canManageHousekeeping Boolean @default(false)
   
   // Financial permissions
   canViewRevenue     Boolean @default(false)
@@ -241,6 +242,9 @@ model Room {
   amenities     String?
   
   status        String  @default("available")
+  cleaningStatus  String?  // departure, turnover, cleaning, clean, verified
+  cleaningUpdatedAt DateTime?
+  cleaningNotes   String?
   isActive      Boolean @default(true)
   
   images        String?
@@ -424,6 +428,7 @@ model Invoice {
   
   status        String   @default("draft")
   paidAt        DateTime?
+  paymentMethod String?
   
   notes         String?
   terms         String?

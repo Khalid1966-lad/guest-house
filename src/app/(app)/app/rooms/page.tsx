@@ -78,6 +78,7 @@ interface Room {
   babyBedAvailable: boolean
   babyBedPrice: number
   status: string
+  cleaningStatus: string | null
   amenities: string | null
   images: string | null
   _count?: { bookings: number }
@@ -100,6 +101,15 @@ const bedTypes = [
   { value: "queen", label: "Queen" },
   { value: "king", label: "King" },
   { value: "bunk", label: "Lit superposé" },
+]
+
+// Cleaning statuses
+const cleaningStatuses = [
+  { value: "departure", label: "En départ", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
+  { value: "turnover", label: "En recouche", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
+  { value: "cleaning", label: "En cours", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" },
+  { value: "clean", label: "Propre", color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
+  { value: "verified", label: "Vérifiée", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
 ]
 
 // Status
@@ -560,8 +570,12 @@ export default function RoomsPage() {
                 ) : (
                   <BedDouble className="w-12 h-12 text-sky-400" />
                 )}
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                   {getStatusBadge(room.status)}
+                  {room.cleaningStatus && (() => {
+                    const cs = cleaningStatuses.find(s => s.value === room.cleaningStatus)
+                    return cs ? <Badge key={cs.value} className={cn("text-xs", cs.color)}>{cs.label}</Badge> : null
+                  })()}
                 </div>
                 {getRoomImages(room).length > 1 && (
                   <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
@@ -691,7 +705,15 @@ export default function RoomsPage() {
                       </div>
                     </td>
                     <td className="p-4 font-medium">{formatAmount(room.basePrice)}</td>
-                    <td className="p-4">{getStatusBadge(room.status)}</td>
+                    <td className="p-4">
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(room.status)}
+                        {room.cleaningStatus && (() => {
+                          const cs = cleaningStatuses.find(s => s.value === room.cleaningStatus)
+                          return cs ? <Badge key={cs.value} variant="outline" className={cn("text-xs w-fit", cs.color)}>{cs.label}</Badge> : null
+                        })()}
+                      </div>
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleEditRoom(room)}>

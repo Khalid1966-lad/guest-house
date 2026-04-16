@@ -91,7 +91,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { items, subtotal, taxes, discount, total, dueDate, notes, terms, guestId } = body
+    const { items, subtotal, taxes, discount, total, dueDate, notes, terms, guestId, paymentMethod } = body
 
     // Supprimer les anciens items et créer les nouveaux
     await db.invoiceItem.deleteMany({
@@ -109,6 +109,7 @@ export async function PUT(
         dueDate: dueDate ? new Date(dueDate) : existingInvoice.dueDate,
         notes: notes !== undefined ? notes : existingInvoice.notes,
         terms: terms !== undefined ? terms : existingInvoice.terms,
+        paymentMethod: paymentMethod !== undefined ? (paymentMethod || null) : existingInvoice.paymentMethod,
         items: items
           ? {
               create: items.map((item: {

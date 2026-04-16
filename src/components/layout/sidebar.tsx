@@ -46,6 +46,7 @@ import {
   Building2,
   HelpCircle,
   UserCog,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -95,6 +96,19 @@ const navigation: NavItem[] = [
     animClass: "icon-bounce",
     glowColor: "rgba(16, 185, 129, 0.25)",
     hoverTextColor: "#059669",
+  },
+  {
+    name: "Ménage",
+    href: "/app/housekeeping",
+    icon: Sparkles,
+    permission: "canManageHousekeeping",
+    iconColor: "#ec4899",
+    hoverBg: "hover:bg-pink-50 dark:hover:bg-pink-950/60",
+    activeBg: "bg-pink-100 dark:bg-pink-900/40",
+    activeText: "text-pink-700 dark:text-pink-300",
+    animClass: "icon-glow",
+    glowColor: "rgba(236, 72, 153, 0.25)",
+    hoverTextColor: "#db2777",
   },
   {
     name: "Réservations",

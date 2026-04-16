@@ -399,3 +399,63 @@ Work Log:
 
 Stage Summary:
 - Statistics page now properly imports `cn` utility — no more runtime error when rendering period selector buttons
+
+---
+Task ID: payment-method
+Agent: full-stack-developer
+Task: Add payment method dropdown to invoices
+
+Work Log:
+- Added `paymentMethod String?` field to Invoice model in all 3 Prisma schemas (schema.prisma, schema.postgresql.prisma, schema.sqlite.prisma) after `paidAt DateTime?`
+- Pushed SQLite schema to local database successfully
+- Updated POST /api/invoices route: added `paymentMethod` parameter to `buildInvoiceData`, included in destructured body, passed through to invoice creation
+- Updated PUT /api/invoices/[id] route: added `paymentMethod` to destructured body, included in invoice update data with existing-value fallback
+- Updated Invoice interface in invoices list page to include `paymentMethod: string | null`
+- Added `paymentMethodOptions` array and `paymentMethodLabels` map constants (7 options: Espèces, Carte bancaire, Virement bancaire, Chèque, Mobile Money, Paiement en ligne, Autre)
+- Added `paymentMethod: ""` to form state default, `handleNewInvoice`, and `handleEditInvoice` (pre-fills from existing invoice)
+- Added shadcn/ui Select dropdown for payment method in invoice dialog form, placed in a 2-column grid alongside Notes
+- Included `paymentMethod` in request body when saving invoices (both POST create and PUT update)
+- Added payment method indicator (💳 icon + label) in invoice list items below guest name
+- Updated Invoice interface in invoice detail page to include `paymentMethod: string | null`
+- Added purple Badge showing payment method next to status Badge in invoice detail header
+- Updated `paymentMethods` map in detail page to match full set of options
+- Added payment method display in print template (purple text in invoice-info section)
+- All lint checks pass, dev server compiles without errors
+
+Stage Summary:
+- Invoices now support optional payment method field with 7 predefined options
+- Payment method dropdown appears in invoice creation/edit dialog alongside Notes
+- Payment method is persisted via API and displayed as purple Badge on invoice detail page
+- Invoice list shows payment method indicator on each invoice row
+- Print template includes payment method in the invoice header area
+- Existing invoices without payment method remain unaffected (null field)
+
+---
+Task ID: housekeeping
+Agent: full-stack-developer
+Task: Add room cleaning/housekeeping management
+
+Work Log:
+- Added `cleaningStatus`, `cleaningUpdatedAt`, `cleaningNotes` fields to Room model in all 3 Prisma schemas (schema.prisma, schema.postgresql.prisma, schema.sqlite.prisma)
+- Added `canManageHousekeeping` Boolean field to Role model in all 3 Prisma schemas
+- Pushed SQLite schema to local database successfully
+- Updated permissions API: `canManageHousekeeping: true` for owner, manager, housekeeping roles; `false` for receptionist, accountant, staff
+- Added "Ménage" sidebar nav entry after "Chambres" with Sparkles icon, pink color scheme (#ec4899), canManageHousekeeping permission
+- Created PATCH /api/housekeeping endpoint: validates role (owner/admin/manager/housekeeping), validates cleaningStatus values, updates room with cleaningStatus/cleaningUpdatedAt/cleaningNotes
+- Created full housekeeping management page at /app/housekeeping:
+  - Header with Sparkles icon and description
+  - Compact inline stats bar with clickable status filter buttons (departure, turnover, cleaning, clean, verified, all)
+  - Room cards with cleaning status badges, room status, guest name, time ago, cleaning notes
+  - Status flow dropdown: logical next statuses + full control all statuses
+  - Notes dialog for optional notes when changing status
+  - Reset option to clear cleaning status
+  - French UI throughout
+- Updated rooms list page: added cleaningStatus to Room interface, cleaning status badges on grid cards and list table rows
+- All lint checks pass
+
+Stage Summary:
+- Full housekeeping management system added with 5 cleaning statuses (En départ, En recouche, En cours, Propre, Vérifiée)
+- Sidebar entry visible to owner, manager, housekeeping roles
+- Rooms page shows cleaning status badges alongside room status
+- Housekeeping page provides filtering, status flow control, and optional notes
+- API validates role permissions and cleaning status values

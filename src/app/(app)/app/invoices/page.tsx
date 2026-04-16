@@ -147,6 +147,7 @@ interface Invoice {
   total: number
   status: string
   notes: string | null
+  paymentMethod: string | null
   guest: Guest
   booking: Booking | null
   items: InvoiceItem[]
@@ -162,6 +163,28 @@ const invoiceStatuses: Record<string, { label: string; color: string; bg: string
   partial: { label: "Partielle", color: "text-yellow-700", bg: "bg-yellow-100" },
   refunded: { label: "Remboursée", color: "text-orange-700", bg: "bg-orange-100" },
   cancelled: { label: "Annulée", color: "text-red-700", bg: "bg-red-100" },
+}
+
+// Payment method options
+const paymentMethodOptions: { value: string; label: string }[] = [
+  { value: "cash", label: "Espèces" },
+  { value: "credit_card", label: "Carte bancaire" },
+  { value: "bank_transfer", label: "Virement bancaire" },
+  { value: "check", label: "Chèque" },
+  { value: "mobile_money", label: "Mobile Money" },
+  { value: "online", label: "Paiement en ligne" },
+  { value: "other", label: "Autre" },
+]
+
+// Payment method labels for display
+const paymentMethodLabels: Record<string, string> = {
+  cash: "Espèces",
+  credit_card: "Carte bancaire",
+  bank_transfer: "Virement bancaire",
+  check: "Chèque",
+  mobile_money: "Mobile Money",
+  online: "Paiement en ligne",
+  other: "Autre",
 }
 
 const defaultItemForm = {
@@ -208,6 +231,7 @@ export default function InvoicesPage() {
     dueDate: "",
     notes: "",
     terms: "",
+    paymentMethod: "",
     items: [{ ...defaultItemForm }],
     touristTax: false,
     touristTaxPerNight: "0.60",
@@ -366,6 +390,7 @@ export default function InvoicesPage() {
       dueDate: "",
       notes: "",
       terms: "",
+      paymentMethod: "",
       items: [{ ...defaultItemForm }],
     })
     setSelectedBookingId("")
@@ -382,6 +407,7 @@ export default function InvoicesPage() {
       dueDate: invoice.dueDate ? format(parseISO(invoice.dueDate), "yyyy-MM-dd") : "",
       notes: invoice.notes || "",
       terms: "",
+      paymentMethod: invoice.paymentMethod || "",
       items: invoice.items.map((item) => ({
         description: item.description,
         quantity: item.quantity.toString(),
@@ -563,6 +589,7 @@ export default function InvoicesPage() {
           dueDate: formData.dueDate || null,
           notes: formData.notes || null,
           terms: formData.terms || null,
+          paymentMethod: formData.paymentMethod || null,
           subtotal,
           taxes,
           discount: 0,
@@ -1136,6 +1163,11 @@ export default function InvoicesPage() {
                             </span>
                           )}
                         </p>
+                        {invoice.paymentMethod && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            💳 {paymentMethodLabels[invoice.paymentMethod] || invoice.paymentMethod}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -1582,15 +1614,32 @@ export default function InvoicesPage() {
               )}
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                value={formData.notes}
-                onChange={(e) => handleFormChange("notes", e.target.value)}
-                placeholder="Notes visibles sur la facture..."
-                rows={2}
-              />
+            {/* Payment Method + Notes */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Mode de paiement</Label>
+                <Select value={formData.paymentMethod || undefined} onValueChange={(v) => handleFormChange("paymentMethod", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethodOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e) => handleFormChange("notes", e.target.value)}
+                  placeholder="Notes visibles sur la facture..."
+                  rows={2}
+                />
+              </div>
             </div>
           </div>
 
