@@ -56,10 +56,16 @@ export async function PATCH(
 
     // Cannot modify items on completed, verified, or needs_repair tasks
     if (["completed", "verified", "needs_repair"].includes(task.status)) {
+      const statusMessages: Record<string, string> = {
+        verified: "Chambre déjà vérifiée",
+        completed: "Tâche déjà terminée",
+        needs_repair: "Tâche en attente de réparation",
+      }
       return NextResponse.json(
         {
-          error:
-            "Impossible de modifier les éléments d'une tâche terminée ou vérifiée",
+          error: statusMessages[task.status] || "Impossible de modifier les éléments de cette tâche",
+          code: "TASK_LOCKED",
+          taskStatus: task.status,
         },
         { status: 400 }
       )

@@ -507,7 +507,10 @@ export default function HousekeepingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checked, notes }),
       })
-      if (!res.ok) throw new Error("Erreur")
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "Erreur")
+      }
       const data = await res.json()
 
       // Update local state
@@ -554,8 +557,13 @@ export default function HousekeepingPage() {
           })
         )
       }
-    } catch {
-      toast({ title: "Erreur", description: "Erreur lors de la mise à jour", variant: "destructive" })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur"
+      toast({
+        title: "Action impossible",
+        description: msg,
+        variant: "destructive",
+      })
     } finally {
       setIsTogglingItem(null)
     }
@@ -903,7 +911,7 @@ export default function HousekeepingPage() {
                 </CardHeader>
 
                 <CardContent className="px-4 pb-4 space-y-3">
-                  {/* Cleaning status */}
+                  {/* Cleaning status — always visible */}
                   {csInfo ? (
                     <Badge className={cn("text-xs font-medium w-full justify-center py-1", csInfo.color)}>
                       <span className={cn("w-2 h-2 rounded-full mr-1.5", csInfo.dotColor)} />
@@ -914,7 +922,12 @@ export default function HousekeepingPage() {
                       <span className={cn("w-2 h-2 rounded-full mr-1.5", getTaskStatusInfo(taskInfo.status).dotColor)} />
                       {getTaskStatusInfo(taskInfo.status).label}
                     </Badge>
-                  ) : null}
+                  ) : (
+                    <Badge className="text-xs font-medium w-full justify-center py-1 bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      <span className="w-2 h-2 rounded-full mr-1.5 bg-gray-400 dark:bg-gray-500" />
+                      Prêt
+                    </Badge>
+                  )}
 
                   {/* Assigned person */}
                   {taskInfo?.assignedTo && (
