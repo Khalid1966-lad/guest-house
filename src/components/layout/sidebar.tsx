@@ -43,8 +43,10 @@ import {
   Moon,
   Sun,
   Shield,
+  ShieldAlert,
   Building2,
   HelpCircle,
+  Lock,
   UserCog,
   Sparkles,
   type LucideIcon,
@@ -265,14 +267,27 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
     if (session?.user) fetchPermissions()
   }, [session])
 
+  // Roles that see all menus but with restricted access for unauthorized items
+  const isRestrictedRole = useMemo(() => {
+    const role = session?.user?.role
+    return role === "femmeDeMenage" || role === "gouvernant" || role === "gouvernante"
+  }, [session])
+
   const filteredNavigation = useMemo(() => {
     if (session?.user?.role === "super_admin") return []
     if (!permissions) return navigation
+    // Restricted roles see ALL menus (restricted ones are handled in the render)
+    if (isRestrictedRole) return navigation
     return navigation.filter((item) => {
       if (!item.permission) return true
       return permissions[item.permission] === true
     })
-  }, [permissions, session])
+  }, [permissions, session, isRestrictedRole])
+
+  const hasPermission = (item: NavItem) => {
+    if (!item.permission) return true
+    return permissions?.[item.permission] === true
+  }
 
   const isSuperAdmin = session?.user?.role === "super_admin"
 
@@ -321,11 +336,64 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
           </Link>
         ) : (
           filteredNavigation.map((item) => {
+            const permitted = hasPermission(item)
             // Smart active check: exact match OR prefix match (but not if a more specific nav item matches)
             const hasMoreSpecificMatch = filteredNavigation.some(
               (other) => other.href !== item.href && pathname.startsWith(other.href) && other.href.length > item.href.length
             )
             const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && !hasMoreSpecificMatch)
+
+            // Restricted item for limited roles
+            if (!permitted && isRestrictedRole) {
+              const restrictedEl = (
+                <div
+                  key={item.name}
+                  className={cn(
+                    "flex items-center rounded-lg px-3 py-2 text-sm transition-all duration-200 w-full",
+                    collapsed && "justify-center px-0",
+                    "text-gray-300 dark:text-gray-600 cursor-not-allowed select-none"
+                  )}
+                  title="Accès restreint"
+                >
+                  <div className="relative">
+                    <item.icon
+                      className="h-5 w-5 flex-shrink-0"
+                      style={{ color: "currentColor" }}
+                    />
+                    <Lock className="h-2.5 w-2.5 absolute -bottom-0.5 -right-0.5 text-gray-400 dark:text-gray-600" />
+                  </div>
+                  {!collapsed && (
+                    <span className="ml-3 flex items-center gap-1.5">
+                      <span>{item.name}</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full leading-none">
+                        Restreint
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )
+
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.name} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      {restrictedEl}
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="font-medium text-gray-400"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>{item.name} — Accès restreint</span>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              }
+
+              return restrictedEl
+            }
 
             const linkEl = (
               <Link
