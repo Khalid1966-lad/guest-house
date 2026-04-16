@@ -811,48 +811,54 @@ export default function RestaurantPage() {
           {menuViewMode === "grid" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredMenuItems.map((item) => (
-              <Card key={item.id} className={cn(!item.isAvailable && "opacity-60")}>
+              <Card key={item.id} className={cn(!item.isAvailable && "opacity-60", "overflow-hidden")}>
+                {/* Image */}
+                {item.image ? (
+                  <div className="relative h-40 overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {!item.isAvailable && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Badge variant="secondary" className="bg-red-500/90 text-white border-0">Indisponible</Badge>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-40 bg-gradient-to-br from-orange-100 to-amber-200 flex items-center justify-center">
+                    <UtensilsCrossed className="w-12 h-12 text-orange-400" />
+                  </div>
+                )}
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-100 to-amber-200 flex items-center justify-center flex-shrink-0">
-                          <UtensilsCrossed className="w-5 h-5 text-orange-500" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium truncate">{item.name}</h3>
-                          {!item.isAvailable && (
-                            <Badge variant="outline" className="text-xs flex-shrink-0">Indisponible</Badge>
-                          )}
-                        </div>
-                        {item.description && (
-                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium truncate">{item.name}</h3>
+                        {!item.isAvailable && !item.image && (
+                          <Badge variant="outline" className="text-xs flex-shrink-0">Indisponible</Badge>
                         )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="font-semibold text-sky-600">{formatAmount(item.price)}</span>
-                          {item.preparationTime && (
-                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {item.preparationTime} min
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex gap-1 mt-2">
-                          {item.isVegetarian && (
-                            <Badge variant="outline" className="text-xs text-green-600 border-green-200">Végétarien</Badge>
-                          )}
-                          {item.isVegan && (
-                            <Badge variant="outline" className="text-xs text-green-600 border-green-200">Vegan</Badge>
-                          )}
-                        </div>
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="font-semibold text-sky-600">{formatAmount(item.price)}</span>
+                        {item.preparationTime && (
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {item.preparationTime} min
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-1 mt-2">
+                        {item.isVegetarian && (
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">Végétarien</Badge>
+                        )}
+                        {item.isVegan && (
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">Vegan</Badge>
+                        )}
                       </div>
                     </div>
                     <DropdownMenu>
