@@ -267,22 +267,11 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
     if (session?.user) fetchPermissions()
   }, [session])
 
-  // Roles that see all menus but with restricted access for unauthorized items
-  const isRestrictedRole = useMemo(() => {
-    const role = session?.user?.role
-    return role === "femmeDeMenage" || role === "gouvernant" || role === "gouvernante"
-  }, [session])
-
+  // ALL non-super_admin users see ALL menus — unauthorized ones get locked badge
   const filteredNavigation = useMemo(() => {
     if (session?.user?.role === "super_admin") return []
-    if (!permissions) return navigation
-    // Restricted roles see ALL menus (restricted ones are handled in the render)
-    if (isRestrictedRole) return navigation
-    return navigation.filter((item) => {
-      if (!item.permission) return true
-      return permissions[item.permission] === true
-    })
-  }, [permissions, session, isRestrictedRole])
+    return navigation
+  }, [session])
 
   const hasPermission = (item: NavItem) => {
     if (!item.permission) return true
@@ -343,8 +332,8 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
             )
             const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && !hasMoreSpecificMatch)
 
-            // Restricted item for limited roles
-            if (!permitted && isRestrictedRole) {
+            // Restricted item — show locked badge for unauthorized menus
+            if (!permitted) {
               const restrictedEl = (
                 <div
                   key={item.name}
