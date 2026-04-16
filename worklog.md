@@ -192,3 +192,37 @@ Stage Summary:
 - Super admin can reset any guesthouse owner's password from the admin panel
 - Password reset uses secure bcrypt hashing
 - Pushed as commit 5d83a52
+
+---
+Task ID: room-photos
+Agent: Main
+Task: Add room photos support - card view display, edit upload/delete, detail gallery
+
+Work Log:
+- Updated room image compression preset in `src/lib/image-compress.ts`: maxWidth 1280, maxHeight 800, quality 75, maxFileSize 100KB, minQuality 40
+- Updated upload API `src/app/api/upload/image/route.ts`: room images limited to 500KB input (others stay 10MB)
+- Created new API endpoint `PATCH /api/rooms/[id]/images` for removing individual images by index
+- Updated rooms list page `src/app/(app)/app/rooms/page.tsx`:
+  - Added image management state (roomImages, isUploadingImage, imageError, fileInputRef)
+  - Added getRoomImages/getRoomFirstImage helpers
+  - Added handleUploadImage (validates 500KB max, calls /api/upload/image)
+  - Added handleRemoveImage (calls PATCH /api/rooms/[id]/images)
+  - Card view: first photo as header image with object-cover, fallback to gradient placeholder
+  - Photo count badge (Camera icon) on cards when multiple photos exist
+  - Edit dialog: photo management section with 5-column grid, delete button on hover, "Principale" label on first photo
+  - Upload button with dashed border, compression progress indicator, max 10 photos
+- Updated room detail page `src/app/(app)/app/rooms/[id]/page.tsx`:
+  - Added `images` field to Room interface
+  - Main photo display (h-64) with photo count badge
+  - Thumbnail gallery strip below main photo for rooms with multiple images
+  - First thumbnail highlighted with sky-500 border
+  - Fallback to gradient placeholder when no photos
+- All lint checks pass
+
+Stage Summary:
+- Room photos fully functional across list, edit, and detail views
+- Images compressed to ~100KB via sharp (webp, 1280x800)
+- Max 10 photos per room, 500KB max input per file
+- First photo used as card thumbnail and detail page hero
+- Individual photo deletion supported via PATCH API
+- Pushed as commit 3db6181
