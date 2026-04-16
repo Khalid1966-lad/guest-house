@@ -242,6 +242,23 @@ export async function DELETE(
       )
     }
 
+    // Reset restaurant orders back to "pending" (they were marked "billed_to_room" when invoice was created)
+    const invoiceItems = await db.invoiceItem.findMany({
+      where: {
+        invoiceId: id,
+        itemType: { in: ["restaurant_order", "restaurant_order_header"] },
+        referenceId: { not: null },
+      },
+      select: { referenceId: true },
+    })
+    const orderIds = [...new Set(invoiceItems.map((item) => item.referenceId!))]
+    if (orderIds.length > 0) {
+      await db.restaurantOrder.updateMany({
+        where: { id: { in: orderIds } },
+        data: { paymentStatus: "pending" },
+      })
+    }
+
     // Supprimer les items d'abord
     await db.invoiceItem.deleteMany({
       where: { invoiceId: id },
