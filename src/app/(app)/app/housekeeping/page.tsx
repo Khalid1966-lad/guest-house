@@ -449,7 +449,10 @@ export default function HousekeepingPage() {
     let filtered = rooms
 
     if (activeFilter === "all") {
-      // Show rooms that need attention (have cleaning status or active task)
+      // Show ALL rooms
+      filtered = rooms
+    } else if (activeFilter === "needs_attention") {
+      // Show rooms that need attention (no cleaning status or still in departure/cleaning)
       filtered = rooms.filter((r) => r.cleaningStatus !== null || r.activeTask !== null)
     } else if (activeFilter === "active") {
       filtered = rooms.filter((r) => r.activeTask !== null)
@@ -788,7 +791,7 @@ export default function HousekeepingPage() {
           )}
         >
           Toutes
-          <span className="font-bold">{stats.activeTasks}</span>
+          <span className="font-bold">{stats.total}</span>
         </button>
         {[
           { key: "departure", label: "En départ", dot: "bg-amber-500", active: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 ring-amber-300 dark:ring-amber-700" },
@@ -834,7 +837,7 @@ export default function HousekeepingPage() {
           <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
             {searchQuery
               ? "Aucun résultat pour cette recherche."
-              : "Toutes les chambres sont propres. Aucune tâche de ménage en cours."}
+              : "Aucune chambre trouvée."}
           </p>
         </div>
       ) : (

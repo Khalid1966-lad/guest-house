@@ -239,7 +239,11 @@ export async function PATCH(
 
         await db.room.update({
           where: { id: existingBooking.roomId },
-          data: { status: "available" },
+          data: {
+            status: "available",
+            cleaningStatus: "departure",
+            cleaningUpdatedAt: new Date(),
+          },
         })
       }
 
