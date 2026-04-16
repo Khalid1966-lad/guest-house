@@ -323,3 +323,65 @@ Stage Summary:
 - Settings → Notifications: full notification history with delete-one and delete-all
 - Invoice dialog: wider (max-w-4xl, min 720px) and user-resizable
 - Cancelled restaurant orders can be deleted by owner
+
+---
+Task ID: 3-restaurant-updates
+Agent: full-stack-developer
+Task: Restaurant page updates - photos, list view, minimized labels
+
+Work Log:
+- Added new imports: `useRef` from React, `Camera`, `X`, `LayoutGrid`, `List` from lucide-react
+- Added state variables: `isUploadingImage`, `imagePreview`, `menuViewMode`, `menuImageInputRef`
+- Updated `handleNewMenuItem` and `handleEditMenuItem` to reset/set `imagePreview`
+- Added `handleUploadMenuImage` function: validates 200KB max, uses API for existing items (with targetId), FileReader for new items
+- Added `handleRemoveMenuImage` function to clear image from form and preview
+- Replaced "Image URL" text input in menu item dialog with image upload UI: hidden file input, Camera button trigger, image preview with delete (X) button, loading spinner during upload, max 200KB hint
+- Added photo thumbnails to grid view menu items: 48x48 rounded-lg image or gradient placeholder with UtensilsCrossed icon
+- Added photo thumbnails to new list view: 56x56 rounded-lg image or gradient placeholder
+- Added view mode toggle (LayoutGrid/List icons) in menu filters area
+- Added list view: ScrollArea with max-h-[600px], single-column rows with photo, name/description/badges, price/prep time, and dropdown actions
+- Replaced 4-card Menu Stats with compact inline flex-wrap format (icons + labels in one line)
+- Replaced 4-card Order Stats with compact inline flex-wrap format (clickable status buttons + revenue)
+- All lint checks pass, dev server compiles without errors
+
+Stage Summary:
+- Menu items now support photo upload via file picker (200KB max, compressed server-side for existing items)
+- Photo thumbnails shown in both grid view (48x48) and list view (56x56) with gradient placeholder fallback
+- Toggle between grid and list views for menu items with LayoutGrid/List icon buttons
+- List view includes ScrollArea with 600px max height for vertical scrolling
+- Menu stats and order stats condensed from 4 cards each into single-line compact formats
+- Order stats buttons are clickable to filter by status
+
+---
+Task ID: 1-statistics-fixes
+Agent: Main
+Task: Statistics page - refresh button, year selector fix, PDF export
+
+Work Log:
+- Replaced broken Tabs-based period selector with custom button group (Mois/Année) using div+button
+- Added year selector dropdown (Select) that appears when "Année" is active, showing current year and 3 previous years
+- Updated statistics API to accept `year` query parameter for yearly statistics (uses referenceDate instead of now)
+- Added RefreshCw icon button that triggers data refresh with spinning animation
+- Added PDF export button using `window.print()` (best approach for dashboard with charts)
+- Added `useMemo` and `cn` imports, `RefreshCw` icon import
+- Added `selectedYear` state variable
+
+Stage Summary:
+- Period selector (Mois/Année) now works reliably with custom buttons instead of Tabs component
+- Year selector shows when "Année" period is selected (current year - 3 previous)
+- Refresh button reloads statistics data with visual feedback
+- PDF export uses browser print dialog (captures charts correctly)
+- Statistics API supports year parameter for historical data
+
+---
+Task ID: 2-notification-transparency
+Agent: Main
+Task: Fix notification popover transparency
+
+Work Log:
+- Added explicit `bg-popover border shadow-lg` classes to PopoverContent in NotificationBell component
+- Ensures solid background instead of potentially transparent default
+
+Stage Summary:
+- Notification popover now has solid background and visible shadow
+- Content behind notifications no longer shows through

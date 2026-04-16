@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useCurrency } from "@/hooks/use-currency"
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -28,6 +28,7 @@ import {
   BarChart3,
   PieChart as PieChartIcon,
   Activity,
+  RefreshCw,
 } from "lucide-react"
 import {
   Area,
@@ -95,11 +96,13 @@ export default function StatisticsPage() {
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("month")
   const [chartType, setChartType] = useState<"revenue" | "occupancy" | "combined">("combined")
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/statistics?period=${period}`)
+      const yearParam = period === "year" ? `&year=${selectedYear}` : ""
+      const response = await fetch(`/api/statistics?period=${period}${yearParam}`)
       const data = await response.json()
 
       if (response.ok) {
@@ -110,11 +113,21 @@ export default function StatisticsPage() {
     } finally {
       setLoading(false)
     }
-  }, [period])
+  }, [period, selectedYear])
 
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
+
+  // Generate list of years for year selector
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    return [currentYear, currentYear - 1, currentYear - 2, currentYear - 3]
+  }, [])
+
+  const handleExportPDF = () => {
+    window.print()
+  }
 
   const formatCurrency = (amount: number) => formatAmountCompact(amount)
 
@@ -179,16 +192,50 @@ export default function StatisticsPage() {
             Analyse détaillée de votre activité
           </p>
         </div>
-        <div className="flex gap-2">
-          <Tabs value={period} onValueChange={setPeriod}>
-            <TabsList>
-              <TabsTrigger value="month">Mois</TabsTrigger>
-              <TabsTrigger value="year">Année</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Exporter
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setPeriod("month")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                period === "month"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Mois
+            </button>
+            <button
+              onClick={() => setPeriod("year")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                period === "year"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Année
+            </button>
+          </div>
+          {period === "year" && (
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+              <SelectTrigger className="w-28 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4 mr-1.5", loading && "animate-spin")} />
+            Rafraîchir
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <Download className="h-4 w-4 mr-1.5" />
+            PDF
           </Button>
         </div>
       </div>

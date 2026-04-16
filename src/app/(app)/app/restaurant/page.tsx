@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useCurrency } from "@/hooks/use-currency"
 import { useRouter } from "next/navigation"
@@ -68,6 +68,10 @@ import {
   DoorOpen,
   ShoppingBag,
   Minus,
+  Camera,
+  X,
+  LayoutGrid,
+  List,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -234,6 +238,12 @@ export default function RestaurantPage() {
   const [isNewOrderSaving, setIsNewOrderSaving] = useState(false)
   const [newOrderError, setNewOrderError] = useState("")
 
+  // Image upload state
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [menuViewMode, setMenuViewMode] = useState<"grid" | "list">("grid")
+  const menuImageInputRef = useRef<HTMLInputElement>(null)
+
   // Filtered menu items
   const filteredMenuItems = useMemo(() => {
     return menuItems.filter((item) => {
@@ -338,6 +348,7 @@ export default function RestaurantPage() {
     setEditingMenuItem(null)
     setMenuFormData(defaultMenuItemForm)
     setMenuFormError("")
+    setImagePreview(null)
     setIsMenuDialogOpen(true)
   }
 
@@ -356,6 +367,7 @@ export default function RestaurantPage() {
       allergens: item.allergens || "",
       preparationTime: item.preparationTime?.toString() || "",
     })
+    setImagePreview(item.image || null)
     setMenuFormError("")
     setIsMenuDialogOpen(true)
   }
@@ -402,6 +414,56 @@ export default function RestaurantPage() {
       setMenuFormError("Une erreur inattendue s'est produite")
       setIsMenuSaving(false)
     }
+  }
+
+  const handleUploadMenuImage = async (file: File) => {
+    if (file.size > 200 * 1024) {
+      setMenuFormError("L'image ne doit pas dépasser 200 Ko")
+      return
+    }
+
+    setIsUploadingImage(true)
+
+    if (editingMenuItem) {
+      try {
+        const formData = new FormData()
+        formData.append("image", file)
+        formData.append("type", "menu")
+        formData.append("target", "menuItem")
+        formData.append("targetId", editingMenuItem.id)
+
+        const res = await fetch("/api/upload/image", { method: "POST", body: formData })
+        const data = await res.json()
+
+        if (res.ok) {
+          setMenuFormData((prev) => ({ ...prev, image: data.image }))
+          setImagePreview(data.image)
+        } else {
+          setMenuFormError(data.error || "Erreur lors du téléchargement de l'image")
+        }
+      } catch {
+        setMenuFormError("Erreur lors du téléchargement de l'image")
+      }
+    } else {
+      try {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string
+          setMenuFormData((prev) => ({ ...prev, image: dataUrl }))
+          setImagePreview(dataUrl)
+        }
+        reader.readAsDataURL(file)
+      } catch {
+        setMenuFormError("Erreur lors de la lecture de l'image")
+      }
+    }
+
+    setIsUploadingImage(false)
+  }
+
+  const handleRemoveMenuImage = () => {
+    setMenuFormData((prev) => ({ ...prev, image: "" }))
+    setImagePreview(null)
   }
 
   const handleDeleteMenuItem = async () => {
@@ -651,43 +713,11 @@ export default function RestaurantPage() {
         {/* Menu Tab */}
         <TabsContent value="menu" className="space-y-6">
           {/* Menu Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <UtensilsCrossed className="w-4 h-4" />
-                  <span className="text-sm">Total</span>
-                </div>
-                <p className="text-2xl font-bold">{menuStats.total}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-green-600 mb-1">
-                  <CheckCircle className="w-4 h-4" />
-                  <span className="text-sm">Disponibles</span>
-                </div>
-                <p className="text-2xl font-bold text-green-600">{menuStats.available}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-green-600 mb-1">
-                  <Leaf className="w-4 h-4" />
-                  <span className="text-sm">Végétarien</span>
-                </div>
-                <p className="text-2xl font-bold text-green-600">{menuStats.vegetarian}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-green-600 mb-1">
-                  <Leaf className="w-4 h-4" />
-                  <span className="text-sm">Vegan</span>
-                </div>
-                <p className="text-2xl font-bold text-green-600">{menuStats.vegan}</p>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <span className="flex items-center gap-1.5 text-gray-500"><UtensilsCrossed className="w-3.5 h-3.5" /> Total: <strong>{menuStats.total}</strong></span>
+            <span className="flex items-center gap-1.5 text-green-600"><CheckCircle className="w-3.5 h-3.5" /> Disponibles: <strong>{menuStats.available}</strong></span>
+            <span className="flex items-center gap-1.5 text-green-600"><Leaf className="w-3.5 h-3.5" /> Végétarien: <strong>{menuStats.vegetarian}</strong></span>
+            <span className="flex items-center gap-1.5 text-green-600"><Leaf className="w-3.5 h-3.5" /> Vegan: <strong>{menuStats.vegan}</strong></span>
           </div>
 
           {/* Menu Filters */}
@@ -714,6 +744,24 @@ export default function RestaurantPage() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center border rounded-md">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("rounded-r-none h-9 w-9", menuViewMode === "grid" && "bg-gray-100")}
+                onClick={() => setMenuViewMode("grid")}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("rounded-l-none h-9 w-9", menuViewMode === "list" && "bg-gray-100")}
+                onClick={() => setMenuViewMode("list")}
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Category Chips */}
@@ -759,43 +807,57 @@ export default function RestaurantPage() {
             })}
           </div>
 
-          {/* Menu Items Grid */}
+          {/* Menu Items - Grid View */}
+          {menuViewMode === "grid" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredMenuItems.map((item) => (
               <Card key={item.id} className={cn(!item.isAvailable && "opacity-60")}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{item.name}</h3>
-                        {!item.isAvailable && (
-                          <Badge variant="outline" className="text-xs">Indisponible</Badge>
-                        )}
-                      </div>
-                      {item.description && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-100 to-amber-200 flex items-center justify-center flex-shrink-0">
+                          <UtensilsCrossed className="w-5 h-5 text-orange-500" />
+                        </div>
                       )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="font-semibold text-sky-600">{formatAmount(item.price)}</span>
-                        {item.preparationTime && (
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {item.preparationTime} min
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium truncate">{item.name}</h3>
+                          {!item.isAvailable && (
+                            <Badge variant="outline" className="text-xs flex-shrink-0">Indisponible</Badge>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
                         )}
-                      </div>
-                      <div className="flex gap-1 mt-2">
-                        {item.isVegetarian && (
-                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">Végétarien</Badge>
-                        )}
-                        {item.isVegan && (
-                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">Vegan</Badge>
-                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="font-semibold text-sky-600">{formatAmount(item.price)}</span>
+                          {item.preparationTime && (
+                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {item.preparationTime} min
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          {item.isVegetarian && (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-200">Végétarien</Badge>
+                          )}
+                          {item.isVegan && (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-200">Vegan</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="flex-shrink-0">
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -835,6 +897,101 @@ export default function RestaurantPage() {
               </Card>
             ))}
           </div>
+          )}
+
+          {/* Menu Items - List View */}
+          {menuViewMode === "list" && (
+          <ScrollArea className="max-h-[600px]">
+            <div className="space-y-2">
+              {filteredMenuItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors",
+                    !item.isAvailable && "opacity-60"
+                  )}
+                >
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-orange-100 to-amber-200 flex items-center justify-center flex-shrink-0">
+                      <UtensilsCrossed className="w-6 h-6 text-orange-500" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium truncate">{item.name}</h3>
+                      {!item.isAvailable && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0">Indisponible</Badge>
+                      )}
+                      {item.isVegetarian && (
+                        <Badge variant="outline" className="text-xs text-green-600 border-green-200">Végétarien</Badge>
+                      )}
+                      {item.isVegan && (
+                        <Badge variant="outline" className="text-xs text-green-600 border-green-200">Vegan</Badge>
+                      )}
+                    </div>
+                    {item.description && (
+                      <p className="text-sm text-gray-500 truncate">{item.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="text-right">
+                      <span className="font-semibold text-sky-600">{formatAmount(item.price)}</span>
+                      {item.preparationTime && (
+                        <span className="text-xs text-gray-500 flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          {item.preparationTime} min
+                        </span>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleToggleAvailability(item)}>
+                          {item.isAvailable ? (
+                            <>
+                              <Pause className="w-4 h-4 mr-2" />
+                              Rendre indisponible
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-4 h-4 mr-2" />
+                              Rendre disponible
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditMenuItem(item)}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600"
+                          onClick={() => {
+                            setMenuItemToDelete(item)
+                            setIsDeleteMenuDialogOpen(true)
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          )}
 
           {filteredMenuItems.length === 0 && (
             <div className="text-center py-12">
@@ -856,43 +1013,19 @@ export default function RestaurantPage() {
         {/* Orders Tab */}
         <TabsContent value="orders" className="space-y-6">
           {/* Order Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOrderStatusFilter("pending")}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-1">
-                  <Clock className="w-4 h-4 text-yellow-600" />
-                  <span className="text-2xl font-bold">{orderStats.pending}</span>
-                </div>
-                <p className="text-sm text-gray-500">En attente</p>
-              </CardContent>
-            </Card>
-            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOrderStatusFilter("preparing")}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-1">
-                  <ChefHat className="w-4 h-4 text-sky-600" />
-                  <span className="text-2xl font-bold">{orderStats.preparing}</span>
-                </div>
-                <p className="text-sm text-gray-500">En préparation</p>
-              </CardContent>
-            </Card>
-            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOrderStatusFilter("ready")}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-1">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-2xl font-bold">{orderStats.ready}</span>
-                </div>
-                <p className="text-sm text-gray-500">Prêtes</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-1">
-                  <DollarSign className="w-4 h-4 text-sky-600" />
-                  <span className="text-2xl font-bold">{formatAmount(orderStats.todayRevenue)}</span>
-                </div>
-                <p className="text-sm text-gray-500">Revenus aujourd'hui</p>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <button onClick={() => setOrderStatusFilter("pending")} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 transition-colors">
+              <Clock className="w-3.5 h-3.5 text-yellow-600" /> <strong>{orderStats.pending}</strong> En attente
+            </button>
+            <button onClick={() => setOrderStatusFilter("preparing")} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 transition-colors">
+              <ChefHat className="w-3.5 h-3.5 text-sky-600" /> <strong>{orderStats.preparing}</strong> En préparation
+            </button>
+            <button onClick={() => setOrderStatusFilter("ready")} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 transition-colors">
+              <CheckCircle className="w-3.5 h-3.5 text-green-600" /> <strong>{orderStats.ready}</strong> Prêtes
+            </button>
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <DollarSign className="w-3.5 h-3.5 text-sky-600" /> <strong>{formatAmount(orderStats.todayRevenue)}</strong> Revenus aujourd'hui
+            </span>
           </div>
 
           {/* Order Filters */}
@@ -1130,12 +1263,52 @@ export default function RestaurantPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="image">Image URL</Label>
-                <Input
-                  id="image"
-                  value={menuFormData.image}
-                  onChange={(e) => handleMenuFormChange("image", e.target.value)}
+                <Label>Photo</Label>
+                <input
+                  ref={menuImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleUploadMenuImage(file)
+                    e.target.value = ""
+                  }}
                 />
+                {imagePreview || menuFormData.image ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={imagePreview || menuFormData.image}
+                      alt="Aperçu"
+                      className="w-20 h-20 rounded-lg object-cover border"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveMenuImage}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-20 h-20 rounded-lg border-dashed flex flex-col items-center justify-center gap-1"
+                    onClick={() => menuImageInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                  >
+                    {isUploadingImage ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    ) : (
+                      <>
+                        <Camera className="w-5 h-5 text-gray-400" />
+                        <span className="text-xs text-gray-400">Photo</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+                <p className="text-xs text-gray-400">Max 200 Ko</p>
               </div>
             </div>
 

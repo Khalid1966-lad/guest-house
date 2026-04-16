@@ -137,7 +137,7 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-80 sm:w-96 p-0 gap-0 max-h-[520px] flex flex-col"
+        className="w-80 sm:w-96 p-0 gap-0 max-h-[520px] flex flex-col bg-popover border shadow-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Header */}

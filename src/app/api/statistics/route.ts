@@ -20,13 +20,23 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const period = searchParams.get("period") || "month"
+    const yearParam = searchParams.get("year")
 
+    // Determine reference date: use specified year for yearly, current date otherwise
     const now = new Date()
-    const startDate = period === "year" ? startOfYear(now) : startOfMonth(now)
-    const endDate = period === "year" ? endOfYear(now) : endOfMonth(now)
+    let referenceDate = now
+    if (period === "year" && yearParam) {
+      const y = parseInt(yearParam)
+      if (!isNaN(y)) {
+        referenceDate = new Date(y, now.getMonth(), now.getDate())
+      }
+    }
 
-    // Plage de 6 mois pour les graphiques
-    const sixMonthsAgo = startOfMonth(subMonths(now, 5))
+    const startDate = period === "year" ? startOfYear(referenceDate) : startOfMonth(referenceDate)
+    const endDate = period === "year" ? endOfYear(referenceDate) : endOfMonth(referenceDate)
+
+    // Plage de 6 mois pour les graphiques (relative to the period end)
+    const sixMonthsAgo = startOfMonth(subMonths(endDate, 5))
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
