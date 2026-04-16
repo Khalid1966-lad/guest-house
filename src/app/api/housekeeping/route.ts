@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { Prisma } from "@prisma/client"
 
 const VALID_CLEANING_STATUSES = ["departure", "turnover", "cleaning", "clean", "verified"]
 
@@ -17,6 +16,19 @@ const ALLOWED_ROLES = [
 ]
 
 const CAN_VERIFY_ROLES = ["owner", "admin", "manager", "gouvernant", "gouvernante"]
+
+// Safe room fields that exist in the base schema (before any housekeeping migration)
+const SAFE_ROOM_SELECT = {
+  id: true,
+  number: true,
+  name: true,
+  floor: true,
+  type: true,
+  capacity: true,
+  status: true,
+  basePrice: true,
+  isActive: true,
+}
 
 // Helper: auth + role check
 async function authenticate(request: Request, requireVerify = false) {
@@ -38,6 +50,19 @@ async function authenticate(request: Request, requireVerify = false) {
   return { error: null, session }
 }
 
+function isMissingColumnError(err: unknown): boolean {
+  if (err && typeof err === "object") {
+    const msg = (err as { message?: string }).message || ""
+    return (
+      msg.includes("does not exist") ||
+      msg.includes("column") && msg.includes("not found") ||
+      msg.includes("No such column") ||
+      msg.includes("undefined column")
+    )
+  }
+  return false
+}
+
 // GET - List rooms with their active cleaning tasks and progress
 export async function GET() {
   try {
@@ -50,10 +75,10 @@ export async function GET() {
 
     const guestHouseId = session.user.guestHouseId
 
-    // Try full query with cleaningTasks included.
-    // If tables don't exist yet (migration not applied), fall back to rooms-only query.
+    // Tier 1: Full query with cleaningTasks included + cleaning columns
     let rooms
     let hasCleaningTasks = true
+    let hasCleaningColumns = true
 
     try {
       rooms = await db.room.findMany({
@@ -75,58 +100,54 @@ export async function GET() {
         },
       })
     } catch (queryError: unknown) {
-      // Check if the error is a missing table/relation error
-      const err = queryError as { code?: string; message?: string }
-      const isTableMissing =
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        (err.code === "P2021" || err.code === "P2022" || err.code === "P2010")
-      const isRelationError =
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        (err.code === "P2028" || err.code === "P2009")
+      console.warn("[housekeeping] Full query failed:", (queryError as Error).message)
 
-      if (isTableMissing || isRelationError || (err.message && err.message.includes("does not exist"))) {
-        // Fallback: query rooms without cleaningTasks
-        console.warn("[housekeeping] CleaningTask tables not found, falling back to rooms-only query")
+      // Tier 2: Try without cleaningTasks include (tables may not exist)
+      try {
         hasCleaningTasks = false
         rooms = await db.room.findMany({
           where: { guestHouseId },
           orderBy: [{ floor: "asc" }, { number: "asc" }],
         })
-      } else {
-        throw queryError
+      } catch (fallbackError: unknown) {
+        console.warn("[housekeeping] Fallback query failed:", (fallbackError as Error).message)
+
+        if (isMissingColumnError(fallbackError)) {
+          // Tier 3: Even Room.cleaningStatus column doesn't exist — use safe select
+          hasCleaningColumns = false
+          rooms = await db.room.findMany({
+            where: { guestHouseId },
+            orderBy: [{ floor: "asc" }, { number: "asc" }],
+            select: SAFE_ROOM_SELECT,
+          })
+        } else {
+          throw fallbackError
+        }
       }
     }
 
-    // Type for rooms with or without cleaningTasks
-    type RoomRow = {
-      id: string
-      number: string
-      name: string | null
-      floor: number | null
-      type: string
-      capacity: number
-      status: string
-      cleaningStatus: string | null
-      cleaningUpdatedAt: Date | null
-      cleaningNotes: string | null
-      cleaningTasks?: Array<{
-        id: string
-        status: string
-        priority: string
-        assignedTo: { id: string; name: string | null; avatar: string | null } | null
-        startedAt: Date | null
-        completedAt: Date | null
-        createdAt: Date
-        items: Array<{ checked: boolean }>
-      }>
-    }
+    // Build response — handle all three tiers safely
+    const roomsWithTasks = (rooms as Record<string, unknown>[]).map((room) => {
+      // Safely read cleaning columns (may be undefined)
+      const cleaningStatus = hasCleaningColumns
+        ? (room.cleaningStatus as string | null) ?? null
+        : null
+      const cleaningUpdatedAt = hasCleaningColumns
+        ? (room.cleaningUpdatedAt as Date | null) ?? null
+        : null
+      const cleaningNotes = hasCleaningColumns
+        ? (room.cleaningNotes as string | null) ?? null
+        : null
 
-    // Enrich each room with active task summary
-    const roomsWithTasks = (rooms as RoomRow[]).map((room) => {
-      const activeTask = hasCleaningTasks && room.cleaningTasks ? room.cleaningTasks[0] || null : null
+      // Safely read active task
+      const tasks = hasCleaningTasks ? (room.cleaningTasks as Array<Record<string, unknown>> | undefined) : undefined
+      const activeTask = tasks && tasks.length > 0 ? tasks[0] : null
 
-      const totalItems = activeTask ? activeTask.items.length : 0
-      const checkedItems = activeTask ? activeTask.items.filter((i) => i.checked).length : 0
+      const taskItems = activeTask
+        ? (activeTask.items as Array<{ checked: boolean }> | undefined)
+        : undefined
+      const totalItems = taskItems ? taskItems.length : 0
+      const checkedItems = taskItems ? taskItems.filter((i) => i.checked).length : 0
 
       return {
         id: room.id,
@@ -136,9 +157,9 @@ export async function GET() {
         type: room.type,
         capacity: room.capacity,
         status: room.status,
-        cleaningStatus: room.cleaningStatus,
-        cleaningUpdatedAt: room.cleaningUpdatedAt,
-        cleaningNotes: room.cleaningNotes,
+        cleaningStatus,
+        cleaningUpdatedAt,
+        cleaningNotes,
         activeTask: activeTask
           ? {
               id: activeTask.id,
@@ -154,7 +175,10 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ rooms: roomsWithTasks, hasCleaningTasks })
+    return NextResponse.json({
+      rooms: roomsWithTasks,
+      hasCleaningTasks: hasCleaningTasks && hasCleaningColumns,
+    })
   } catch (error) {
     console.error("Error fetching housekeeping data:", error)
     const message = error instanceof Error ? error.message : "Erreur lors de la récupération des données"
@@ -209,15 +233,16 @@ export async function PATCH(request: Request) {
       data: {
         cleaningStatus: cleaningStatus || null,
         cleaningUpdatedAt: cleaningStatus ? new Date() : null,
-        cleaningNotes: cleaningNotes !== undefined ? cleaningNotes : room.cleaningNotes,
+        cleaningNotes: cleaningNotes !== undefined ? cleaningNotes : (room as Record<string, unknown>).cleaningNotes as string | null,
       },
     })
 
     return NextResponse.json({ room: updatedRoom })
   } catch (error) {
     console.error("Error updating cleaning status:", error)
+    const message = error instanceof Error ? error.message : "Erreur lors de la mise à jour"
     return NextResponse.json(
-      { error: "Erreur lors de la mise à jour" },
+      { error: message },
       { status: 500 }
     )
   }

@@ -770,7 +770,7 @@ export default function HousekeepingPage() {
           <div>
             <p className="font-medium">Migration de la base de données requise</p>
             <p className="text-xs mt-0.5 opacity-80">
-              Les tables de ménage n'ont pas été créées. Exécutez <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">prisma db push</code> sur le serveur PostgreSQL.
+              Les nouvelles colonnes et tables de ménage n'ont pas encore été créées sur le serveur. Exécutez la migration PostgreSQL pour activer les fonctionnalités avancées (checklist, historique…).
             </p>
           </div>
         </div>
