@@ -43,9 +43,14 @@ import {
   Baby,
   Loader2,
   Settings,
+  Camera,
+  X,
+  ImageIcon,
+  Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useRef } from "react"
 
 // Types
 interface Amenity {
@@ -154,6 +159,11 @@ export default function RoomsPage() {
   const [formData, setFormData] = useState(defaultFormData)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
+  // Image management state
+  const [roomImages, setRoomImages] = useState<string[]>([])
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [imageError, setImageError] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch rooms and amenities
   const fetchData = useCallback(async () => {
@@ -214,11 +224,90 @@ export default function RoomsPage() {
     }
   }, [session?.user?.guestHouseId, status, statusFilter, typeFilter, search, fetchData])
 
+  // Helper: get images from room
+  const getRoomImages = (room: Room): string[] => {
+    if (!room.images) return []
+    try { return JSON.parse(room.images) } catch { return [] }
+  }
+
+  // Helper: get first image from room
+  const getRoomFirstImage = (room: Room): string | null => {
+    const imgs = getRoomImages(room)
+    return imgs.length > 0 ? imgs[0] : null
+  }
+
+  // Upload room image
+  const handleUploadImage = async (file: File) => {
+    if (!editingRoom) return
+    if (file.size > 500 * 1024) {
+      setImageError("L'image ne doit pas dépasser 500 Ko")
+      return
+    }
+    if (!file.type.startsWith("image/")) {
+      setImageError("Type de fichier non supporté")
+      return
+    }
+    setIsUploadingImage(true)
+    setImageError("")
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append("image", file)
+      formDataUpload.append("type", "room")
+      formDataUpload.append("target", "room")
+      formDataUpload.append("targetId", editingRoom.id)
+      const res = await fetch("/api/upload/image", {
+        method: "POST",
+        body: formDataUpload,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setImageError(data.error || "Erreur lors de l'upload")
+        return
+      }
+      const data = await res.json()
+      const newImages = getRoomImages(editingRoom)
+      if (data.image) {
+        newImages.push(data.image)
+      }
+      setRoomImages(newImages)
+      // Update local room data
+      setEditingRoom({ ...editingRoom, images: JSON.stringify(newImages) })
+      setRooms(prev => prev.map(r => r.id === editingRoom.id ? { ...r, images: JSON.stringify(newImages) } : r))
+    } catch {
+      setImageError("Erreur lors de l'upload")
+    } finally {
+      setIsUploadingImage(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  // Remove room image
+  const handleRemoveImage = async (index: number) => {
+    if (!editingRoom) return
+    try {
+      const res = await fetch(`/api/rooms/${editingRoom.id}/images`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove", index }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setRoomImages(data.images || [])
+        setEditingRoom({ ...editingRoom, images: JSON.stringify(data.images || []) })
+        setRooms(prev => prev.map(r => r.id === editingRoom.id ? { ...r, images: JSON.stringify(data.images || []) } : r))
+      }
+    } catch {
+      console.error("Erreur suppression image")
+    }
+  }
+
   // Open dialog for new room
   const handleNewRoom = () => {
     setEditingRoom(null)
     setFormData(defaultFormData)
+    setRoomImages([])
     setError("")
+    setImageError("")
     setIsDialogOpen(true)
   }
 
@@ -244,7 +333,9 @@ export default function RoomsPage() {
       amenities: room.amenities ? JSON.parse(room.amenities) : [],
       status: room.status,
     })
+    setRoomImages(getRoomImages(room))
     setError("")
+    setImageError("")
     setIsDialogOpen(true)
   }
 
@@ -455,12 +546,26 @@ export default function RoomsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {rooms.map((room) => (
             <Card key={room.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              {/* Room Image Placeholder */}
-              <div className="h-40 bg-gradient-to-br from-sky-100 to-blue-100 dark:from-sky-900 dark:to-blue-900 flex items-center justify-center relative">
-                <BedDouble className="w-12 h-12 text-sky-400" />
+              {/* Room Image or Placeholder */}
+              <div className="h-40 bg-gradient-to-br from-sky-100 to-blue-100 dark:from-sky-900 dark:to-blue-900 flex items-center justify-center relative overflow-hidden">
+                {getRoomFirstImage(room) ? (
+                  <img
+                    src={getRoomFirstImage(room)!}
+                    alt={`Chambre ${room.number}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <BedDouble className="w-12 h-12 text-sky-400" />
+                )}
                 <div className="absolute top-2 right-2">
                   {getStatusBadge(room.status)}
                 </div>
+                {getRoomImages(room).length > 1 && (
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
+                    <Camera className="w-3 h-3 inline mr-1" />
+                    {getRoomImages(room).length} photos
+                  </div>
+                )}
               </div>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
@@ -842,6 +947,89 @@ export default function RoomsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {/* Photos (only for editing existing rooms) */}
+            {editingRoom && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Camera className="w-4 h-4" />
+                    Photos de la chambre
+                  </Label>
+                  <span className="text-xs text-gray-400">
+                    {roomImages.length}/10 · Max 500 Ko/photo
+                  </span>
+                </div>
+                {imageError && (
+                  <p className="text-sm text-red-600">{imageError}</p>
+                )}
+                {/* Current images */}
+                {roomImages.length > 0 && (
+                  <div className="grid grid-cols-5 gap-2">
+                    {roomImages.map((img, idx) => (
+                      <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border">
+                        <img
+                          src={img}
+                          alt={`Photo ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Supprimer cette photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        {idx === 0 && (
+                          <span className="absolute bottom-1 left-1 bg-sky-600 text-white text-[10px] px-1.5 py-0.5 rounded">Principale</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Upload button */}
+                {roomImages.length < 10 && (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleUploadImage(file)
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-dashed"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingImage}
+                    >
+                      {isUploadingImage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Compression en cours...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          {roomImages.length === 0
+                            ? "Ajouter une photo"
+                            : "Ajouter une autre photo"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400">
+                  <ImageIcon className="w-3 h-3 inline mr-1" />
+                  Les images sont compressées automatiquement (~100 Ko). La première photo sera affichée en guise de miniature.
+                </p>
               </div>
             )}
 

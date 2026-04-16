@@ -48,7 +48,9 @@ import {
   Star,
   Snowflake,
   Shirt,
+  Camera,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // Types
 interface Amenity {
@@ -84,6 +86,7 @@ interface Room {
   weekendPrice: number | null
   status: string
   amenities: string | null
+  images: string | null
   roomPrices: RoomPrice[]
   bookings: Array<{
     id: string
@@ -286,6 +289,13 @@ export default function RoomDetailsPage() {
     )
   }
 
+  // Parse room images
+  const roomImages: string[] = (() => {
+    if (!room.images) return []
+    try { return JSON.parse(room.images) } catch { return [] }
+  })()
+  const firstImage = roomImages.length > 0 ? roomImages[0] : null
+
   const statusInfo = roomStatuses[room.status] || roomStatuses.available
   const roomAmenities = getRoomAmenities()
 
@@ -314,11 +324,50 @@ export default function RoomDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Image Placeholder */}
-          <Card>
-            <div className="h-64 bg-gradient-to-br from-sky-100 to-blue-100 dark:from-sky-900 dark:to-blue-900 flex items-center justify-center rounded-t-lg">
-              <BedDouble className="w-20 h-20 text-sky-400" />
-            </div>
+          {/* Room Image(s) */}
+          <Card className="overflow-hidden">
+            {roomImages.length > 0 ? (
+              <div className="space-y-0">
+                {/* Main image */}
+                <div className="h-64 relative">
+                  <img
+                    src={firstImage!}
+                    alt={`Chambre ${room.number}`}
+                    className="w-full h-full object-cover"
+                  />
+                  {roomImages.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                      <Camera className="w-3 h-3 inline mr-1" />
+                      {roomImages.length} photos
+                    </div>
+                  )}
+                </div>
+                {/* Thumbnail gallery */}
+                {roomImages.length > 1 && (
+                  <div className="flex gap-1 p-2 overflow-x-auto">
+                    {roomImages.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "w-16 h-16 flex-shrink-0 rounded-md overflow-hidden border-2",
+                          idx === 0 ? "border-sky-500" : "border-transparent hover:border-gray-300"
+                        )}
+                      >
+                        <img
+                          src={img}
+                          alt={`Photo ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-64 bg-gradient-to-br from-sky-100 to-blue-100 dark:from-sky-900 dark:to-blue-900 flex items-center justify-center">
+                <BedDouble className="w-20 h-20 text-sky-400" />
+              </div>
+            )}
             <CardContent className="p-4">
               <p className="text-gray-600 dark:text-gray-400">
                 {room.description || "Aucune description"}

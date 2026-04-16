@@ -50,11 +50,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Max input size: 10MB (we'll compress it down)
-    const maxInputSize = 10 * 1024 * 1024
+    // Max input size depends on target type
+    // Room images: 500KB max input (compressed to ~100KB)
+    // Others: 10MB max input
+    const maxInputSize = imageType === "room" ? 500 * 1024 : 10 * 1024 * 1024
+    const maxLabel = imageType === "room" ? "500 Ko" : "10 Mo"
     if (file.size > maxInputSize) {
       return NextResponse.json(
-        { error: "Fichier trop volumineux. Maximum 10 Mo." },
+        { error: `Fichier trop volumineux. Maximum ${maxLabel}.` },
         { status: 400 }
       )
     }

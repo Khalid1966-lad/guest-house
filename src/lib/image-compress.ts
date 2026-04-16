@@ -38,12 +38,12 @@ const PRESETS: Record<ImageCompressPreset, CompressOptions> = {
     minQuality: 65,
   },
   room: {
-    maxWidth: 1920,
-    maxHeight: 1080,
-    quality: 82,
+    maxWidth: 1280,
+    maxHeight: 800,
+    quality: 75,
     format: "webp",
-    maxFileSize: 500 * 1024, // 500KB per room image
-    minQuality: 60,
+    maxFileSize: 100 * 1024, // 100KB per room image (target)
+    minQuality: 40,
   },
   receipt: {
     maxWidth: 1200,
