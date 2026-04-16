@@ -18,6 +18,7 @@ datasource db {
 // ============================================
 model GuestHouse {
   id            String   @id @default(cuid())
+  code          String   @unique   // Unique code like GH001, GH002...
   name          String
   slug          String   @unique
   description   String?
