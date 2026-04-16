@@ -2,7 +2,84 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { Prisma } from "@prisma/client"
 import bcrypt from "bcryptjs"
+
+// Helper: try to select menuAccess, return null if column doesn't exist
+async function getUsersWithMenuAccess(guestHouseId: string) {
+  try {
+    return await db.user.findMany({
+      where: { guestHouseId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        menuAccess: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    })
+  } catch {
+    // menuAccess column doesn't exist yet — fetch without it
+    return await db.user.findMany({
+      where: { guestHouseId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    })
+  }
+}
+
+// Helper: try to create user with menuAccess
+async function createUserWithMenuAccess(data: Record<string, unknown>, selectFields: Record<string, boolean>) {
+  try {
+    return await db.user.create({
+      data: {
+        email: data.email as string,
+        firstName: (data.firstName as string) || null,
+        lastName: (data.lastName as string) || null,
+        name: data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : null,
+        password: data.hashedPassword as string,
+        role: data.userRole as string,
+        guestHouseId: data.guestHouseId as string,
+        isActive: true,
+        emailVerified: new Date(),
+        menuAccess: (data.menuAccess as Record<string, boolean>) || null,
+      },
+      select: selectFields,
+    })
+  } catch {
+    // menuAccess column doesn't exist — create without it
+    return await db.user.create({
+      data: {
+        email: data.email as string,
+        firstName: (data.firstName as string) || null,
+        lastName: (data.lastName as string) || null,
+        name: data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : null,
+        password: data.hashedPassword as string,
+        role: data.userRole as string,
+        guestHouseId: data.guestHouseId as string,
+        isActive: true,
+        emailVerified: new Date(),
+      },
+      select: selectFields,
+    })
+  }
+}
 
 // GET - List users in the guest house (owner only)
 export async function GET() {
@@ -21,25 +98,7 @@ export async function GET() {
       )
     }
 
-    const users = await db.user.findMany({
-      where: {
-        guestHouseId: session.user.guestHouseId,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        menuAccess: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    })
-
+    const users = await getUsersWithMenuAccess(session.user.guestHouseId)
     return NextResponse.json({ users })
   } catch (error) {
     console.error("Error fetching users:", error)
@@ -111,31 +170,10 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     // Create user
-    const user = await db.user.create({
-      data: {
-        email,
-        firstName: firstName || null,
-        lastName: lastName || null,
-        name: firstName && lastName ? `${firstName} ${lastName}` : null,
-        password: hashedPassword,
-        role: userRole,
-        guestHouseId: session.user.guestHouseId,
-        isActive: true,
-        emailVerified: new Date(),
-        menuAccess: data.menuAccess || null,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        menuAccess: true,
-        createdAt: true,
-      },
-    })
+    const user = await createUserWithMenuAccess(
+      { email, firstName, lastName, userRole, hashedPassword, guestHouseId: session.user.guestHouseId, menuAccess: data.menuAccess },
+      { id: true, email: true, name: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true }
+    )
 
     return NextResponse.json({ user }, { status: 201 })
   } catch (error) {

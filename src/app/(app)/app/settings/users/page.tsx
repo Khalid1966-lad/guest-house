@@ -198,6 +198,27 @@ export default function UsersSettingsPage() {
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // ── Auto-migrate menuAccess column if missing ────────────────────────────
+  const [migrating, setMigrating] = useState(false)
+  const isOwner = session?.user?.role === "owner"
+
+  const runMigration = async () => {
+    try {
+      setMigrating(true)
+      const res = await fetch("/api/setup/migrate", { method: "POST" })
+      if (res.ok) {
+        toast({ title: "Migration réussie", description: "La colonne menuAccess a été ajoutée." })
+        fetchUsers() // Re-fetch after migration
+      } else {
+        toast({ title: "Erreur de migration", description: "Vérifiez la console serveur.", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'exécuter la migration.", variant: "destructive" })
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   // ── Fetch users ───────────────────────────────────────────────────────────
   const fetchUsers = async () => {
     if (!session?.user?.guestHouseId) return
@@ -206,7 +227,14 @@ export default function UsersSettingsPage() {
       const res = await fetch("/api/users")
       if (res.ok) {
         const data = await res.json()
-        setUsers(data.users || [])
+        const usersList = data.users || []
+        // Detect missing menuAccess column: no user has the field
+        const hasMenuAccess = usersList.length === 0 || usersList.some((u: User) => u.menuAccess !== undefined)
+        if (!hasMenuAccess && isOwner && !migrating) {
+          console.log("[users] menuAccess column missing, triggering migration...")
+          runMigration()
+        }
+        setUsers(usersList)
       }
     } catch {
       toast({ title: "Erreur", description: "Impossible de charger les utilisateurs", variant: "destructive" })
@@ -220,7 +248,6 @@ export default function UsersSettingsPage() {
   }, [session])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const isOwner = session?.user?.role === "owner"
   const isSelf = (userId: string) => session?.user?.id === userId
   const ownerCount = users.filter((u) => u.role === "owner").length
   const isLastOwner = (userId: string) =>

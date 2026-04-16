@@ -8,6 +8,58 @@ interface RouteParams {
   params: Promise<{ id: string }>
 }
 
+// Base select without menuAccess (safe fallback)
+const baseSelect = {
+  id: true,
+  email: true,
+  name: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+}
+
+// Extended select with menuAccess
+const menuSelect = {
+  ...baseSelect,
+  menuAccess: true,
+}
+
+// Helper: safe query with/without menuAccess column
+async function safeFindUser(id: string, guestHouseId: string) {
+  try {
+    return await db.user.findFirst({
+      where: { id, guestHouseId },
+      select: { ...baseSelect, language: true, theme: true, menuAccess: true },
+    })
+  } catch {
+    return await db.user.findFirst({
+      where: { id, guestHouseId },
+      select: { ...baseSelect, language: true, theme: true },
+    })
+  }
+}
+
+async function safeUpdateUser(id: string, data: Record<string, unknown>) {
+  try {
+    return await db.user.update({
+      where: { id },
+      data,
+      select: menuSelect,
+    })
+  } catch {
+    // If menuAccess column doesn't exist, remove it from data
+    const { menuAccess, ...safeData } = data
+    return await db.user.update({
+      where: { id },
+      data: safeData,
+      select: baseSelect,
+    })
+  }
+}
+
 // GET - Get a single user (owner only)
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -22,26 +74,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Permissions insuffisantes" }, { status: 403 })
     }
 
-    const user = await db.user.findFirst({
-      where: {
-        id,
-        guestHouseId: session.user.guestHouseId,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        language: true,
-        theme: true,
-        menuAccess: true,
-        createdAt: true,
-      },
-    })
+    const user = await safeFindUser(id, session.user.guestHouseId)
 
     if (!user) {
       return NextResponse.json(
@@ -135,21 +168,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       updateData.menuAccess = data.menuAccess
     }
 
-    const user = await db.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        menuAccess: true,
-        createdAt: true,
-      },
-    })
+    const user = await safeUpdateUser(id, updateData)
 
     return NextResponse.json({ user })
   } catch (error) {
@@ -207,21 +226,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (action === "toggleBlock") {
       // Block/unblock user
-      const user = await db.user.update({
-        where: { id },
-        data: { isActive: !existingUser.isActive },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          isActive: true,
-          menuAccess: true,
-          createdAt: true,
-        },
-      })
+      const user = await safeUpdateUser(id, { isActive: !existingUser.isActive })
 
       return NextResponse.json({
         user,

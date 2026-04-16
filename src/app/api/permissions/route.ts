@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { Prisma } from "@prisma/client"
 
 // Menu keys matching the sidebar navigation
 const ALL_MENUS = [
@@ -75,19 +76,26 @@ export async function GET() {
       return NextResponse.json({ permissions: allPermissions })
     }
 
-    // Fetch user's menuAccess from database
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { menuAccess: true },
-    })
-
-    // Parse menuAccess (may be JSON object or JSON string depending on DB)
+    // Fetch user's menuAccess from database — resilient to missing column
     let menuAccess: Record<string, boolean> | null = null
-    if (user?.menuAccess) {
-      if (typeof user.menuAccess === "string") {
-        try { menuAccess = JSON.parse(user.menuAccess) } catch { menuAccess = null }
+    try {
+      const user = await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { menuAccess: true },
+      })
+      if (user?.menuAccess) {
+        if (typeof user.menuAccess === "string") {
+          try { menuAccess = JSON.parse(user.menuAccess) } catch { menuAccess = null }
+        } else {
+          menuAccess = user.menuAccess as unknown as Record<string, boolean>
+        }
+      }
+    } catch (err) {
+      // Column doesn't exist yet (migration not applied) — fall through to no access
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        console.warn("[permissions] menuAccess column missing, user gets no menus")
       } else {
-        menuAccess = user.menuAccess as unknown as Record<string, boolean>
+        throw err
       }
     }
 
