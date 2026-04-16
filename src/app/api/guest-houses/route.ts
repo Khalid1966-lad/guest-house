@@ -67,9 +67,20 @@ export async function POST(request: NextRequest) {
 
     // Créer la maison d'hôtes et associer l'utilisateur dans une transaction
     const guestHouse = await db.$transaction(async (tx) => {
+      // 0. Generate unique guesthouse code (GH001, GH002, ...)
+      const allGuestHouses = await tx.guestHouse.findMany({
+        select: { code: true },
+        orderBy: { createdAt: 'asc' },
+      })
+      const usedCodes = new Set(allGuestHouses.map(gh => gh.code))
+      let nextNum = 1
+      while (usedCodes.has("GH" + String(nextNum).padStart(3, "0"))) nextNum++
+      const ghCode = "GH" + String(nextNum).padStart(3, "0")
+
       // 1. Créer la maison d'hôtes
       const newGuestHouse = await tx.guestHouse.create({
         data: {
+          code: ghCode,
           name,
           slug,
           description: description || null,
@@ -131,6 +142,7 @@ export async function POST(request: NextRequest) {
       success: true,
       guestHouse: {
         id: guestHouse.id,
+        code: guestHouse.code,
         name: guestHouse.name,
         slug: guestHouse.slug,
       },

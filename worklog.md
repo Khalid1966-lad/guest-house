@@ -256,3 +256,31 @@ Stage Summary:
 - Booking creation UI adapts the price summary display
 - Invoice generation correctly uses the already-calculated totalPrice from booking
 - Pushed as commit c83e28c
+
+---
+Task ID: guesthouse-code-invoice-fix
+Agent: Main
+Task: Fix invoice creation unique constraint error + add guesthouse code to invoice numbers
+
+Work Log:
+- Diagnosed root cause: `invoiceNumber` had global `@unique` constraint, so two guesthouses creating the same number (e.g., FAC-2026-00001) would conflict
+- Initially changed to compound `@@unique([invoiceNumber, guestHouseId])` but reverted after user pointed out sandbox uses SQLite while Vercel uses PostgreSQL (can't db:push in sandbox)
+- Added `code` field to GuestHouse model: `String @unique` (e.g., GH001, GH002, GH003...)
+- Updated guesthouse creation API: auto-generates next sequential code on create
+- Updated invoice number format: `FAC-2026-00001/GH001` (globally unique because GH code is unique)
+- Reverted to simple `@unique` on invoiceNumber (no longer needs compound constraint)
+- Added `extractInvoiceSeq()` helper that handles both old and new invoice number formats
+- Added retry loop (5 attempts) in invoice creation to handle race conditions
+- Added auto-assign code mechanism: if existing guesthouse has no code (post-migration), assigns one on first invoice creation
+- Updated seed file: added `code: 'GH001'` to guesthouse, updated invoice numbers to new format
+- Updated settings establishment API GET to include `code` field
+- Added guesthouse code display in establishment settings → Billing tab (read-only, with example invoice number)
+- All lint checks pass
+
+Stage Summary:
+- Invoice creation error fixed: each guesthouse now has a unique code (GH001, GH002...)
+- Invoice format: FAC-2026-00001/GH001 — globally unique across all guesthouses
+- Guesthouse code auto-generated on creation, auto-assigned to existing guesthouses on first use
+- Code displayed read-only in establishment settings → Facturation tab
+- Backward-compatible: invoice number parser handles both old (FAC-2026-00001) and new (FAC-2026-00001/GH001) formats
+- Changes ready for deployment (schema push needed on Vercel/PostgreSQL)

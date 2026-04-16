@@ -18,6 +18,7 @@ datasource db {
 // ============================================
 model GuestHouse {
   id            String   @id @default(cuid())
+  code          String   @unique   // Unique code like GH001, GH002...
   name          String
   slug          String   @unique
   description   String?
@@ -400,7 +401,7 @@ model Invoice {
   guestHouseId  String
   guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
   
-  invoiceNumber String
+  invoiceNumber String   @unique
   invoiceDate   DateTime @default(now())
   dueDate       DateTime?
   
@@ -429,8 +430,6 @@ model Invoice {
   
   items         InvoiceItem[]
   payments      Payment[]
-
-  @@unique([invoiceNumber, guestHouseId])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

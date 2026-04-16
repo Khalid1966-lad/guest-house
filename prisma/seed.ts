@@ -30,6 +30,7 @@ async function main() {
   // Créer la maison d'hôtes
   const guestHouse = await prisma.guestHouse.create({
     data: {
+      code: 'GH001',
       name: 'Villa Azur',
       slug: 'villa-azur',
       description: "Maison d'hôtes de charme au bord de la mer",
@@ -432,7 +433,7 @@ async function main() {
     prisma.invoice.create({
       data: {
         guestHouseId: guestHouse.id,
-        invoiceNumber: 'INV-2024-001',
+        invoiceNumber: 'FAC-2024-00001/GH001',
         guestId: guests[0].id,
         bookingId: bookings[0].id,
         invoiceDate: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
@@ -446,7 +447,7 @@ async function main() {
     prisma.invoice.create({
       data: {
         guestHouseId: guestHouse.id,
-        invoiceNumber: 'INV-2024-002',
+        invoiceNumber: 'FAC-2024-00002/GH001',
         guestId: guests[3].id,
         invoiceDate: new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000),
         subtotal: 890,
@@ -459,7 +460,7 @@ async function main() {
     prisma.invoice.create({
       data: {
         guestHouseId: guestHouse.id,
-        invoiceNumber: 'INV-2024-003',
+        invoiceNumber: 'FAC-2024-00003/GH001',
         guestId: guests[1].id,
         bookingId: bookings[1].id,
         invoiceDate: today,

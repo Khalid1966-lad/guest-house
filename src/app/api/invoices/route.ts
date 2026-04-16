@@ -154,6 +154,22 @@ function buildInvoiceData(
   }
 }
 
+// Extract sequence number from invoice number
+// Supports both old format (FAC-2026-00001) and new format (FAC-2026-00001/GH001)
+function extractInvoiceSeq(invoiceNumber: string): number {
+  // New format: FAC-2026-00001/GH001 → extract 00001
+  if (invoiceNumber.includes("/")) {
+    const beforeSlash = invoiceNumber.split("/")[0]
+    const parts = beforeSlash.split("-")
+    const n = parseInt(parts[parts.length - 1], 10)
+    return isNaN(n) ? 0 : n
+  }
+  // Old format: FAC-2026-00001 → extract 00001
+  const parts = invoiceNumber.split("-")
+  const n = parseInt(parts[parts.length - 1], 10)
+  return isNaN(n) ? 0 : n
+}
+
 // POST - Créer une nouvelle facture
 export async function POST(request: NextRequest) {
   try {
@@ -210,8 +226,32 @@ export async function POST(request: NextRequest) {
     }
 
     const year = new Date().getFullYear()
-    const prefix = "FAC-" + year + "-"
     const ghId = session.user.guestHouseId
+
+    // Fetch guesthouse code for invoice number
+    // If no code assigned yet (post-migration), auto-generate one
+    let guestHouse = await db.guestHouse.findUnique({
+      where: { id: ghId },
+      select: { code: true },
+    })
+
+    let ghCode = guestHouse?.code
+    if (!ghCode) {
+      // Auto-assign a code to guesthouses that don't have one yet (post-migration)
+      const allGH = await db.guestHouse.findMany({
+        select: { id: true, code: true },
+        orderBy: { createdAt: 'asc' },
+      })
+      const usedCodes = new Set(allGH.filter(g => g.code).map(g => g.code!))
+      let nextNum = 1
+      while (usedCodes.has("GH" + String(nextNum).padStart(3, "0"))) nextNum++
+      ghCode = "GH" + String(nextNum).padStart(3, "0")
+
+      await db.guestHouse.update({
+        where: { id: ghId },
+        data: { code: ghCode },
+      })
+    }
 
     // Retry loop to handle race conditions on invoice number
     const MAX_RETRIES = 5
@@ -225,23 +265,22 @@ export async function POST(request: NextRequest) {
           const existingInvoices = await tx.invoice.findMany({
             where: {
               guestHouseId: ghId,
-              invoiceNumber: { startsWith: prefix },
+              invoiceNumber: { startsWith: "FAC-" + year + "-" },
             },
             select: { invoiceNumber: true },
           })
 
           const usedNums = new Set<number>()
           for (const inv of existingInvoices) {
-            const p = inv.invoiceNumber.split("-")
-            const n = parseInt(p[p.length - 1], 10)
-            if (!isNaN(n)) usedNums.add(n)
+            const n = extractInvoiceSeq(inv.invoiceNumber)
+            if (n > 0) usedNums.add(n)
           }
 
           // Find next available number
           let nextNum = 1
           while (usedNums.has(nextNum)) nextNum++
 
-          const invoiceNumber = prefix + String(nextNum).padStart(5, "0")
+          const invoiceNumber = "FAC-" + year + "-" + String(nextNum).padStart(5, "0") + "/" + ghCode
 
           return tx.invoice.create({
             data: buildInvoiceData(

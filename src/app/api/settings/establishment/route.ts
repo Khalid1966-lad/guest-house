@@ -15,6 +15,7 @@ export async function GET() {
       where: { id: session.user.guestHouseId },
       select: {
         id: true,
+        code: true,
         name: true,
         slug: true,
         description: true,

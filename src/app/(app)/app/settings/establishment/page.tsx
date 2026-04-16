@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast"
 
 interface GuestHouseSettings {
   id: string
+  code: string | null
   name: string
   slug: string
   description: string | null
@@ -89,6 +90,7 @@ export default function EstablishmentSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [ghCode, setGhCode] = useState<string>("")
   const [logoCompression, setLogoCompression] = useState<{
     originalSize: string
     compressedSize: string
@@ -137,6 +139,7 @@ export default function EstablishmentSettingsPage() {
       if (response.ok) {
         const gh = data.guestHouse
         setLogoUrl(gh.logo || null)
+        setGhCode(gh.code || "")
         setFormData({
           name: gh.name || "",
           description: gh.description || "",
@@ -793,6 +796,26 @@ export default function EstablishmentSettingsPage() {
 
         {/* Billing Tab */}
         <TabsContent value="billing" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Identifiant de l&apos;établissement</CardTitle>
+              <CardDescription>
+                Code unique utilisé dans la numérotation des factures
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <div className="px-4 py-2 bg-sky-50 dark:bg-sky-950 rounded-lg border border-sky-200 dark:border-sky-800">
+                  <span className="font-mono text-lg font-bold text-sky-700 dark:text-sky-300">{ghCode || "—"}</span>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Ce code est généré automatiquement et apparaît dans vos numéros de facture
+                  (ex: <span className="font-mono text-xs">FAC-2026-00001/{ghCode || "GH001"}</span>)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Taxe de séjour</CardTitle>
