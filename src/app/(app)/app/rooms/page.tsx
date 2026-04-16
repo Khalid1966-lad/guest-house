@@ -73,6 +73,7 @@ interface Room {
   maxExtraBeds: number
   basePrice: number
   weekendPrice: number | null
+  pricingMode: string
   extraBedPrice: number
   babyBedAvailable: boolean
   babyBedPrice: number
@@ -123,6 +124,7 @@ const defaultFormData = {
   maxExtraBeds: "0",
   basePrice: "",
   weekendPrice: "",
+  pricingMode: "per_room",
   extraBedPrice: "0",
   babyBedAvailable: false,
   babyBedPrice: "0",
@@ -327,6 +329,7 @@ export default function RoomsPage() {
       maxExtraBeds: room.maxExtraBeds?.toString() || "0",
       basePrice: room.basePrice.toString(),
       weekendPrice: room.weekendPrice?.toString() || "",
+      pricingMode: room.pricingMode || "per_room",
       extraBedPrice: room.extraBedPrice?.toString() || "0",
       babyBedAvailable: room.babyBedAvailable || false,
       babyBedPrice: room.babyBedPrice?.toString() || "0",
@@ -623,7 +626,7 @@ export default function RoomsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-semibold text-sky-600">
-                    {formatAmount(room.basePrice)}<span className="text-sm font-normal text-gray-500">/nuit</span>
+                    {formatAmount(room.basePrice)}<span className="text-sm font-normal text-gray-500">/nuit {room.pricingMode === "per_person" ? "/pers." : ""}</span>
                   </span>
                   {room._count && (
                     <span className="text-xs text-gray-400">
@@ -868,6 +871,20 @@ export default function RoomsPage() {
                     placeholder="100"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pricingMode">Mode de tarification</Label>
+                  <Select value={formData.pricingMode} onValueChange={(v) => handleFormChange("pricingMode", v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="per_room">Par chambre</SelectItem>
+                      <SelectItem value="per_person">Par personne</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="weekendPrice">Prix weekend</Label>
                   <Input

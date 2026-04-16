@@ -84,6 +84,7 @@ interface Room {
   id: string
   number: string
   name: string | null
+  pricingMode?: string
 }
 
 interface Booking {
@@ -420,15 +421,21 @@ export default function InvoicesPage() {
         ))
         
         const roomNumber = booking.room?.number || 'N/A'
+        const isPerPerson = booking.room?.pricingMode === "per_person"
+        
+        // Use totalPrice which already accounts for per_person/per_room calculation
+        // But show the breakdown correctly in the description
+        const accommodationTotal = booking.totalPrice || (nights * (booking.nightlyRate || 0))
+        const unitPrice = Math.round((accommodationTotal / nights) * 100) / 100
         
         // Auto-fill with booking details
         setFormData(prev => ({
           ...prev,
           bookingId,
           items: [{
-            description: `Séjour chambre ${roomNumber} (${format(checkInDate, "d MMM", { locale: fr })} - ${format(checkOutDate, "d MMM yyyy", { locale: fr })}) - ${nights} nuit${nights > 1 ? 's' : ''}`,
+            description: `Séjour chambre ${roomNumber} (${format(checkInDate, "d MMM", { locale: fr })} - ${format(checkOutDate, "d MMM yyyy", { locale: fr })}) - ${nights} nuit${nights > 1 ? 's' : ''}${isPerPerson ? ` - ${booking.adults} pers.` : ""}`,
             quantity: nights.toString(),
-            unitPrice: (booking.nightlyRate || 0).toString(),
+            unitPrice: unitPrice.toString(),
             taxRate: "10", // Default tax rate
           }],
         }))

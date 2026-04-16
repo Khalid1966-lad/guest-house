@@ -230,6 +230,7 @@ model Room {
   
   basePrice     Float
   weekendPrice  Float?
+  pricingMode   String  @default("per_room")  // per_room | per_person
   currency      String  @default("EUR")
   
   extraBedPrice    Float @default(0)

@@ -84,6 +84,7 @@ interface Room {
   babyBedPrice: number
   basePrice: number
   weekendPrice: number | null
+  pricingMode: string
   status: string
   amenities: string | null
   images: string | null
@@ -493,7 +494,14 @@ export default function RoomDetailsPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Prix de base</span>
-                <span className="text-xl font-bold text-sky-600">{formatAmount(room.basePrice)}</span>
+                <div className="text-right">
+                  <span className="text-xl font-bold text-sky-600">{formatAmount(room.basePrice)}</span>
+                  <span className="text-sm text-gray-400 ml-1">/nuit {room.pricingMode === "per_person" ? "par pers." : ""}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Tarification</span>
+                <span className="text-sm font-medium">{room.pricingMode === "per_person" ? "Par personne" : "Par chambre"}</span>
               </div>
               {room.weekendPrice && (
                 <div className="flex items-center justify-between">

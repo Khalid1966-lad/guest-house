@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         maxExtraBeds: true,
         basePrice: true,
         weekendPrice: true,
+        pricingMode: true,
         extraBedPrice: true,
         babyBedAvailable: true,
         babyBedPrice: true,

@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
               select: {
                 number: true,
                 name: true,
+                pricingMode: true,
               },
             },
           },

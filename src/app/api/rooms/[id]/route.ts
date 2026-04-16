@@ -129,6 +129,7 @@ export async function PUT(
     if (body.maxExtraBeds !== undefined) updateData.maxExtraBeds = parseInt(body.maxExtraBeds) || 0
     if (body.basePrice !== undefined) updateData.basePrice = parseFloat(body.basePrice)
     if (body.weekendPrice !== undefined) updateData.weekendPrice = body.weekendPrice ? parseFloat(body.weekendPrice) : null
+    if (body.pricingMode !== undefined) updateData.pricingMode = body.pricingMode
     if (body.extraBedPrice !== undefined) updateData.extraBedPrice = parseFloat(body.extraBedPrice) || 0
     if (body.babyBedAvailable !== undefined) updateData.babyBedAvailable = body.babyBedAvailable === true
     if (body.babyBedPrice !== undefined) updateData.babyBedPrice = parseFloat(body.babyBedPrice) || 0

@@ -94,6 +94,7 @@ export async function GET(request: NextRequest) {
             type: true,
             capacity: true,
             basePrice: true,
+            pricingMode: true,
             maxExtraBeds: true,
             extraBedPrice: true,
             babyBedAvailable: true,
