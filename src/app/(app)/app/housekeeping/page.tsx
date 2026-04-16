@@ -323,6 +323,7 @@ export default function HousekeepingPage() {
   const [activeFilter, setActiveFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [error, setError] = useState("")
+  const [hasCleaningTasks, setHasCleaningTasks] = useState(true)
 
   // Task detail sheet
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -387,6 +388,7 @@ export default function HousekeepingPage() {
       }
       const data = await res.json()
       setRooms(data.rooms || [])
+      if (data.hasCleaningTasks === false) setHasCleaningTasks(false)
     } catch (err) {
       console.error("Error fetching rooms:", err)
       setError(err instanceof Error ? err.message : "Erreur lors du chargement")
@@ -761,6 +763,19 @@ export default function HousekeepingPage() {
         </div>
       )}
 
+      {/* Migration warning */}
+      {!error && !hasCleaningTasks && (
+        <div className="p-3 text-sm text-amber-700 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 rounded-lg flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Migration de la base de données requise</p>
+            <p className="text-xs mt-0.5 opacity-80">
+              Les tables de ménage n'ont pas été créées. Exécutez <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">prisma db push</code> sur le serveur PostgreSQL.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Summary stats bar */}
       <div className="flex flex-wrap gap-2 items-center">
         <button
@@ -836,10 +851,12 @@ export default function HousekeepingPage() {
               <Card
                 key={room.id}
                 className={cn(
-                  "overflow-hidden transition-all hover:shadow-md border-l-4 cursor-pointer",
+                  "overflow-hidden transition-all hover:shadow-md border-l-4",
+                  hasCleaningTasks ? "cursor-pointer" : "opacity-70",
                   csInfo?.borderColor || "border-gray-200 dark:border-gray-700"
                 )}
                 onClick={() => {
+                  if (!hasCleaningTasks) return
                   if (taskInfo) {
                     openTaskDetail(taskInfo.id)
                   } else {
@@ -926,8 +943,10 @@ export default function HousekeepingPage() {
                     variant={taskInfo ? "outline" : "default"}
                     size="sm"
                     className="w-full text-xs"
+                    disabled={!hasCleaningTasks}
                     onClick={(e) => {
                       e.stopPropagation()
+                      if (!hasCleaningTasks) return
                       if (taskInfo) {
                         openTaskDetail(taskInfo.id)
                       } else {
@@ -936,7 +955,12 @@ export default function HousekeepingPage() {
                       }
                     }}
                   >
-                    {taskInfo ? (
+                    {!hasCleaningTasks ? (
+                      <>
+                        <CircleAlert className="w-3.5 h-3.5 mr-1.5" />
+                        Migration requise
+                      </>
+                    ) : taskInfo ? (
                       <>
                         <Eye className="w-3.5 h-3.5 mr-1.5" />
                         Voir la checklist

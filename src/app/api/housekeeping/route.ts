@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { Prisma } from "@prisma/client"
 
 const VALID_CLEANING_STATUSES = ["departure", "turnover", "cleaning", "clean", "verified"]
 
@@ -49,29 +50,80 @@ export async function GET() {
 
     const guestHouseId = session.user.guestHouseId
 
-    // Fetch all rooms
-    const rooms = await db.room.findMany({
-      where: { guestHouseId },
-      orderBy: [{ floor: "asc" }, { number: "asc" }],
-      include: {
-        cleaningTasks: {
-          where: {
-            status: { in: ["pending", "in_progress", "completed"] },
-          },
-          orderBy: { createdAt: "desc" },
-          include: {
-            items: true,
-            assignedTo: {
-              select: { id: true, name: true, firstName: true, lastName: true, avatar: true },
+    // Try full query with cleaningTasks included.
+    // If tables don't exist yet (migration not applied), fall back to rooms-only query.
+    let rooms
+    let hasCleaningTasks = true
+
+    try {
+      rooms = await db.room.findMany({
+        where: { guestHouseId },
+        orderBy: [{ floor: "asc" }, { number: "asc" }],
+        include: {
+          cleaningTasks: {
+            where: {
+              status: { in: ["pending", "in_progress", "completed"] },
+            },
+            orderBy: { createdAt: "desc" },
+            include: {
+              items: true,
+              assignedTo: {
+                select: { id: true, name: true, firstName: true, lastName: true, avatar: true },
+              },
             },
           },
         },
-      },
-    })
+      })
+    } catch (queryError: unknown) {
+      // Check if the error is a missing table/relation error
+      const err = queryError as { code?: string; message?: string }
+      const isTableMissing =
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        (err.code === "P2021" || err.code === "P2022" || err.code === "P2010")
+      const isRelationError =
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        (err.code === "P2028" || err.code === "P2009")
+
+      if (isTableMissing || isRelationError || (err.message && err.message.includes("does not exist"))) {
+        // Fallback: query rooms without cleaningTasks
+        console.warn("[housekeeping] CleaningTask tables not found, falling back to rooms-only query")
+        hasCleaningTasks = false
+        rooms = await db.room.findMany({
+          where: { guestHouseId },
+          orderBy: [{ floor: "asc" }, { number: "asc" }],
+        })
+      } else {
+        throw queryError
+      }
+    }
+
+    // Type for rooms with or without cleaningTasks
+    type RoomRow = {
+      id: string
+      number: string
+      name: string | null
+      floor: number | null
+      type: string
+      capacity: number
+      status: string
+      cleaningStatus: string | null
+      cleaningUpdatedAt: Date | null
+      cleaningNotes: string | null
+      cleaningTasks?: Array<{
+        id: string
+        status: string
+        priority: string
+        assignedTo: { id: string; name: string | null; avatar: string | null } | null
+        startedAt: Date | null
+        completedAt: Date | null
+        createdAt: Date
+        items: Array<{ checked: boolean }>
+      }>
+    }
 
     // Enrich each room with active task summary
-    const roomsWithTasks = rooms.map((room) => {
-      const activeTask = room.cleaningTasks[0] || null
+    const roomsWithTasks = (rooms as RoomRow[]).map((room) => {
+      const activeTask = hasCleaningTasks && room.cleaningTasks ? room.cleaningTasks[0] || null : null
 
       const totalItems = activeTask ? activeTask.items.length : 0
       const checkedItems = activeTask ? activeTask.items.filter((i) => i.checked).length : 0
@@ -102,11 +154,12 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ rooms: roomsWithTasks })
+    return NextResponse.json({ rooms: roomsWithTasks, hasCleaningTasks })
   } catch (error) {
     console.error("Error fetching housekeeping data:", error)
+    const message = error instanceof Error ? error.message : "Erreur lors de la récupération des données"
     return NextResponse.json(
-      { error: "Erreur lors de la récupération des données" },
+      { error: message },
       { status: 500 }
     )
   }
