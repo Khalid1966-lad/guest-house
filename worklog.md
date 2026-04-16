@@ -145,3 +145,27 @@ Stage Summary:
 - Clicking an order adds its items (with prices) to the invoice
 - After saving, orders are automatically marked as "billed_to_room"
 - itemType/referenceId fields on InvoiceItem are now utilized for restaurant order tracing
+
+---
+Task ID: fix-restaurant-orders-invoice
+Agent: Main
+Task: Fix bugs and improve restaurant orders integration in invoices (continuing from commit 3c4d3fb)
+
+Work Log:
+- Fixed availableRestaurantOrders: was showing ALL pending orders regardless of guest. Now filters by matching selected guest's first/last name against order guestName
+- Added selectedGuestFullName computed value for reliable guest name matching
+- Fixed handleAddRestaurantOrder: added duplicate prevention check (same order can't be added twice)
+- Fixed availableRestaurantOrders: now excludes orders already present in current invoice form items (by referenceId)
+- Fixed syntax error in availableRestaurantOrders filter callback (was using invalid arrow function params)
+- Updated invoice detail page: added itemType/referenceId to InvoiceItem interface
+- Added UtensilsCrossed icon import to invoice detail page
+- Restaurant items on invoice detail page: orange background for headers, utensils icon on each row
+- Updated print template: restaurant headers get orange background + emoji prefix, sub-items get light orange
+- All lint checks pass, dev server compiles without errors
+
+Stage Summary:
+- Restaurant orders are now properly filtered by guest name when creating invoices
+- Duplicate order additions are prevented
+- Already-added orders disappear from the available list
+- Invoice detail and print views clearly distinguish restaurant items visually
+- Pushed as commit 18e8cd9
