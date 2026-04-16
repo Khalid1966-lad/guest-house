@@ -53,6 +53,7 @@ declare module "next-auth" {
       id: string
       email: string
       name: string | null
+      avatar: string | null
       role: string
       guestHouseId: string | null
       guestHouseSlug: string | null
@@ -62,6 +63,8 @@ declare module "next-auth" {
   }
   interface User {
     id: string
+    name?: string | null
+    avatar?: string | null
     role: string
     guestHouseId: string | null
     guestHouseSlug?: string | null
@@ -75,6 +78,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string
     role: string
+    avatar?: string | null
     guestHouseId: string | null
     guestHouseSlug?: string | null
     guestHouseName?: string | null
@@ -166,6 +170,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name,
+            avatar: user.avatar || null,
             role: user.role,
             guestHouseId: null,
             guestHouseSlug: null,
@@ -185,6 +190,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
+          avatar: user.avatar || null,
           role: user.role,
           guestHouseId: user.guestHouseId,
           guestHouseSlug: user.guestHouse.slug,
@@ -214,6 +220,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
+        token.avatar = user.avatar ?? null
         token.guestHouseId = user.guestHouseId ?? null
         token.guestHouseSlug = user.guestHouseSlug ?? null
         token.guestHouseName = user.guestHouseName ?? null
@@ -269,6 +276,7 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id as string
         session.user.role = token.role as string
+        session.user.avatar = (token.avatar as string | null) ?? null
         session.user.guestHouseId = token.guestHouseId as string | null
         session.user.guestHouseSlug = token.guestHouseSlug as string | null
         session.user.guestHouseName = token.guestHouseName as string | null

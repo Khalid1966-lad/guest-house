@@ -550,3 +550,38 @@ Stage Summary:
 - Checkout will set cleaningStatus="departure" reliably, and won't fail the entire checkout if migration is missing
 - "Toutes" filter should work correctly now that hasCleaningTasks resets properly
 - Lint passes clean
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix user avatar in sidebar - show photo if exists, otherwise show initials
+
+Work Log:
+- Identified root cause: `avatar` field exists in Prisma User model but was NOT passed through NextAuth session pipeline
+- Updated `src/lib/auth.ts`:
+  - Added `avatar: string | null` to Session interface
+  - Added `avatar?: string | null` to JWT interface
+  - Added `avatar?: string | null` to User interface
+  - Pass `user.avatar` in both authorize return paths (with and without guestHouse)
+  - Store `token.avatar` in JWT callback
+  - Pass `token.avatar` to `session.user.avatar` in session callback
+- Sidebar component already had correct Avatar/AvatarImage/AvatarFallback code with initials fallback
+
+Stage Summary:
+- Avatar now flows: DB → authorize → JWT → session → sidebar Avatar component
+- If no avatar photo exists, user initials are displayed in a colored circle
+- No sidebar component changes needed - only auth.ts data pipeline fix
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: First authorized menu redirect when Dashboard is not allowed
+
+Work Log:
+- Verified existing implementation in `computeDefaultMenu()` (auth.ts line 26-39)
+- Verified JWT callback stores `token.defaultMenu` (auth.ts line 227)
+- Verified middleware redirects to `defaultMenu` from /login (middleware.ts line 49) and /app/dashboard (middleware.ts line 61-63)
+- Feature was already fully implemented in previous conversation session
+
+Stage Summary:
+- No code changes needed - redirect logic already works correctly
+- When Dashboard is not in user's menuAccess, middleware redirects to first authorized menu
