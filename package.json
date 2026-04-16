@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "prisma generate --schema=prisma/schema.postgresql.prisma && prisma db push --schema=prisma/schema.postgresql.prisma --accept-data-loss && next build",
+    "build": "prisma generate --schema=prisma/schema.postgresql.prisma && next build",
     "start": "next start",
     "lint": "eslint .",
     "postinstall": "prisma generate",
