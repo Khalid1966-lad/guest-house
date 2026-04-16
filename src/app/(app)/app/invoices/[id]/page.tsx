@@ -30,6 +30,7 @@ import {
   Phone,
   MapPin,
   Building,
+  UtensilsCrossed,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
@@ -44,6 +45,8 @@ interface InvoiceItem {
   unitPrice: number
   total: number
   taxRate: number
+  itemType: string | null
+  referenceId: string | null
 }
 
 interface Payment {
@@ -335,6 +338,8 @@ export default function InvoiceDetailPage() {
             border-radius: 4px;
           }
           .notes-title { font-weight: 600; margin-bottom: 0.5rem; }
+          .restaurant-header td { background: #fff7ed; font-weight: 600; }
+          .restaurant-item td { background: #fffbf5; }
           .footer { 
             margin-top: 3rem; 
             text-align: center; 
@@ -398,17 +403,19 @@ export default function InvoiceDetailPage() {
             </tr>
           </thead>
           <tbody>
-            ${invoice.items.map(item => `
-              <tr>
-                <td>
-                  ${item.description}
-                  ${item.taxRate > 0 ? `<br><small style="color: #666;">TVA: ${item.taxRate}%</small>` : ""}
-                </td>
-                <td class="text-center">${item.quantity}</td>
-                <td class="text-right">${item.unitPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</td>
-                <td class="text-right"><strong>${item.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</strong></td>
-              </tr>
-            `).join("")}
+            ${invoice.items.map(item => {
+              const isRest = item.itemType === "restaurant_order"
+              const isHeader = isRest && item.quantity === 1 && item.unitPrice === item.total
+              const rowClass = isHeader ? "restaurant-header" : (isRest ? "restaurant-item" : "")
+              const emoji = isHeader ? '<span style="margin-right:6px;">🍽️</span>' : ''
+              const taxLine = item.taxRate > 0 ? '<br><small style="color: #666;">TVA: ' + item.taxRate + '%</small>' : ""
+              return '<tr class="' + rowClass + '">' +
+                '<td>' + emoji + item.description + taxLine + '</td>' +
+                '<td class="text-center">' + item.quantity + '</td>' +
+                '<td class="text-right">' + item.unitPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + ' ' + symbol + '</td>' +
+                '<td class="text-right"><strong>' + item.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + ' ' + symbol + '</strong></td>' +
+              '</tr>'
+            }).join("")}
           </tbody>
         </table>
 
@@ -654,19 +661,41 @@ export default function InvoiceDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {invoice.items.map((item) => (
-                  <tr key={item.id} className="border-t print:border-gray-200">
-                    <td className="p-3 print:text-black">
-                      <p>{item.description}</p>
-                      {item.taxRate > 0 && (
-                        <p className="text-xs text-gray-500 print:text-gray-600">TVA: {item.taxRate}%</p>
-                      )}
-                    </td>
-                    <td className="p-3 text-center print:text-black">{item.quantity}</td>
-                    <td className="p-3 text-right print:text-black">{formatAmount(item.unitPrice)}</td>
-                    <td className="p-3 text-right font-medium print:text-black">{formatAmount(item.total)}</td>
-                  </tr>
-                ))}
+                {invoice.items.map((item) => {
+                  const isRestaurantItem = item.itemType === "restaurant_order"
+                  const isRestaurantHeader = isRestaurantItem && item.description.startsWith("Service en chambre") && item.quantity === 1 && item.unitPrice === item.total
+                    || isRestaurantItem && item.description.startsWith("Restaurant") && item.quantity === 1 && item.unitPrice === item.total
+                  return (
+                    <tr key={item.id} className={cn(
+                      "border-t print:border-gray-200",
+                      isRestaurantHeader && "bg-orange-50/60 dark:bg-orange-950/20",
+                      isRestaurantItem && !isRestaurantHeader && "print:bg-orange-50/40"
+                    )}>
+                      <td className="p-3 print:text-black">
+                        <div className="flex items-start gap-2">
+                          {isRestaurantItem && (
+                            <UtensilsCrossed className={cn(
+                              "w-3.5 h-3.5 mt-0.5 flex-shrink-0 print:hidden",
+                              isRestaurantHeader ? "text-orange-600" : "text-orange-400"
+                            )} />
+                          )}
+                          <div>
+                            <p className={cn(isRestaurantHeader && "font-semibold text-orange-700 dark:text-orange-400 print:text-orange-700")}>
+                              {isRestaurantHeader && <span className="hidden print:inline mr-1.5">🍽️</span>}
+                              {item.description}
+                            </p>
+                            {item.taxRate > 0 && (
+                              <p className="text-xs text-gray-500 print:text-gray-600">TVA: {item.taxRate}%</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-center print:text-black">{item.quantity}</td>
+                      <td className="p-3 text-right print:text-black">{formatAmount(item.unitPrice)}</td>
+                      <td className="p-3 text-right font-medium print:text-black">{formatAmount(item.total)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

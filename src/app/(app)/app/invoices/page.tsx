@@ -234,15 +234,36 @@ export default function InvoicesPage() {
     }
   }, [bookings, formData.guestId])
 
-  // Get unbilled restaurant orders for selected guest
+  // Get the selected guest's full name for matching restaurant orders
+  const selectedGuestFullName = useMemo(() => {
+    if (!formData.guestId || !guests || guests.length === 0) return ""
+    const g = guests.find(g => g.id === formData.guestId)
+    if (!g) return ""
+    return `${g.firstName} ${g.lastName}`.toLowerCase().trim()
+  }, [guests, formData.guestId])
+
+  // Get unbilled restaurant orders for selected guest (matching by guest name)
+  // Also exclude orders already present in the current invoice form items
   const availableRestaurantOrders = useMemo(() => {
     if (!formData.guestId || !restaurantOrders || restaurantOrders.length === 0) return []
-    return restaurantOrders.filter(o =>
-      o.guestName &&
-      o.paymentStatus === "pending" &&
-      o.status !== "cancelled"
+    if (!selectedGuestFullName) return []
+
+    // Collect order IDs already added to form items
+    const alreadyAddedOrderIds = new Set(
+      formData.items
+        .filter((item: any) => item.referenceId && item.itemType === "restaurant_order")
+        .map((item: any) => item.referenceId)
     )
-  }, [restaurantOrders, formData.guestId])
+
+    return restaurantOrders.filter(o => {
+      if (!o.guestName || o.paymentStatus !== "pending" || o.status === "cancelled") return false
+      if (alreadyAddedOrderIds.has(o.id)) return false
+      // Match by checking if order guest name contains the selected guest's first or last name
+      const orderName = o.guestName.toLowerCase().trim()
+      const parts = selectedGuestFullName.split(" ")
+      return parts.some(part => part.length > 1 && orderName.includes(part))
+    })
+  }, [restaurantOrders, formData.guestId, selectedGuestFullName, formData.items])
 
   // Calculate totals
   const calculateTotals = () => {
@@ -447,19 +468,16 @@ export default function InvoicesPage() {
 
   // Add restaurant order items to invoice
   const handleAddRestaurantOrder = (order: RestaurantOrderForInvoice) => {
+    // Prevent duplicate: check if this order is already in the form
+    const alreadyAdded = formData.items.some(
+      (item: any) => item.referenceId === order.id && item.itemType === "restaurant_order"
+    )
+    if (alreadyAdded) return
+
     const orderLabel = order.orderType === "room" ? "Service en chambre"
       : order.orderType === "table" ? "Restaurant (sur place)"
       : "Restaurant (à emporter)"
     const orderDate = format(parseISO(order.orderDate), "d MMM yyyy, HH:mm", { locale: fr })
-
-    const newItems = order.items.map((item) => ({
-      description: `${orderLabel} - ${item.menuItem.name}${item.notes ? ` (${item.notes})` : ""}`,
-      quantity: item.quantity.toString(),
-      unitPrice: item.unitPrice.toString(),
-      taxRate: "0",
-      itemType: "restaurant_order" as string | null,
-      referenceId: order.id as string | null,
-    }))
 
     // Add a header line for the order
     const headerItem = {
@@ -471,9 +489,23 @@ export default function InvoicesPage() {
       referenceId: order.id as string | null,
     }
 
+    const newItems = order.items.map((item) => ({
+      description: `${orderLabel} - ${item.menuItem.name}${item.notes ? ` (${item.notes})` : ""}`,
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString(),
+      taxRate: "0",
+      itemType: "restaurant_order" as string | null,
+      referenceId: order.id as string | null,
+    }))
+
+    // Remove the default empty item and append order items
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items.filter(i => i.description), headerItem, ...newItems],
+      items: [
+        ...prev.items.filter(i => i.description),
+        headerItem,
+        ...newItems,
+      ],
     }))
   }
 
