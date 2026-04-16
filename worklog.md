@@ -226,3 +226,33 @@ Stage Summary:
 - First photo used as card thumbnail and detail page hero
 - Individual photo deletion supported via PATCH API
 - Pushed as commit 3db6181
+
+---
+Task ID: pricing-mode
+Agent: Main
+Task: Add per room vs per person pricing mode for room rates
+
+Work Log:
+- Added `pricingMode` field to Room model across all 3 Prisma schemas (default: "per_room")
+- Pushed SQLite schema to local database
+- Updated Room interface in bookings page to include `pricingMode`
+- Updated `calculateTotal()` in bookings: per_person multiplies rate × adults × nights
+- Extra beds and baby beds remain extras regardless of pricing mode
+- Updated booking price summary UI to show "× N pers." for per_person mode
+- Updated Room interface in rooms page, added pricingMode to defaultFormData and handleEditRoom
+- Added "Mode de tarification" select in room edit dialog (Par chambre / Par personne)
+- Updated room card view: "/nuit /pers." suffix when per_person
+- Updated room detail page: pricing mode display + "/nuit par pers." label
+- Updated invoices: Room interface includes pricingMode, handleBookingSelect uses totalPrice
+- Invoice description includes "- N pers." for per_person bookings
+- Updated all API routes to include pricingMode in selects and updates
+- All lint checks pass
+
+Stage Summary:
+- Rooms can now be configured as "Par chambre" or "Par personne" pricing
+- Per person mode: total = nightlyRate × number of adults × nights
+- Per room mode: total = nightlyRate × nights (unchanged behavior)
+- Extra beds always charged additionally in both modes
+- Booking creation UI adapts the price summary display
+- Invoice generation correctly uses the already-calculated totalPrice from booking
+- Pushed as commit c83e28c
