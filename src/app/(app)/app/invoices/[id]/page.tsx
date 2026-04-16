@@ -404,16 +404,17 @@ export default function InvoiceDetailPage() {
           </thead>
           <tbody>
             ${invoice.items.map(item => {
-              const isRest = item.itemType === "restaurant_order"
-              const isHeader = isRest && item.quantity === 1 && item.unitPrice === item.total
+              const isHeader = item.itemType === "restaurant_order_header"
+              const isRest = item.itemType === "restaurant_order" || isHeader
               const rowClass = isHeader ? "restaurant-header" : (isRest ? "restaurant-item" : "")
               const emoji = isHeader ? '<span style="margin-right:6px;">🍽️</span>' : ''
               const taxLine = item.taxRate > 0 ? '<br><small style="color: #666;">TVA: ' + item.taxRate + '%</small>' : ""
+              const dash = isHeader ? '—' : ''
               return '<tr class="' + rowClass + '">' +
                 '<td>' + emoji + item.description + taxLine + '</td>' +
-                '<td class="text-center">' + item.quantity + '</td>' +
-                '<td class="text-right">' + item.unitPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + ' ' + symbol + '</td>' +
-                '<td class="text-right"><strong>' + item.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + ' ' + symbol + '</strong></td>' +
+                '<td class="text-center">' + (dash || item.quantity) + '</td>' +
+                '<td class="text-right">' + (dash || item.unitPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + ' ' + symbol) + '</td>' +
+                '<td class="text-right"><strong>' + (dash || item.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + ' ' + symbol) + '</strong></td>' +
               '</tr>'
             }).join("")}
           </tbody>
@@ -662,9 +663,8 @@ export default function InvoiceDetailPage() {
               </thead>
               <tbody>
                 {invoice.items.map((item) => {
-                  const isRestaurantItem = item.itemType === "restaurant_order"
-                  const isRestaurantHeader = isRestaurantItem && item.description.startsWith("Service en chambre") && item.quantity === 1 && item.unitPrice === item.total
-                    || isRestaurantItem && item.description.startsWith("Restaurant") && item.quantity === 1 && item.unitPrice === item.total
+                  const isRestaurantHeader = item.itemType === "restaurant_order_header"
+                  const isRestaurantItem = item.itemType === "restaurant_order" || isRestaurantHeader
                   return (
                     <tr key={item.id} className={cn(
                       "border-t print:border-gray-200",
@@ -690,9 +690,9 @@ export default function InvoiceDetailPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-3 text-center print:text-black">{item.quantity}</td>
-                      <td className="p-3 text-right print:text-black">{formatAmount(item.unitPrice)}</td>
-                      <td className="p-3 text-right font-medium print:text-black">{formatAmount(item.total)}</td>
+                      <td className="p-3 text-center print:text-black">{isRestaurantHeader ? "—" : item.quantity}</td>
+                      <td className="p-3 text-right print:text-black">{isRestaurantHeader ? "—" : formatAmount(item.unitPrice)}</td>
+                      <td className="p-3 text-right font-medium print:text-black">{isRestaurantHeader ? "—" : formatAmount(item.total)}</td>
                     </tr>
                   )
                 })}

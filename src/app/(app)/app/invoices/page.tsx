@@ -252,7 +252,7 @@ export default function InvoicesPage() {
     // Collect order IDs already added to form items
     const alreadyAddedOrderIds = new Set(
       formData.items
-        .filter((item: any) => item.referenceId && item.itemType === "restaurant_order")
+        .filter((item: any) => item.referenceId && (item.itemType === "restaurant_order" || item.itemType === "restaurant_order_header"))
         .map((item: any) => item.referenceId)
     )
 
@@ -477,7 +477,7 @@ export default function InvoicesPage() {
   const handleAddRestaurantOrder = (order: RestaurantOrderForInvoice) => {
     // Prevent duplicate: check if this order is already in the form
     const alreadyAdded = formData.items.some(
-      (item: any) => item.referenceId === order.id && item.itemType === "restaurant_order"
+      (item: any) => item.referenceId === order.id && (item.itemType === "restaurant_order" || item.itemType === "restaurant_order_header")
     )
     if (alreadyAdded) return
 
@@ -486,13 +486,13 @@ export default function InvoicesPage() {
       : "Restaurant (à emporter)"
     const orderDate = format(parseISO(order.orderDate), "d MMM yyyy, HH:mm", { locale: fr })
 
-    // Add a header line for the order
+    // Add a header line for the order (zero-price label, not counted in totals)
     const headerItem = {
       description: `${orderLabel} — ${order.guestName || "Client"} — ${orderDate}`,
-      quantity: "1",
-      unitPrice: order.total.toString(),
+      quantity: "0",
+      unitPrice: "0",
       taxRate: "0",
-      itemType: "restaurant_order" as string | null,
+      itemType: "restaurant_order_header" as string | null,
       referenceId: order.id as string | null,
     }
 
@@ -586,7 +586,7 @@ export default function InvoicesPage() {
       // Mark restaurant orders as billed_to_room
       const restaurantOrderIds = formData.items
         .map((item, idx) => ({ refId: (item as any).referenceId, type: (item as any).itemType }))
-        .filter((entry) => entry.refId && entry.type === "restaurant_order")
+        .filter((entry) => entry.refId && (entry.type === "restaurant_order" || entry.type === "restaurant_order_header"))
         .map((entry) => entry.refId)
       
       const uniqueOrderIds = [...new Set(restaurantOrderIds)]
