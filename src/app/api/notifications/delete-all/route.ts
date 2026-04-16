@@ -11,6 +11,10 @@ export async function DELETE() {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
+    if (session.user.role !== "owner") {
+      return NextResponse.json({ error: "Seul le propriétaire peut supprimer les notifications" }, { status: 403 })
+    }
+
     const result = await db.notification.deleteMany({
       where: {
         guestHouseId: session.user.guestHouseId,

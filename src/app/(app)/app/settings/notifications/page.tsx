@@ -257,6 +257,7 @@ export default function NotificationsSettingsPage() {
     }
   }
 
+  const isOwner = session?.user?.role === "owner"
   const unreadCount = notifications.filter(n => !n.isRead).length
 
   if (loading) {
@@ -319,7 +320,7 @@ export default function NotificationsSettingsPage() {
                   Tout lire
                 </Button>
               )}
-              {notifications.length > 0 && (
+              {notifications.length > 0 && isOwner && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -390,6 +391,7 @@ export default function NotificationsSettingsPage() {
                     </div>
 
                     {/* Delete button */}
+                    {isOwner && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -402,6 +404,7 @@ export default function NotificationsSettingsPage() {
                     >
                       <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
                     </Button>
+                    )}
                   </div>
                 ))}
               </div>

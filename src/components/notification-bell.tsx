@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
 import { Bell, Check, CheckCheck, Trash2, CalendarDays, LogIn, LogOut, XCircle, Receipt, CreditCard, UtensilsCrossed, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -51,6 +52,8 @@ function getNotificationIcon(type: string) {
 // ─── Component ────────────────────────────────────────────────────────────
 
 export function NotificationBell() {
+  const { data: session } = useSession()
+  const isOwner = session?.user?.role === "owner"
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -230,18 +233,20 @@ export function NotificationBell() {
                         <Check className="h-3.5 w-3.5 text-gray-400" />
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteNotification(notification.id)
-                      }}
-                      title="Supprimer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
-                    </Button>
+                    {isOwner && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteNotification(notification.id)
+                        }}
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

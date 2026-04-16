@@ -49,6 +49,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
+    if (session.user.role !== "owner") {
+      return NextResponse.json({ error: "Seul le propriétaire peut supprimer les notifications" }, { status: 403 })
+    }
+
     const { id } = await params
 
     const notification = await db.notification.findUnique({
