@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useCurrency } from "@/hooks/use-currency"
+import { cn } from "@/lib/utils"
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns"
 import { fr } from "date-fns/locale"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
