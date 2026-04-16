@@ -227,10 +227,24 @@ export async function PATCH(
         updateData.actualCheckIn = new Date()
         updateData.checkedInBy = session.user.id
 
+        // Update room status and reset cleaning status (room is now occupied)
         await db.room.update({
           where: { id: existingBooking.roomId },
           data: { status: "occupied" },
         })
+
+        // Reset cleaning status on check-in (non-blocking)
+        try {
+          await db.room.update({
+            where: { id: existingBooking.roomId },
+            data: {
+              cleaningStatus: null,
+              cleaningUpdatedAt: null,
+            },
+          })
+        } catch (cleaningErr) {
+          console.warn("[checkin] Could not reset cleaningStatus:", (cleaningErr as Error).message)
+        }
       }
 
       if (status === "checked_out") {

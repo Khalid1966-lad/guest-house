@@ -966,40 +966,55 @@ export default function HousekeepingPage() {
                     </div>
                   )}
 
-                  {/* Action button */}
-                  <Button
-                    variant={taskInfo ? "outline" : "default"}
-                    size="sm"
-                    className="w-full text-xs"
-                    disabled={!hasCleaningTasks}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (!hasCleaningTasks) return
-                      if (taskInfo) {
-                        openTaskDetail(taskInfo.id)
-                      } else {
-                        setCreateDialogRoom(room)
-                        setCreateDialogOpen(true)
-                      }
-                    }}
-                  >
-                    {!hasCleaningTasks ? (
-                      <>
-                        <CircleAlert className="w-3.5 h-3.5 mr-1.5" />
-                        Migration requise
-                      </>
-                    ) : taskInfo ? (
-                      <>
-                        <Eye className="w-3.5 h-3.5 mr-1.5" />
-                        Voir la checklist
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                        Démarrer le ménage
-                      </>
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant={taskInfo ? "outline" : "default"}
+                      size="sm"
+                      className="flex-1 text-xs"
+                      disabled={!hasCleaningTasks}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!hasCleaningTasks) return
+                        if (taskInfo) {
+                          openTaskDetail(taskInfo.id)
+                        } else {
+                          setCreateDialogRoom(room)
+                          setCreateDialogOpen(true)
+                        }
+                      }}
+                    >
+                      {!hasCleaningTasks ? (
+                        <>
+                          <CircleAlert className="w-3.5 h-3.5 mr-1.5" />
+                          Migration requise
+                        </>
+                      ) : taskInfo ? (
+                        <>
+                          <Eye className="w-3.5 h-3.5 mr-1.5" />
+                          Voir la checklist
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                          Démarrer le ménage
+                        </>
+                      )}
+                    </Button>
+                    {hasCleaningTasks && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs px-2.5"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openHistory(room)
+                        }}
+                      >
+                        <History className="w-3.5 h-3.5" />
+                      </Button>
                     )}
-                  </Button>
+                  </div>
                 </CardContent>
               </Card>
             )
@@ -1018,7 +1033,7 @@ export default function HousekeepingPage() {
             <>
               {/* Header */}
               <SheetHeader className="p-4 pb-3 border-b bg-gradient-to-r from-pink-50 to-transparent dark:from-pink-950/30">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-lg bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center flex-shrink-0">
                       <BedDouble className="w-5 h-5 text-pink-600 dark:text-pink-400" />
@@ -1038,14 +1053,6 @@ export default function HousekeepingPage() {
                       </SheetDescription>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 flex-shrink-0"
-                    onClick={closeTaskDetail}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
                 </div>
 
                 {/* Assigned person + history */}
