@@ -459,3 +459,52 @@ Stage Summary:
 - Rooms page shows cleaning status badges alongside room status
 - Housekeeping page provides filtering, status flow control, and optional notes
 - API validates role permissions and cleaning status values
+
+---
+Task ID: 4-housekeeping-v2
+Agent: Main
+Task: Comprehensive housekeeping system with checklist, staff assignment, history, and role-based access
+
+Work Log:
+- Added `CleaningTask` and `CleaningTaskItem` models to all 3 Prisma schemas (schema.prisma, schema.postgresql.prisma, schema.sqlite.prisma)
+- CleaningTask: links room to cleaning session with assignedTo, status, priority, timestamps, notes, damage tracking
+- CleaningTaskItem: individual checklist items with category, checked status, timestamp, user reference, anomaly notes
+- Added User relations: CleaningAssignedTo, CleaningVerifiedBy, CleaningCheckedBy
+- Added Room and GuestHouse relations for cleaningTasks
+- Pushed SQLite schema to local database successfully
+- Updated housekeeping API route (GET): now returns rooms with active task summary including progress
+- Created POST /api/housekeeping/tasks: creates task with 10 auto-generated checklist items
+- Created GET /api/housekeeping/tasks: lists tasks with filters (status, roomId, assignedToId)
+- Created GET/PATCH/DELETE /api/housekeeping/tasks/[id]: task CRUD with role-based access
+- Created PATCH /api/housekeeping/tasks/[id]/items/[itemId]: toggle checklist items with auto-start/auto-complete logic
+- Created GET /api/housekeeping/history: room cleaning history with pagination
+- Updated permissions API: added gouvernant, gouvernante, femmeDeMenage role defaults
+- Fixed category mismatch: API uses salle_de_bain to match frontend
+- Fixed progress shape mismatch: API returns {checked, total} object
+- Completely rewrote housekeeping page (1621 lines) with:
+  - Header with pink Sparkles icon and refresh button
+  - Compact stats filter pills (En départ, En cours, Terminé, Vérifié)
+  - Search bar for room filtering
+  - Room cards grid with cleaning status, progress bars, assigned person, time ago
+  - Task detail Sheet with 10-item checklist grouped by 5 categories
+  - Large 44px+ touch-friendly checkboxes with checkmark animations
+  - Category sections: Vérification, Linge, Nettoyage, Salle de bain, Consommables
+  - Anomaly note dialog per checklist item
+  - Damage reporting dialog (marks task as needs_repair)
+  - Staff assignment dialog for gouvernante/owner
+  - Create task dialog with room selection, staff assignment, priority
+  - Cleaning history sheet per room
+  - Role-based access: femmeDeMenage can check items and mark completed; gouvernante/owner can verify
+- Updated version to v2.4.0
+- All lint checks pass (zero errors)
+
+Stage Summary:
+- Complete room cleaning management system with 10-point checklist
+- Role-based access: femme de ménage (execution), gouvernante (supervision/verification), owner (full access)
+- Checklist categories: Vérification, Linge, Nettoyage, Salle de bain, Consommables
+- Staff assignment to cleaning tasks
+- Damage reporting and tracking
+- Cleaning history per room
+- Mobile-first responsive design with large touch targets
+- Auto-start on first check, auto-complete when all items checked
+- Version bumped to v2.4.0

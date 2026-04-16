@@ -56,6 +56,7 @@ model GuestHouse {
   settings       GuestHouseSetting?
   roles          Role[]
   notifications  Notification[]
+  cleaningTasks  CleaningTask[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -123,6 +124,11 @@ model User {
   checkIns      Booking[] @relation("CheckInsBy")
   checkOuts     Booking[] @relation("CheckOutsBy")
   notifications Notification[]
+  
+  // Housekeeping relations
+  cleaningTasksAssigned    CleaningTask[] @relation("CleaningAssignedTo")
+  cleaningTasksVerified    CleaningTask[] @relation("CleaningVerifiedBy")
+  cleaningTaskItemsChecked CleaningTaskItem[] @relation("CleaningCheckedBy")
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -251,6 +257,7 @@ model Room {
   
   bookings      Booking[]
   roomPrices    RoomPrice[]
+  cleaningTasks CleaningTask[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -627,6 +634,60 @@ model Notification {
   @@index([guestHouseId, isRead])
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+// ============================================
+// MÉNAGE / NETTOYAGE
+// ============================================
+model CleaningTask {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  roomId        String
+  room          Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  
+  assignedToId  String?
+  assignedTo    User?   @relation("CleaningAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  status        String  @default("pending")  // pending, in_progress, completed, verified, needs_repair
+  priority      String  @default("normal")  // low, normal, high
+  
+  startedAt     DateTime?
+  completedAt   DateTime?
+  
+  verifiedById  String?
+  verifiedBy    User?   @relation("CleaningVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt    DateTime?
+  
+  notes         String?
+  damageNotes   String?
+  hasDamage     Boolean @default(false)
+  
+  items         CleaningTaskItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CleaningTaskItem {
+  id            String @id @default(cuid())
+  taskId        String
+  task          CleaningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  label         String
+  category      String  @default("general")
+  sortOrder     Int     @default(0)
+  
+  checked       Boolean @default(false)
+  checkedAt     DateTime?
+  checkedById   String?
+  checkedBy     User?   @relation("CleaningCheckedBy", fields: [checkedById], references: [id], onDelete: SetNull)
+  
+  notes         String?  // for anomaly reporting
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================
