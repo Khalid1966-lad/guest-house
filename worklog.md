@@ -284,3 +284,23 @@ Stage Summary:
 - Code displayed read-only in establishment settings → Facturation tab
 - Backward-compatible: invoice number parser handles both old (FAC-2026-00001) and new (FAC-2026-00001/GH001) formats
 - Changes ready for deployment (schema push needed on Vercel/PostgreSQL)
+
+---
+Task ID: restaurant-order-price-lock
+Agent: Main
+Task: Lock restaurant order prices in invoice creation (prevent price editing) + fix order reappear bug
+
+Work Log:
+- Updated InvoiceItem interface to include `itemType` and `referenceId` fields
+- Updated `handleEditInvoice` to preserve `itemType` and `referenceId` when editing invoices
+- Made quantity, unitPrice, taxRate, and description fields `readOnly` for restaurant order items
+- Added visual indicators: orange/amber backgrounds for restaurant items, Lock icon on description label
+- Restaurant order headers get amber background, individual items get orange background
+- Removed item delete button still available (user can remove order from form)
+- Previous bug (orders not reappearing after invoice deletion) was already fixed: DELETE endpoint resets `paymentStatus` to "pending"
+
+Stage Summary:
+- Restaurant order prices are now locked/read-only in invoice creation form
+- Visual distinction: restaurant items have orange/amber tinted backgrounds with lock icon
+- Edit mode also preserves restaurant item lock status
+- Invoice deletion properly resets order paymentStatus to "pending" (was already implemented)

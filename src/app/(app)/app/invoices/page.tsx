@@ -64,6 +64,7 @@ import {
   Printer,
   FileSpreadsheet,
   UtensilsCrossed,
+  Lock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
@@ -107,6 +108,8 @@ interface InvoiceItem {
   unitPrice: number
   total: number
   taxRate: number
+  itemType?: string | null
+  referenceId?: string | null
 }
 
 interface RestaurantOrderForInvoice {
@@ -382,6 +385,8 @@ export default function InvoicesPage() {
         quantity: item.quantity.toString(),
         unitPrice: item.unitPrice.toString(),
         taxRate: item.taxRate.toString(),
+        itemType: item.itemType || null,
+        referenceId: item.referenceId || null,
       })),
     })
     setFormError("")
@@ -1407,14 +1412,34 @@ export default function InvoicesPage() {
               </div>
 
               <div className="space-y-3">
-                {formData.items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                {formData.items.map((item, index) => {
+                  const isRestaurantItem = (item as any).itemType === "restaurant_order" || (item as any).itemType === "restaurant_order_header"
+                  const isHeaderItem = (item as any).itemType === "restaurant_order_header"
+
+                  return (
+                  <div key={index} className={cn(
+                    "grid grid-cols-12 gap-2 items-end p-3 rounded-lg",
+                    isRestaurantItem
+                      ? isHeaderItem
+                        ? "bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50"
+                        : "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/40"
+                      : "bg-gray-50 dark:bg-gray-900"
+                  )}>
                     <div className="col-span-5 space-y-1">
-                      <Label className="text-xs">Description</Label>
+                      <Label className="text-xs flex items-center gap-1">
+                        Description
+                        {isRestaurantItem && (
+                          <Lock className="w-3 h-3 text-orange-500" />
+                        )}
+                      </Label>
                       <Input
                         value={item.description}
                         onChange={(e) => handleItemChange(index, "description", e.target.value)}
                         placeholder="Description de l'article"
+                        readOnly={isRestaurantItem}
+                        className={cn(
+                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                        )}
                       />
                     </div>
                     <div className="col-span-2 space-y-1">
@@ -1424,6 +1449,10 @@ export default function InvoicesPage() {
                         min="1"
                         value={item.quantity}
                         onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                        readOnly={isRestaurantItem}
+                        className={cn(
+                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                        )}
                       />
                     </div>
                     <div className="col-span-2 space-y-1">
@@ -1433,6 +1462,10 @@ export default function InvoicesPage() {
                         step="0.01"
                         value={item.unitPrice}
                         onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
+                        readOnly={isRestaurantItem}
+                        className={cn(
+                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                        )}
                       />
                     </div>
                     <div className="col-span-2 space-y-1">
@@ -1442,6 +1475,10 @@ export default function InvoicesPage() {
                         step="0.1"
                         value={item.taxRate}
                         onChange={(e) => handleItemChange(index, "taxRate", e.target.value)}
+                        readOnly={isRestaurantItem}
+                        className={cn(
+                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                        )}
                       />
                     </div>
                     <div className="col-span-1">
@@ -1451,13 +1488,15 @@ export default function InvoicesPage() {
                           size="icon"
                           className="text-red-600 hover:text-red-700"
                           onClick={() => removeItem(index)}
+                          title={isRestaurantItem ? "Retirer cette commande" : "Supprimer l'article"}
                         >
                           <XCircle className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Totals */}
