@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,8 @@ import {
   ClipboardList,
   AlertTriangle,
   Clock,
+  KeyRound,
+  CheckCircle,
 } from "lucide-react"
 
 // Types
@@ -139,6 +142,16 @@ export default function AdminGuestHousesPage() {
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
 
+  // Password change state
+  const [passwordDialogGhId, setPasswordDialogGhId] = useState<string | null>(null)
+  const [passwordDialogUserId, setPasswordDialogUserId] = useState<string | null>(null)
+  const [passwordDialogUserName, setPasswordDialogUserName] = useState<string>("")
+  const [newPassword, setNewPassword] = useState("")
+  const [passwordConfirm, setPasswordConfirm] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
+
   // Vérifier que l'utilisateur est super_admin
   useEffect(() => {
     if (sessionStatus === "loading") return
@@ -176,6 +189,68 @@ export default function AdminGuestHousesPage() {
       fetchData()
     }
   }, [session, statusFilter, planFilter, search])
+
+  // Open password dialog
+  const handleOpenPasswordDialog = (ghId: string, userId: string, userName: string) => {
+    setPasswordDialogGhId(ghId)
+    setPasswordDialogUserId(userId)
+    setPasswordDialogUserName(userName)
+    setNewPassword("")
+    setPasswordConfirm("")
+    setPasswordError("")
+    setPasswordSuccess(false)
+  }
+
+  // Close password dialog
+  const handleClosePasswordDialog = () => {
+    setPasswordDialogGhId(null)
+    setPasswordDialogUserId(null)
+    setPasswordDialogUserName("")
+    setNewPassword("")
+    setPasswordConfirm("")
+    setPasswordError("")
+    setPasswordSuccess(false)
+  }
+
+  // Handle password reset
+  const handleResetPassword = async () => {
+    setPasswordError("")
+    setPasswordSuccess(false)
+
+    if (!passwordDialogGhId || !passwordDialogUserId) return
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError("Le mot de passe doit contenir au moins 6 caractères")
+      return
+    }
+    if (newPassword !== passwordConfirm) {
+      setPasswordError("Les mots de passe ne correspondent pas")
+      return
+    }
+
+    setIsResettingPassword(true)
+    try {
+      const res = await fetch(`/api/admin/guesthouses/${passwordDialogGhId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "resetPassword",
+          userId: passwordDialogUserId,
+          newPassword,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPasswordSuccess(true)
+        setTimeout(() => handleClosePasswordDialog(), 2000)
+      } else {
+        setPasswordError(data.error || "Erreur lors de la réinitialisation")
+      }
+    } catch {
+      setPasswordError("Erreur réseau. Veuillez réessayer.")
+    } finally {
+      setIsResettingPassword(false)
+    }
+  }
 
   // Action: Changer le statut
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -426,6 +501,18 @@ export default function AdminGuestHousesPage() {
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
+                    {gh.owner && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-sky-600 hover:bg-sky-50 hover:text-sky-700 h-8"
+                        disabled={isUpdatingThis}
+                        onClick={() => handleOpenPasswordDialog(gh.id, gh.owner.id, `${gh.owner.firstName || ''} ${gh.owner.lastName || ''}`.trim() || gh.owner.email)}
+                        title="Réinitialiser le mot de passe"
+                      >
+                        <KeyRound className="w-3 h-3" />
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" className="h-8 w-8">
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </Button>
@@ -475,6 +562,68 @@ export default function AdminGuestHousesPage() {
           })}
         </div>
       )}
+
+      {/* Dialog de réinitialisation du mot de passe */}
+      <Dialog open={!!passwordDialogGhId} onOpenChange={(open) => { if (!open) handleClosePasswordDialog() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-sky-600" />
+              Réinitialiser le mot de passe
+            </DialogTitle>
+            <DialogDescription>
+              Définir un nouveau mot de passe pour <strong>{passwordDialogUserName}</strong>.<br />
+              L'utilisateur devra utiliser ce mot de passe lors de sa prochaine connexion.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nouveau mot de passe</label>
+              <Input
+                type="password"
+                placeholder="Minimum 6 caractères"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isResettingPassword || passwordSuccess}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confirmer le mot de passe</label>
+              <Input
+                type="password"
+                placeholder="Confirmer le mot de passe"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                disabled={isResettingPassword || passwordSuccess}
+              />
+            </div>
+            {passwordError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                {passwordError}
+              </div>
+            )}
+            {passwordSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Mot de passe réinitialisé avec succès !
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={handleClosePasswordDialog} disabled={isResettingPassword}>
+                Annuler
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                disabled={isResettingPassword || passwordSuccess || !newPassword || !passwordConfirm}
+                className="bg-sky-600 hover:bg-sky-700"
+              >
+                {isResettingPassword && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Réinitialiser
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de suppression */}
       <Dialog open={!!deleteDialog} onOpenChange={() => setDeleteDialog(null)}>

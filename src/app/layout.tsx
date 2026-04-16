@@ -30,12 +30,6 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-  openGraph: {
-    title: "PMS Guest House - Gestion de Maisons d'Hôtes",
-    description: "Solution SaaS complète pour la gestion de maisons d'hôtes",
-    type: "website",
-    images: ["/android-chrome-512x512.png"],
-  },
 };
 
 export default function RootLayout({

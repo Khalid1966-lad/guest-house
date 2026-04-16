@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Prisma } from "@prisma/client"
+import bcrypt from "bcryptjs"
 
 async function requireSuperAdmin() {
   const session = await getServerSession(authOptions)
@@ -89,11 +90,45 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { status, plan, isActive } = body
+    const { status, plan, isActive, action, userId, newPassword } = body
 
-    const existing = await db.guestHouse.findUnique({ where: { id } })
+    const existing = await db.guestHouse.findUnique({
+      where: { id },
+      include: {
+        users: {
+          select: { id: true, role: true },
+        },
+      },
+    })
     if (!existing) {
       return NextResponse.json({ error: "Maison d'hôtes non trouvée" }, { status: 404 })
+    }
+
+    // Handle password reset for a user belonging to this guesthouse
+    if (action === "resetPassword") {
+      if (!userId) {
+        return NextResponse.json({ error: "L'ID utilisateur est requis" }, { status: 400 })
+      }
+      if (!newPassword || newPassword.length < 6) {
+        return NextResponse.json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, { status: 400 })
+      }
+
+      // Verify the user belongs to this guesthouse
+      const targetUser = existing.users.find(u => u.id === userId)
+      if (!targetUser) {
+        return NextResponse.json({ error: "Utilisateur non trouvé dans cette maison d'hôtes" }, { status: 404 })
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10)
+      await db.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: "Mot de passe réinitialisé avec succès",
+      })
     }
 
     const updateData: Prisma.GuestHouseUpdateInput = {}
