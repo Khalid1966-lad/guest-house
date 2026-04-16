@@ -96,6 +96,64 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Helper to build invoice create data
+function buildInvoiceData(
+  guestHouseId: string,
+  invoiceNumber: string,
+  guestId: string,
+  bookingId: string | null,
+  subtotal: unknown,
+  taxes: unknown,
+  discount: unknown,
+  total: unknown,
+  dueDate: string | null,
+  notes: string | null,
+  terms: string | null,
+  touristTaxApplied: unknown,
+  touristTaxPerNight: unknown,
+  touristTaxNights: unknown,
+  touristTaxAmount: unknown,
+  items: unknown[]
+) {
+  return {
+    guestHouseId,
+    invoiceNumber,
+    guestId,
+    bookingId,
+    subtotal: typeof subtotal === 'number' ? subtotal : parseFloat(subtotal as string) || 0,
+    taxes: typeof taxes === 'number' ? taxes : parseFloat(taxes as string) || 0,
+    discount: typeof discount === 'number' ? discount : parseFloat(discount as string) || 0,
+    total: typeof total === 'number' ? total : parseFloat(total as string) || 0,
+    dueDate: dueDate ? new Date(dueDate) : null,
+    notes,
+    terms,
+    status: "draft" as const,
+    touristTaxApplied: !!touristTaxApplied,
+    touristTaxPerNight: parseFloat(touristTaxPerNight as string) || 0,
+    touristTaxNights: parseInt(touristTaxNights as string) || 0,
+    touristTaxAmount: parseFloat(touristTaxAmount as string) || 0,
+    items: {
+      create: (items as Array<{
+        description: string
+        quantity: number
+        unitPrice: number
+        total: number
+        taxRate: number
+        itemType?: string
+        referenceId?: string
+      }>).map((item) => ({
+        description: item.description,
+        quantity: item.quantity || 1,
+        unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice as unknown as string) || 0,
+        total: typeof item.total === 'number' ? item.total : parseFloat(item.total as unknown as string) || 0,
+        taxRate: typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate as unknown as string) || 0,
+        itemType: item.itemType || null,
+        referenceId: item.referenceId || null,
+      })),
+    },
+  }
+}
+
 // POST - Créer une nouvelle facture
 export async function POST(request: NextRequest) {
   try {
@@ -145,174 +203,108 @@ export async function POST(request: NextRequest) {
       })
       if (existingInvoice) {
         return NextResponse.json(
-          { error: `Une facture (${existingInvoice.invoiceNumber}) existe déjà pour ce séjour` },
+          { error: "Une facture (" + existingInvoice.invoiceNumber + ") existe déjà pour ce séjour" },
           { status: 400 }
         )
       }
     }
 
-    // Générer le numéro de facture de manière atomique
     const year = new Date().getFullYear()
-    const prefix = `FAC-${year}-`
+    const prefix = "FAC-" + year + "-"
+    const ghId = session.user.guestHouseId
 
-    let invoice: any
-    try {
-      invoice = await db.$transaction(async (tx) => {
-        // Trouver le dernier numéro de facture pour cette année et ce guest house
-        const lastInvoice = await tx.invoice.findFirst({
-          where: {
-            guestHouseId: session.user.guestHouseId,
-            invoiceNumber: { startsWith: prefix },
-          },
-          orderBy: { invoiceNumber: "desc" },
-          select: { invoiceNumber: true },
-        })
+    // Retry loop to handle race conditions on invoice number
+    const MAX_RETRIES = 5
+    let invoice: any = null
+    let lastError: Error | null = null
 
-        let nextNum = 1
-        if (lastInvoice) {
-          // Extraire le numéro depuis FAC-2026-XXXXX
-          const parts = lastInvoice.invoiceNumber.split("-")
-          const lastNum = parseInt(parts[parts.length - 1], 10)
-          nextNum = isNaN(lastNum) ? 1 : lastNum + 1
-        }
-
-        const invoiceNumber = `${prefix}${String(nextNum).padStart(5, "0")}`
-
-        // Vérifier que ce numéro n'existe pas déjà pour ce guest house
-        const existing = await tx.invoice.findUnique({
-          where: { invoiceNumber_guestHouseId: { invoiceNumber, guestHouseId: session.user.guestHouseId } },
-        })
-        if (existing) {
-          // Retrouver un numéro libre en cherchant le max
-          const allNumbers = await tx.invoice.findMany({
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        invoice = await db.$transaction(async (tx) => {
+          // Find all used numbers for this guest house & year in one query
+          const existingInvoices = await tx.invoice.findMany({
             where: {
-              guestHouseId: session.user.guestHouseId,
+              guestHouseId: ghId,
               invoiceNumber: { startsWith: prefix },
             },
             select: { invoiceNumber: true },
           })
-          const usedNums = new Set(
-            allNumbers
-              .map((inv) => {
-                const p = inv.invoiceNumber.split("-")
-                return parseInt(p[p.length - 1], 10)
-              })
-              .filter((n) => !isNaN(n))
-          )
-          nextNum = 1
+
+          const usedNums = new Set<number>()
+          for (const inv of existingInvoices) {
+            const p = inv.invoiceNumber.split("-")
+            const n = parseInt(p[p.length - 1], 10)
+            if (!isNaN(n)) usedNums.add(n)
+          }
+
+          // Find next available number
+          let nextNum = 1
           while (usedNums.has(nextNum)) nextNum++
-          const fallbackNumber = `${prefix}${String(nextNum).padStart(5, "0")}`
+
+          const invoiceNumber = prefix + String(nextNum).padStart(5, "0")
 
           return tx.invoice.create({
-            data: {
-              guestHouseId: session.user.guestHouseId,
-              invoiceNumber: fallbackNumber,
+            data: buildInvoiceData(
+              ghId,
+              invoiceNumber,
               guestId,
-              bookingId: bookingId || null,
-              subtotal: typeof subtotal === 'number' ? subtotal : parseFloat(subtotal) || 0,
-              taxes: typeof taxes === 'number' ? taxes : parseFloat(taxes) || 0,
-              discount: typeof discount === 'number' ? discount : parseFloat(discount) || 0,
-              total: typeof total === 'number' ? total : parseFloat(total) || 0,
-              dueDate: dueDate ? new Date(dueDate) : null,
-              notes: notes || null,
-              terms: terms || null,
-              status: "draft",
-              touristTaxApplied: touristTaxApplied || false,
-              touristTaxPerNight: parseFloat(touristTaxPerNight) || 0,
-              touristTaxNights: parseInt(touristTaxNights) || 0,
-              touristTaxAmount: parseFloat(touristTaxAmount) || 0,
-              items: {
-                create: items.map((item: {
-                  description: string
-                  quantity: number
-                  unitPrice: number
-                  total: number
-                  taxRate: number
-                  itemType: string
-                  referenceId: string
-                }) => ({
-                  description: item.description,
-                  quantity: item.quantity || 1,
-                  unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0,
-                  total: typeof item.total === 'number' ? item.total : parseFloat(item.total) || 0,
-                  taxRate: typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate) || 0,
-                  itemType: item.itemType || null,
-                  referenceId: item.referenceId || null,
-                })),
-              },
-            },
+              bookingId || null,
+              subtotal,
+              taxes,
+              discount,
+              total,
+              dueDate,
+              notes || null,
+              terms || null,
+              touristTaxApplied,
+              touristTaxPerNight,
+              touristTaxNights,
+              touristTaxAmount,
+              items
+            ),
             include: {
               guest: true,
               items: true,
             },
           })
+        })
+        // Success — break out of retry loop
+        break
+      } catch (txError: unknown) {
+        lastError = txError instanceof Error ? txError : new Error(String(txError))
+
+        // Check if it's a unique constraint error on invoiceNumber (P2002)
+        const isConstraintError =
+          lastError.message.includes("Unique constraint") &&
+          lastError.message.includes("invoiceNumber")
+
+        if (isConstraintError && attempt < MAX_RETRIES - 1) {
+          // Another request created the same number — retry with a new number
+          console.warn("Invoice number collision on attempt " + (attempt + 1) + ", retrying...")
+          continue
         }
 
-        return tx.invoice.create({
-          data: {
-            guestHouseId: session.user.guestHouseId,
-            invoiceNumber,
-            guestId,
-            bookingId: bookingId || null,
-            subtotal: typeof subtotal === 'number' ? subtotal : parseFloat(subtotal) || 0,
-            taxes: typeof taxes === 'number' ? taxes : parseFloat(taxes) || 0,
-            discount: typeof discount === 'number' ? discount : parseFloat(discount) || 0,
-            total: typeof total === 'number' ? total : parseFloat(total) || 0,
-            dueDate: dueDate ? new Date(dueDate) : null,
-            notes: notes || null,
-            terms: terms || null,
-            status: "draft",
-            touristTaxApplied: touristTaxApplied || false,
-            touristTaxPerNight: parseFloat(touristTaxPerNight) || 0,
-            touristTaxNights: parseInt(touristTaxNights) || 0,
-            touristTaxAmount: parseFloat(touristTaxAmount) || 0,
-            items: {
-              create: items.map((item: {
-                description: string
-                quantity: number
-                unitPrice: number
-                total: number
-                taxRate: number
-                itemType: string
-                referenceId: string
-              }) => ({
-                description: item.description,
-                quantity: item.quantity || 1,
-                unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0,
-                total: typeof item.total === 'number' ? item.total : parseFloat(item.total) || 0,
-                taxRate: typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate) || 0,
-                itemType: item.itemType || null,
-                referenceId: item.referenceId || null,
-              })),
-            },
-          },
-          include: {
-            guest: true,
-            items: true,
-          },
-        })
-      })
-    } catch (txError) {
-      console.error("Transaction error:", txError)
-      const errMsg = txError instanceof Error ? txError.message : "Erreur inconnue"
-      return NextResponse.json(
-        { error: "Erreur lors de la création de la facture: " + errMsg },
-        { status: 500 }
-      )
+        // Not a constraint error or max retries exceeded — propagate
+        throw lastError
+      }
+    }
+
+    if (!invoice) {
+      throw lastError || new Error("Impossible de générer un numéro de facture unique après " + MAX_RETRIES + " tentatives")
     }
 
     // Trigger notification (fire-and-forget)
     notifyNewInvoice({
-      guestHouseId: session.user.guestHouseId,
+      guestHouseId: ghId,
       userId: session.user.id,
       invoiceNumber: invoice.invoiceNumber,
-      guestName: `${invoice.guest.firstName} ${invoice.guest.lastName}`,
+      guestName: invoice.guest.firstName + " " + invoice.guest.lastName,
       total: invoice.total,
       invoiceId: invoice.id,
     }).catch(console.error)
 
     return NextResponse.json({ invoice }, { status: 201 })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Erreur création facture:", error)
 
     // Handle specific Prisma errors
