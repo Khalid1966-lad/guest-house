@@ -385,3 +385,17 @@ Work Log:
 Stage Summary:
 - Notification popover now has solid background and visible shadow
 - Content behind notifications no longer shows through
+
+---
+Task ID: fix-cn-import
+Agent: Main
+Task: Fix missing cn import in statistics page (runtime error)
+
+Work Log:
+- Statistics page was using `cn()` utility but missing `import { cn } from "@/lib/utils"`
+- Added the missing import line after `useCurrency` import
+- Lint passes, dev server compiles without errors
+- Committed as 56bac17
+
+Stage Summary:
+- Statistics page now properly imports `cn` utility — no more runtime error when rendering period selector buttons
