@@ -62,7 +62,7 @@ export async function GET() {
           include: {
             items: true,
             assignedTo: {
-              select: { id: true, name: true, firstName: true, lastName: true },
+              select: { id: true, name: true, firstName: true, lastName: true, avatar: true },
             },
           },
         },

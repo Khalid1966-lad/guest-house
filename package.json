@@ -7,7 +7,7 @@
     "build": "prisma generate --schema=prisma/schema.postgresql.prisma && next build",
     "start": "next start",
     "lint": "eslint .",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate --schema=prisma/schema.sqlite.prisma",
     "db:push": "prisma db push",
     "db:push:pg": "prisma db push --schema=prisma/schema.postgresql.prisma",
     "db:generate": "prisma generate",

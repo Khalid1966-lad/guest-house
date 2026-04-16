@@ -376,7 +376,14 @@ export default function HousekeepingPage() {
 
       const res = await fetch("/api/housekeeping")
       if (!res.ok) {
-        throw new Error("Erreur lors du chargement des chambres")
+        let errorMsg = "Erreur lors du chargement des chambres"
+        try {
+          const errData = await res.json()
+          if (errData.error) errorMsg = errData.error
+        } catch {
+          // ignore parse error
+        }
+        throw new Error(errorMsg)
       }
       const data = await res.json()
       setRooms(data.rooms || [])

@@ -45,7 +45,7 @@ const CLEANING_CHECKLIST_TEMPLATE = [
   },
   {
     label: "Réapprovisionnement des consommables (savon, shampoing, papier toilette, café, eau, etc.)",
-    category: "supplies",
+    category: "consommables",
   },
   {
     label: "Mise en place du linge propre (draps, housse de couette, serviettes)",

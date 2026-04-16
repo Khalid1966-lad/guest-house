@@ -508,3 +508,24 @@ Stage Summary:
 - Mobile-first responsive design with large touch targets
 - Auto-start on first check, auto-complete when all items checked
 - Version bumped to v2.4.0
+
+---
+Task ID: fix-housekeeping-loading
+Agent: Main
+Task: Fix "Erreur lors du chargement des chambres" in housekeeping page
+
+Work Log:
+- Diagnosed root cause: `postinstall` script ran `prisma generate` (using default `schema.prisma` with `provider = "postgresql"`) but `DATABASE_URL` points to SQLite. This generated a PostgreSQL Prisma client that couldn't query SQLite, causing all Prisma queries to fail with 500 errors
+- Fixed `postinstall` in package.json: changed to `prisma generate --schema=prisma/schema.sqlite.prisma`
+- Regenerated Prisma client with SQLite schema
+- Fixed category mismatch in task creation template: `supplies` → `consommables` (frontend expects `consommables` key)
+- Fixed `assignedTo` select in GET /api/housekeeping: added missing `avatar` field to match frontend interface
+- Improved error handling in fetchRooms: now parses API error response body to show actual error message instead of generic text
+- All lint checks pass
+
+Stage Summary:
+- Root cause: PostgreSQL Prisma client was generated while DATABASE_URL is SQLite, causing all housekeeping queries to fail
+- Fixed postinstall to always generate SQLite client for local development
+- Fixed checklist category mismatch (supplies → consommables)
+- Added avatar field to assignedTo API response
+- Improved frontend error reporting to show actual API errors
