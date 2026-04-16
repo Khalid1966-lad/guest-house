@@ -25,19 +25,19 @@ const CLEANING_CHECKLIST_TEMPLATE = [
   },
   {
     label: "Gestion du linge (retrait des draps, serviettes, tri éventuel)",
-    category: "linen",
+    category: "linge",
   },
   {
     label: "Nettoyage poussière (meubles, plinthes, interrupteurs, cadres)",
-    category: "cleaning",
+    category: "nettoyage",
   },
   {
     label: "Vitres et miroirs sans traces",
-    category: "cleaning",
+    category: "nettoyage",
   },
   {
     label: "Aspirateur (sols, sous le lit, recoins)",
-    category: "cleaning",
+    category: "nettoyage",
   },
   {
     label: "Désinfection salle de bain (lavabo, douche/baignoire, WC, robinetterie, joints)",
@@ -49,7 +49,7 @@ const CLEANING_CHECKLIST_TEMPLATE = [
   },
   {
     label: "Mise en place du linge propre (draps, housse de couette, serviettes)",
-    category: "linen",
+    category: "linge",
   },
   {
     label: "Contrôle final (lumière, odeur, fonctionnement TV/clim/prises)",

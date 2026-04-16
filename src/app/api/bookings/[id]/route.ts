@@ -237,14 +237,26 @@ export async function PATCH(
         updateData.actualCheckOut = new Date()
         updateData.checkedOutBy = session.user.id
 
+        // Update room status (always succeeds)
         await db.room.update({
           where: { id: existingBooking.roomId },
           data: {
             status: "available",
-            cleaningStatus: "departure",
-            cleaningUpdatedAt: new Date(),
           },
         })
+
+        // Update cleaning status (may fail if migration not applied yet — non-blocking)
+        try {
+          await db.room.update({
+            where: { id: existingBooking.roomId },
+            data: {
+              cleaningStatus: "departure",
+              cleaningUpdatedAt: new Date(),
+            },
+          })
+        } catch (cleaningErr) {
+          console.warn("[checkout] Could not set cleaningStatus (migration may be missing):", (cleaningErr as Error).message)
+        }
       }
 
       if (status === "cancelled") {

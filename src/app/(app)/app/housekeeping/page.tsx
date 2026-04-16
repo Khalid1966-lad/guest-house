@@ -388,7 +388,8 @@ export default function HousekeepingPage() {
       }
       const data = await res.json()
       setRooms(data.rooms || [])
-      if (data.hasCleaningTasks === false) setHasCleaningTasks(false)
+      // Reset hasCleaningTasks based on API response (handles both pre and post migration)
+      setHasCleaningTasks(data.hasCleaningTasks !== false)
     } catch (err) {
       console.error("Error fetching rooms:", err)
       setError(err instanceof Error ? err.message : "Erreur lors du chargement")
@@ -701,12 +702,23 @@ export default function HousekeepingPage() {
     }
   }
 
+  // Category name normalization (handle old English names from existing DB records)
+  const normalizeCategory = (cat: string): string => {
+    const map: Record<string, string> = {
+      linen: "linge",
+      cleaning: "nettoyage",
+      bathroom: "salle_de_bain",
+      supplies: "consommables",
+    }
+    return map[cat] || cat
+  }
+
   // ── Group items by category ──
   const groupedItems = useMemo(() => {
     if (!selectedTask) return new Map<string, ChecklistItem[]>()
     const map = new Map<string, ChecklistItem[]>()
     selectedTask.items.forEach((item) => {
-      const cat = item.category || "general"
+      const cat = normalizeCategory(item.category || "general")
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(item)
     })

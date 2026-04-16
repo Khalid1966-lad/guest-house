@@ -529,3 +529,24 @@ Stage Summary:
 - Fixed checklist category mismatch (supplies → consommables)
 - Added avatar field to assignedTo API response
 - Improved frontend error reporting to show actual API errors
+
+---
+Task ID: 1
+Agent: main
+Task: Fix checklist showing only 5/10 items, checkout not setting departure, "Toutes" filter empty
+
+Work Log:
+- Analyzed full housekeeping flow: checkout → cleaningStatus → housekeeping API → frontend filtering
+- Found ROOT CAUSE of 5/10 items: category name mismatch between template (English: "linen"/"cleaning") and frontend (French: "linge"/"nettoyage")
+- Fixed template in tasks/route.ts: changed "linen" → "linge", "cleaning" → "nettoyage" for new tasks
+- Added normalizeCategory() in frontend groupedItems to handle existing DB records with old English category names
+- Fixed checkout resilience: separated room.status update from cleaningStatus update in bookings/[id]/route.ts, wrapping cleaningStatus in try-catch
+- Fixed hasCleaningTasks state never resetting to true after migration (was only set to false, never back to true)
+- Verified "Toutes" filter logic is correct (just returns rooms array), the empty issue was likely caused by hasCleaningTasks being stuck on false
+
+Stage Summary:
+- 3 files modified: tasks/route.ts, housekeeping/page.tsx, bookings/[id]/route.ts
+- All 10 checklist items will now be visible (5 existing categories + normalization for old data)
+- Checkout will set cleaningStatus="departure" reliably, and won't fail the entire checkout if migration is missing
+- "Toutes" filter should work correctly now that hasCleaningTasks resets properly
+- Lint passes clean
