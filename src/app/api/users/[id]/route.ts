@@ -38,6 +38,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         isActive: true,
         language: true,
         theme: true,
+        menuAccess: true,
         createdAt: true,
       },
     })
@@ -119,17 +120,24 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    const updateData: Record<string, unknown> = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      name: data.firstName && data.lastName 
+        ? `${data.firstName} ${data.lastName}` 
+        : data.firstName || data.lastName || null,
+      phone: data.phone,
+      role: data.role,
+    }
+
+    // Handle menuAccess update
+    if (data.menuAccess !== undefined) {
+      updateData.menuAccess = data.menuAccess
+    }
+
     const user = await db.user.update({
       where: { id },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        name: data.firstName && data.lastName 
-          ? `${data.firstName} ${data.lastName}` 
-          : data.firstName || data.lastName || null,
-        phone: data.phone,
-        role: data.role,
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,
@@ -138,6 +146,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         lastName: true,
         role: true,
         isActive: true,
+        menuAccess: true,
         createdAt: true,
       },
     })
@@ -209,6 +218,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           lastName: true,
           role: true,
           isActive: true,
+          menuAccess: true,
           createdAt: true,
         },
       })

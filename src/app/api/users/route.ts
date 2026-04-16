@@ -34,6 +34,7 @@ export async function GET() {
         phone: true,
         role: true,
         isActive: true,
+        menuAccess: true,
         createdAt: true,
       },
       orderBy: { createdAt: "asc" },
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
         guestHouseId: session.user.guestHouseId,
         isActive: true,
         emailVerified: new Date(),
+        menuAccess: data.menuAccess || null,
       },
       select: {
         id: true,
@@ -130,6 +132,7 @@ export async function POST(request: NextRequest) {
         lastName: true,
         role: true,
         isActive: true,
+        menuAccess: true,
         createdAt: true,
       },
     })

@@ -3,7 +3,37 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 
-// GET - Get current user's permissions
+// Menu keys matching the sidebar navigation
+const ALL_MENUS = [
+  "dashboard",
+  "rooms",
+  "housekeeping",
+  "bookings",
+  "guests",
+  "invoices",
+  "restaurant",
+  "expenses",
+  "statistics",
+  "users",
+  "settings",
+] as const
+
+// Map menu keys to the old permission names (for backward compatibility)
+const MENU_TO_PERMISSION: Record<string, string> = {
+  dashboard: "canViewDashboard",
+  rooms: "canViewRooms",
+  housekeeping: "canManageHousekeeping",
+  bookings: "canViewBookings",
+  guests: "canViewGuests",
+  invoices: "canViewInvoices",
+  restaurant: "canViewRestaurant",
+  expenses: "canViewExpenses",
+  statistics: "canViewStatistics",
+  users: "canViewUsers",
+  settings: "canViewSettings",
+}
+
+// GET - Get current user's permissions based on menuAccess
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -21,271 +51,54 @@ export async function GET() {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
-    // Get the role permissions for this user
-    const role = await db.role.findFirst({
-      where: {
-        guestHouseId: session.user.guestHouseId,
-        name: session.user.role,
-      },
-    })
-
-    // If no role record exists, return default permissions based on role name
-    if (!role) {
-      const defaultPermissions: Record<string, Record<string, boolean>> = {
-        owner: {
-          canViewDashboard: true,
-          canViewRooms: true,
-          canViewBookings: true,
-          canViewGuests: true,
-          canViewInvoices: true,
-          canViewRestaurant: true,
-          canViewExpenses: true,
-          canViewStatistics: true,
-          canViewSettings: true,
-          canViewUsers: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canCreateInvoices: true,
-          canEditInvoices: true,
-          canDeleteInvoices: true,
-          canManageRooms: true,
-          canManageGuests: true,
-          canManageExpenses: true,
-          canManageUsers: true,
-          canManageSettings: true,
-          canManageHousekeeping: true,
-          canViewRevenue: true,
-          canApplyDiscounts: true,
-          canRefundPayments: true,
-        },
-        manager: {
-          canViewDashboard: true,
-          canViewRooms: true,
-          canViewBookings: true,
-          canViewGuests: true,
-          canViewInvoices: true,
-          canViewRestaurant: true,
-          canViewExpenses: true,
-          canViewStatistics: true,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canCreateInvoices: true,
-          canEditInvoices: true,
-          canDeleteInvoices: true,
-          canManageRooms: true,
-          canManageGuests: true,
-          canManageExpenses: true,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: true,
-          canViewRevenue: true,
-          canApplyDiscounts: true,
-          canRefundPayments: false,
-        },
-        receptionist: {
-          canViewDashboard: true,
-          canViewRooms: true,
-          canViewBookings: true,
-          canViewGuests: true,
-          canViewInvoices: true,
-          canViewRestaurant: false,
-          canViewExpenses: false,
-          canViewStatistics: false,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: false,
-          canCreateInvoices: true,
-          canEditInvoices: false,
-          canDeleteInvoices: false,
-          canManageRooms: false,
-          canManageGuests: true,
-          canManageExpenses: false,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: false,
-          canViewRevenue: false,
-          canApplyDiscounts: false,
-          canRefundPayments: false,
-        },
-        accountant: {
-          canViewDashboard: true,
-          canViewRooms: false,
-          canViewBookings: true,
-          canViewGuests: true,
-          canViewInvoices: true,
-          canViewRestaurant: true,
-          canViewExpenses: true,
-          canViewStatistics: true,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canCreateInvoices: true,
-          canEditInvoices: true,
-          canDeleteInvoices: true,
-          canManageRooms: false,
-          canManageGuests: false,
-          canManageExpenses: true,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: false,
-          canViewRevenue: true,
-          canApplyDiscounts: true,
-          canRefundPayments: false,
-        },
-        housekeeping: {
-          canViewDashboard: false,
-          canViewRooms: true,
-          canViewBookings: true,
-          canViewGuests: false,
-          canViewInvoices: false,
-          canViewRestaurant: true,
-          canViewExpenses: false,
-          canViewStatistics: false,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canCreateInvoices: false,
-          canEditInvoices: false,
-          canDeleteInvoices: false,
-          canManageRooms: true,
-          canManageGuests: false,
-          canManageExpenses: false,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: true,
-          canViewRevenue: false,
-          canApplyDiscounts: false,
-          canRefundPayments: false,
-        },
-        // Housekeeping supervisor roles
-        gouvernant: {
-          canViewDashboard: false,
-          canViewRooms: false,
-          canViewBookings: false,
-          canViewGuests: false,
-          canViewInvoices: false,
-          canViewRestaurant: false,
-          canViewExpenses: false,
-          canViewStatistics: false,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canCreateInvoices: false,
-          canEditInvoices: false,
-          canDeleteInvoices: false,
-          canManageRooms: false,
-          canManageGuests: false,
-          canManageExpenses: false,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: true,
-          canViewRevenue: false,
-          canApplyDiscounts: false,
-          canRefundPayments: false,
-        },
-        gouvernante: {
-          canViewDashboard: false,
-          canViewRooms: false,
-          canViewBookings: false,
-          canViewGuests: false,
-          canViewInvoices: false,
-          canViewRestaurant: false,
-          canViewExpenses: false,
-          canViewStatistics: false,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canCreateInvoices: false,
-          canEditInvoices: false,
-          canDeleteInvoices: false,
-          canManageRooms: false,
-          canManageGuests: false,
-          canManageExpenses: false,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: true,
-          canViewRevenue: false,
-          canApplyDiscounts: false,
-          canRefundPayments: false,
-        },
-        // Housekeeping staff role
-        femmeDeMenage: {
-          canViewDashboard: false,
-          canViewRooms: false,
-          canViewBookings: false,
-          canViewGuests: false,
-          canViewInvoices: false,
-          canViewRestaurant: false,
-          canViewExpenses: false,
-          canViewStatistics: false,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canCreateInvoices: false,
-          canEditInvoices: false,
-          canDeleteInvoices: false,
-          canManageRooms: false,
-          canManageGuests: false,
-          canManageExpenses: false,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: true,
-          canViewRevenue: false,
-          canApplyDiscounts: false,
-          canRefundPayments: false,
-        },
-        // Legacy fallback for old "staff" role
-        staff: {
-          canViewDashboard: true,
-          canViewRooms: true,
-          canViewBookings: true,
-          canViewGuests: true,
-          canViewInvoices: true,
-          canViewRestaurant: true,
-          canViewExpenses: false,
-          canViewStatistics: false,
-          canViewSettings: false,
-          canViewUsers: false,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: false,
-          canCreateInvoices: true,
-          canEditInvoices: false,
-          canDeleteInvoices: false,
-          canManageRooms: false,
-          canManageGuests: true,
-          canManageExpenses: false,
-          canManageUsers: false,
-          canManageSettings: false,
-          canManageHousekeeping: false,
-          canViewRevenue: false,
-          canApplyDiscounts: false,
-          canRefundPayments: false,
-        },
+    // Owners ALWAYS have all permissions
+    if (session.user.role === "owner") {
+      const allPermissions: Record<string, boolean> = {}
+      for (const perm of Object.values(MENU_TO_PERMISSION)) {
+        allPermissions[perm] = true
       }
-
-      const permissions = defaultPermissions[session.user.role] || defaultPermissions.staff
-
-      return NextResponse.json({ permissions })
+      // Add action-level permissions for owners
+      allPermissions.canCreateBookings = true
+      allPermissions.canEditBookings = true
+      allPermissions.canDeleteBookings = true
+      allPermissions.canCreateInvoices = true
+      allPermissions.canEditInvoices = true
+      allPermissions.canDeleteInvoices = true
+      allPermissions.canManageRooms = true
+      allPermissions.canManageGuests = true
+      allPermissions.canManageExpenses = true
+      allPermissions.canManageUsers = true
+      allPermissions.canManageSettings = true
+      allPermissions.canViewRevenue = true
+      allPermissions.canApplyDiscounts = true
+      allPermissions.canRefundPayments = true
+      return NextResponse.json({ permissions: allPermissions })
     }
 
-    return NextResponse.json({ permissions: role })
+    // Fetch user's menuAccess from database
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { menuAccess: true },
+    })
+
+    // Parse menuAccess (may be JSON object or JSON string depending on DB)
+    let menuAccess: Record<string, boolean> | null = null
+    if (user?.menuAccess) {
+      if (typeof user.menuAccess === "string") {
+        try { menuAccess = JSON.parse(user.menuAccess) } catch { menuAccess = null }
+      } else {
+        menuAccess = user.menuAccess as unknown as Record<string, boolean>
+      }
+    }
+
+    // Build permissions from menuAccess
+    const permissions: Record<string, boolean> = {}
+    for (const menu of ALL_MENUS) {
+      const permName = MENU_TO_PERMISSION[menu]
+      permissions[permName] = menuAccess?.[menu] === true
+    }
+
+    return NextResponse.json({ permissions })
   } catch (error) {
     console.error("Error fetching permissions:", error)
     return NextResponse.json(

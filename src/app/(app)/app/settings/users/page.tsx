@@ -76,6 +76,7 @@ interface User {
   role: string
   isActive: boolean
   createdAt: string
+  menuAccess: Record<string, boolean> | null
 }
 
 // ── Role configuration ─────────────────────────────────────────────────────────
@@ -116,6 +117,20 @@ const ROLES = [
     badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
     avatar: "bg-rose-500",
   },
+] as const
+
+const MENU_ITEMS = [
+  { key: "dashboard", label: "Dashboard", icon: "LayoutDashboard" },
+  { key: "rooms", label: "Chambres", icon: "BedDouble" },
+  { key: "housekeeping", label: "Ménage", icon: "Sparkles" },
+  { key: "bookings", label: "Réservations", icon: "CalendarDays" },
+  { key: "guests", label: "Clients", icon: "Users" },
+  { key: "invoices", label: "Facturation", icon: "CreditCard" },
+  { key: "restaurant", label: "Restaurant", icon: "UtensilsCrossed" },
+  { key: "expenses", label: "Dépenses", icon: "Receipt" },
+  { key: "statistics", label: "Statistiques", icon: "BarChart3" },
+  { key: "users", label: "Utilisateurs", icon: "UserCog" },
+  { key: "settings", label: "Paramètres", icon: "Settings" },
 ] as const
 
 function getRoleConfig(role: string) {
@@ -168,6 +183,7 @@ export default function UsersSettingsPage() {
     lastName: "",
     role: "receptionist",
     password: "",
+    menuAccess: {} as Record<string, boolean>,
   })
 
   // Dialog: reset password
@@ -216,18 +232,27 @@ export default function UsersSettingsPage() {
   // ── Dialog: Add / Edit handlers ───────────────────────────────────────────
   const openAddDialog = () => {
     setEditingUser(null)
-    setFormData({ email: "", firstName: "", lastName: "", role: "receptionist", password: "" })
+    setFormData({ email: "", firstName: "", lastName: "", role: "receptionist", password: "", menuAccess: {} as Record<string, boolean> })
     setIsDialogOpen(true)
   }
 
   const openEditDialog = (user: User) => {
     setEditingUser(user)
+    let menuAccess: Record<string, boolean> = {}
+    if (user.menuAccess) {
+      if (typeof user.menuAccess === 'string') {
+        try { menuAccess = JSON.parse(user.menuAccess) } catch { menuAccess = {} }
+      } else {
+        menuAccess = user.menuAccess as Record<string, boolean>
+      }
+    }
     setFormData({
       email: user.email,
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       role: user.role,
       password: "",
+      menuAccess,
     })
     setIsDialogOpen(true)
   }
@@ -247,14 +272,23 @@ export default function UsersSettingsPage() {
       const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users"
       const method = editingUser ? "PUT" : "POST"
 
+      // Build menuAccess with only true values
+      const menuAccess: Record<string, boolean> = {}
+      for (const menu of MENU_ITEMS) {
+        if (formData.menuAccess[menu.key]) {
+          menuAccess[menu.key] = true
+        }
+      }
+
       const body = editingUser
-        ? { firstName: formData.firstName, lastName: formData.lastName, role: formData.role }
+        ? { firstName: formData.firstName, lastName: formData.lastName, role: formData.role, menuAccess }
         : {
             email: formData.email,
             firstName: formData.firstName,
             lastName: formData.lastName,
             role: formData.role,
             password: formData.password,
+            menuAccess,
           }
 
       const res = await fetch(url, {
@@ -636,6 +670,12 @@ export default function UsersSettingsPage() {
                           </>
                         )}
                       </Badge>
+                      {user.menuAccess && typeof user.menuAccess === 'object' && (
+                        <Badge variant="secondary" className="border-0 gap-1 bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                          <Lock className="w-3 h-3" />
+                          {Object.values(user.menuAccess as Record<string, boolean>).filter(Boolean).length}/{MENU_ITEMS.length} menus
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Bottom row: date + actions */}
@@ -784,6 +824,55 @@ export default function UsersSettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {!(editingUser?.role === "owner") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Accès aux menus</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allChecked = MENU_ITEMS.every(m => formData.menuAccess[m.key])
+                      const newAccess = { ...formData.menuAccess }
+                      MENU_ITEMS.forEach(m => {
+                        newAccess[m.key] = !allChecked
+                      })
+                      setFormData({ ...formData, menuAccess: newAccess })
+                    }}
+                    className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+                  >
+                    {MENU_ITEMS.every(m => formData.menuAccess[m.key]) ? "Tout désactiver" : "Tout activer"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  {MENU_ITEMS.map((menu) => (
+                    <label
+                      key={menu.key}
+                      className="flex items-center gap-2 cursor-pointer text-sm py-1 px-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.menuAccess[menu.key] === true}
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            menuAccess: {
+                              ...formData.menuAccess,
+                              [menu.key]: e.target.checked,
+                            },
+                          })
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                      />
+                      <span className="text-gray-700 dark:text-gray-300">{menu.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  ⚠️ Les menus non cochés seront visibles mais afficheront « Accès restreint »
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
