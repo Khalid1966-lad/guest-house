@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         babyBedAvailable: true,
         babyBedPrice: true,
         status: true,
+        cleaningStatus: true,
         amenities: true,
         images: true,
         isActive: true,
