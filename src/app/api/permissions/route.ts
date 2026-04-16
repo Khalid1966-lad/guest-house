@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { Prisma } from "@prisma/client"
 
 // Menu keys matching the sidebar navigation
 const ALL_MENUS = [
@@ -34,6 +33,26 @@ const MENU_TO_PERMISSION: Record<string, string> = {
   settings: "canViewSettings",
 }
 
+// Safely fetch menuAccess using raw SQL — works even if column doesn't exist
+async function getUserMenuAccess(userId: string): Promise<Record<string, boolean> | null> {
+  try {
+    // Try raw SQL to avoid Prisma typed query crashing on missing column
+    const rows = await db.$queryRawUnsafe<{ menuAccess: unknown }[]>(
+      `SELECT "menuAccess" FROM "User" WHERE "id" = '${userId.replace(/'/g, "''")}' LIMIT 1`
+    )
+    if (rows.length === 0 || !rows[0].menuAccess) return null
+
+    const raw = rows[0].menuAccess
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw) } catch { return null }
+    }
+    return raw as Record<string, boolean>
+  } catch {
+    // Column doesn't exist — return null (all menus off)
+    return null
+  }
+}
+
 // GET - Get current user's permissions based on menuAccess
 export async function GET() {
   try {
@@ -58,7 +77,6 @@ export async function GET() {
       for (const perm of Object.values(MENU_TO_PERMISSION)) {
         allPermissions[perm] = true
       }
-      // Add action-level permissions for owners
       allPermissions.canCreateBookings = true
       allPermissions.canEditBookings = true
       allPermissions.canDeleteBookings = true
@@ -76,28 +94,8 @@ export async function GET() {
       return NextResponse.json({ permissions: allPermissions })
     }
 
-    // Fetch user's menuAccess from database — resilient to missing column
-    let menuAccess: Record<string, boolean> | null = null
-    try {
-      const user = await db.user.findUnique({
-        where: { id: session.user.id },
-        select: { menuAccess: true },
-      })
-      if (user?.menuAccess) {
-        if (typeof user.menuAccess === "string") {
-          try { menuAccess = JSON.parse(user.menuAccess) } catch { menuAccess = null }
-        } else {
-          menuAccess = user.menuAccess as unknown as Record<string, boolean>
-        }
-      }
-    } catch (err) {
-      // Column doesn't exist yet (migration not applied) — fall through to no access
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        console.warn("[permissions] menuAccess column missing, user gets no menus")
-      } else {
-        throw err
-      }
-    }
+    // Fetch user's menuAccess using raw SQL (resilient to missing column)
+    const menuAccess = await getUserMenuAccess(session.user.id)
 
     // Build permissions from menuAccess
     const permissions: Record<string, boolean> = {}

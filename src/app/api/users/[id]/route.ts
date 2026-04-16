@@ -8,7 +8,6 @@ interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// Base select without menuAccess (safe fallback)
 const baseSelect = {
   id: true,
   email: true,
@@ -21,42 +20,17 @@ const baseSelect = {
   createdAt: true,
 }
 
-// Extended select with menuAccess
-const menuSelect = {
-  ...baseSelect,
-  menuAccess: true,
-}
+let columnExistsCache: boolean | null = null
 
-// Helper: safe query with/without menuAccess column
-async function safeFindUser(id: string, guestHouseId: string) {
+async function menuAccessColumnExists(): Promise<boolean> {
+  if (columnExistsCache !== null) return columnExistsCache
   try {
-    return await db.user.findFirst({
-      where: { id, guestHouseId },
-      select: { ...baseSelect, language: true, theme: true, menuAccess: true },
-    })
+    await db.$queryRawUnsafe(`SELECT "menuAccess" FROM "User" LIMIT 0`)
+    columnExistsCache = true
+    return true
   } catch {
-    return await db.user.findFirst({
-      where: { id, guestHouseId },
-      select: { ...baseSelect, language: true, theme: true },
-    })
-  }
-}
-
-async function safeUpdateUser(id: string, data: Record<string, unknown>) {
-  try {
-    return await db.user.update({
-      where: { id },
-      data,
-      select: menuSelect,
-    })
-  } catch {
-    // If menuAccess column doesn't exist, remove it from data
-    const { menuAccess, ...safeData } = data
-    return await db.user.update({
-      where: { id },
-      data: safeData,
-      select: baseSelect,
-    })
+    columnExistsCache = false
+    return false
   }
 }
 
@@ -69,18 +43,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!session?.user?.guestHouseId) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
-
     if (session.user.role !== "owner") {
       return NextResponse.json({ error: "Permissions insuffisantes" }, { status: 403 })
     }
 
-    const user = await safeFindUser(id, session.user.guestHouseId)
+    const hasColumn = await menuAccessColumnExists()
+    const selectFields = hasColumn
+      ? { ...baseSelect, language: true, theme: true, menuAccess: true }
+      : { ...baseSelect, language: true, theme: true }
+
+    const user = await db.user.findFirst({
+      where: { id, guestHouseId: session.user.guestHouseId },
+      select: selectFields,
+    })
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
 
     return NextResponse.json({ user })
@@ -102,8 +80,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (!session?.user?.guestHouseId) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
-
-    // Only owner can update users
     if (session.user.role !== "owner") {
       return NextResponse.json(
         { error: "Seul le propriétaire peut modifier des utilisateurs" },
@@ -113,22 +89,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const data = await request.json()
 
-    // Verify user belongs to same guest house
     const existingUser = await db.user.findFirst({
-      where: {
-        id,
-        guestHouseId: session.user.guestHouseId,
-      },
+      where: { id, guestHouseId: session.user.guestHouseId },
     })
-
     if (!existingUser) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
 
-    // Validate role if changing
     if (data.role) {
       const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping"]
       if (!validRoles.includes(data.role)) {
@@ -136,15 +103,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Don't allow changing the last owner's role
     if (existingUser.role === "owner" && data.role && data.role !== "owner") {
       const ownerCount = await db.user.count({
-        where: {
-          guestHouseId: session.user.guestHouseId,
-          role: "owner",
-        },
+        where: { guestHouseId: session.user.guestHouseId, role: "owner" },
       })
-
       if (ownerCount <= 1) {
         return NextResponse.json(
           { error: "Impossible de modifier le rôle du dernier propriétaire" },
@@ -156,19 +118,30 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const updateData: Record<string, unknown> = {
       firstName: data.firstName,
       lastName: data.lastName,
-      name: data.firstName && data.lastName 
-        ? `${data.firstName} ${data.lastName}` 
+      name: data.firstName && data.lastName
+        ? `${data.firstName} ${data.lastName}`
         : data.firstName || data.lastName || null,
       phone: data.phone,
       role: data.role,
     }
 
-    // Handle menuAccess update
     if (data.menuAccess !== undefined) {
-      updateData.menuAccess = data.menuAccess
+      const hasColumn = await menuAccessColumnExists()
+      if (hasColumn) {
+        updateData.menuAccess = data.menuAccess
+      }
     }
 
-    const user = await safeUpdateUser(id, updateData)
+    const hasColumn = await menuAccessColumnExists()
+    const selectFields = hasColumn
+      ? { ...baseSelect, menuAccess: true }
+      : baseSelect
+
+    const user = await db.user.update({
+      where: { id },
+      data: updateData,
+      select: selectFields,
+    })
 
     return NextResponse.json({ user })
   } catch (error) {
@@ -189,8 +162,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!session?.user?.guestHouseId) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
-
-    // Only owner can block/reset
     if (session.user.role !== "owner") {
       return NextResponse.json(
         { error: "Seul le propriétaire peut effectuer cette action" },
@@ -201,22 +172,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const data = await request.json()
     const { action } = data
 
-    // Verify user belongs to same guest house
     const existingUser = await db.user.findFirst({
-      where: {
-        id,
-        guestHouseId: session.user.guestHouseId,
-      },
+      where: { id, guestHouseId: session.user.guestHouseId },
     })
-
     if (!existingUser) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
-
-    // Can't block/reset yourself
     if (id === session.user.id) {
       return NextResponse.json(
         { error: "Vous ne pouvez pas effectuer cette action sur votre propre compte" },
@@ -225,8 +186,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     if (action === "toggleBlock") {
-      // Block/unblock user
-      const user = await safeUpdateUser(id, { isActive: !existingUser.isActive })
+      const hasColumn = await menuAccessColumnExists()
+      const selectFields = hasColumn
+        ? { ...baseSelect, menuAccess: true }
+        : baseSelect
+
+      const user = await db.user.update({
+        where: { id },
+        data: { isActive: !existingUser.isActive },
+        select: selectFields,
+      })
 
       return NextResponse.json({
         user,
@@ -236,30 +205,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (action === "resetPassword") {
       const { newPassword } = data
-
       if (!newPassword || newPassword.length < 6) {
         return NextResponse.json(
           { error: "Le mot de passe doit contenir au moins 6 caractères" },
           { status: 400 }
         )
       }
-
       const hashedPassword = await bcrypt.hash(newPassword, 10)
-
       await db.user.update({
         where: { id },
         data: { password: hashedPassword },
       })
-
-      return NextResponse.json({
-        message: "Mot de passe réinitialisé avec succès",
-      })
+      return NextResponse.json({ message: "Mot de passe réinitialisé avec succès" })
     }
 
-    return NextResponse.json(
-      { error: "Action non reconnue" },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "Action non reconnue" }, { status: 400 })
   } catch (error) {
     console.error("Error in PATCH /api/users/[id]:", error)
     return NextResponse.json(
@@ -278,8 +238,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (!session?.user?.guestHouseId) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
-
-    // Only owner can delete users
     if (session.user.role !== "owner") {
       return NextResponse.json(
         { error: "Seul le propriétaire peut supprimer des utilisateurs" },
@@ -287,38 +245,22 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Verify user belongs to same guest house
     const existingUser = await db.user.findFirst({
-      where: {
-        id,
-        guestHouseId: session.user.guestHouseId,
-      },
+      where: { id, guestHouseId: session.user.guestHouseId },
     })
-
     if (!existingUser) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
     }
-
-    // Don't allow deleting yourself
     if (id === session.user.id) {
       return NextResponse.json(
         { error: "Vous ne pouvez pas supprimer votre propre compte" },
         { status: 400 }
       )
     }
-
-    // Don't allow deleting the last owner
     if (existingUser.role === "owner") {
       const ownerCount = await db.user.count({
-        where: {
-          guestHouseId: session.user.guestHouseId,
-          role: "owner",
-        },
+        where: { guestHouseId: session.user.guestHouseId, role: "owner" },
       })
-
       if (ownerCount <= 1) {
         return NextResponse.json(
           { error: "Impossible de supprimer le dernier propriétaire" },
@@ -327,10 +269,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    await db.user.delete({
-      where: { id },
-    })
-
+    await db.user.delete({ where: { id } })
     return NextResponse.json({ message: "Utilisateur supprimé" })
   } catch (error) {
     console.error("Error deleting user:", error)

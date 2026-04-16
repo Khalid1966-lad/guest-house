@@ -2,83 +2,50 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { Prisma } from "@prisma/client"
 import bcrypt from "bcryptjs"
 
-// Helper: try to select menuAccess, return null if column doesn't exist
-async function getUsersWithMenuAccess(guestHouseId: string) {
+// Base select without menuAccess
+const baseSelect = {
+  id: true,
+  email: true,
+  name: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+}
+
+// Check if menuAccess column exists
+let columnExistsCache: boolean | null = null
+
+async function menuAccessColumnExists(): Promise<boolean> {
+  if (columnExistsCache !== null) return columnExistsCache
   try {
-    return await db.user.findMany({
-      where: { guestHouseId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        menuAccess: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    })
+    await db.$queryRawUnsafe(`SELECT "menuAccess" FROM "User" LIMIT 0`)
+    columnExistsCache = true
+    return true
   } catch {
-    // menuAccess column doesn't exist yet — fetch without it
-    return await db.user.findMany({
-      where: { guestHouseId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    })
+    columnExistsCache = false
+    return false
   }
 }
 
-// Helper: try to create user with menuAccess
-async function createUserWithMenuAccess(data: Record<string, unknown>, selectFields: Record<string, boolean>) {
-  try {
-    return await db.user.create({
-      data: {
-        email: data.email as string,
-        firstName: (data.firstName as string) || null,
-        lastName: (data.lastName as string) || null,
-        name: data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : null,
-        password: data.hashedPassword as string,
-        role: data.userRole as string,
-        guestHouseId: data.guestHouseId as string,
-        isActive: true,
-        emailVerified: new Date(),
-        menuAccess: (data.menuAccess as Record<string, boolean>) || null,
-      },
-      select: selectFields,
-    })
-  } catch {
-    // menuAccess column doesn't exist — create without it
-    return await db.user.create({
-      data: {
-        email: data.email as string,
-        firstName: (data.firstName as string) || null,
-        lastName: (data.lastName as string) || null,
-        name: data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : null,
-        password: data.hashedPassword as string,
-        role: data.userRole as string,
-        guestHouseId: data.guestHouseId as string,
-        isActive: true,
-        emailVerified: new Date(),
-      },
-      select: selectFields,
+async function getUsersWithMenuAccess(guestHouseId: string) {
+  const hasColumn = await menuAccessColumnExists()
+  if (!hasColumn) {
+    return await db.user.findMany({
+      where: { guestHouseId },
+      select: baseSelect,
+      orderBy: { createdAt: "asc" },
     })
   }
+  return await db.user.findMany({
+    where: { guestHouseId },
+    select: { ...baseSelect, menuAccess: true },
+    orderBy: { createdAt: "asc" },
+  })
 }
 
 // GET - List users in the guest house (owner only)
@@ -90,7 +57,6 @@ export async function GET() {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
-    // Only owner can view users list
     if (session.user.role !== "owner") {
       return NextResponse.json(
         { error: "Permissions insuffisantes. Seul le propriétaire peut gérer les utilisateurs." },
@@ -118,7 +84,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
-    // Only owner can create users
     if (session.user.role !== "owner") {
       return NextResponse.json(
         { error: "Seul le propriétaire peut créer des utilisateurs" },
@@ -129,51 +94,51 @@ export async function POST(request: NextRequest) {
     const data = await request.json()
     const { email, firstName, lastName, role, password } = data
 
-    // Validation
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email et mot de passe requis" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 })
     }
-
     if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, { status: 400 })
     }
 
-    // Check if email already exists
-    const existingUser = await db.user.findUnique({
-      where: { email },
-    })
-
+    const existingUser = await db.user.findUnique({ where: { email } })
     if (existingUser) {
-      return NextResponse.json(
-        { error: "Un utilisateur avec cet email existe déjà" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Un utilisateur avec cet email existe déjà" }, { status: 400 })
     }
 
-    // Validate role
     const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping"]
     const userRole = role || "receptionist"
     if (!validRoles.includes(userRole)) {
-      return NextResponse.json(
-        { error: "Rôle invalide" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Rôle invalide" }, { status: 400 })
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
+    const hasColumn = await menuAccessColumnExists()
 
-    // Create user
-    const user = await createUserWithMenuAccess(
-      { email, firstName, lastName, userRole, hashedPassword, guestHouseId: session.user.guestHouseId, menuAccess: data.menuAccess },
-      { id: true, email: true, name: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true }
-    )
+    // Build create data conditionally
+    const createData: Record<string, unknown> = {
+      email,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      name: firstName && lastName ? `${firstName} ${lastName}` : null,
+      password: hashedPassword,
+      role: userRole,
+      guestHouseId: session.user.guestHouseId,
+      isActive: true,
+      emailVerified: new Date(),
+    }
+    if (hasColumn && data.menuAccess) {
+      createData.menuAccess = data.menuAccess
+    }
+
+    const selectFields = hasColumn
+      ? { ...baseSelect, menuAccess: true }
+      : baseSelect
+
+    const user = await db.user.create({
+      data: createData,
+      select: selectFields,
+    })
 
     return NextResponse.json({ user }, { status: 201 })
   } catch (error) {
