@@ -170,8 +170,8 @@ export async function GET() {
         // Housekeeping supervisor roles
         gouvernant: {
           canViewDashboard: false,
-          canViewRooms: true,
-          canViewBookings: true,
+          canViewRooms: false,
+          canViewBookings: false,
           canViewGuests: false,
           canViewInvoices: false,
           canViewRestaurant: false,
@@ -197,8 +197,8 @@ export async function GET() {
         },
         gouvernante: {
           canViewDashboard: false,
-          canViewRooms: true,
-          canViewBookings: true,
+          canViewRooms: false,
+          canViewBookings: false,
           canViewGuests: false,
           canViewInvoices: false,
           canViewRestaurant: false,
@@ -225,7 +225,7 @@ export async function GET() {
         // Housekeeping staff role
         femmeDeMenage: {
           canViewDashboard: false,
-          canViewRooms: true,
+          canViewRooms: false,
           canViewBookings: false,
           canViewGuests: false,
           canViewInvoices: false,
