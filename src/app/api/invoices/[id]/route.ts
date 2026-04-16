@@ -140,6 +140,7 @@ export async function PUT(
     return NextResponse.json({ invoice })
   } catch (error) {
     console.error("Erreur mise à jour facture:", error)
+    const errMsg = error instanceof Error ? error.message : String(error)
     if (error && typeof error === 'object' && 'code' in error) {
       const prismaError = error as { code: string }
       if (prismaError.code === 'P2003') {
@@ -149,8 +150,8 @@ export async function PUT(
         )
       }
     }
-    console.error("Full invoice update error:", JSON.stringify(error, null, 2))
-    return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
+    console.error("Full invoice update error:", errMsg)
+    return NextResponse.json({ error: "Erreur interne: " + errMsg }, { status: 500 })
   }
 }
 

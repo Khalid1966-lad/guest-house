@@ -294,8 +294,9 @@ export async function POST(request: NextRequest) {
       })
     } catch (txError) {
       console.error("Transaction error:", txError)
+      const errMsg = txError instanceof Error ? txError.message : "Erreur inconnue"
       return NextResponse.json(
-        { error: "Erreur lors de la création de la facture. Veuillez réessayer." },
+        { error: "Erreur lors de la création de la facture: " + errMsg },
         { status: 500 }
       )
     }
@@ -339,10 +340,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Log full error for debugging
-    console.error("Full invoice creation error:", JSON.stringify(error, null, 2))
+    const fullMsg = error instanceof Error ? error.message : String(error)
+    console.error("Full invoice creation error:", fullMsg, JSON.stringify(error, null, 2))
 
     return NextResponse.json(
-      { error: "Erreur interne du serveur" },
+      { error: "Erreur interne: " + fullMsg },
       { status: 500 }
     )
   }
