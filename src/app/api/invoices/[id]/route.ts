@@ -223,6 +223,15 @@ export async function DELETE(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
+    // Only owner and admin roles can delete invoices
+    const userRole = (session.user as { role?: string }).role
+    if (!userRole || !["owner", "admin"].includes(userRole)) {
+      return NextResponse.json(
+        { error: "Seuls le propriétaire et l'administrateur peuvent supprimer des factures" },
+        { status: 403 }
+      )
+    }
+
     const existingInvoice = await db.invoice.findFirst({
       where: {
         id,

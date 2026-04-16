@@ -137,7 +137,7 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-80 sm:w-96 p-0 gap-0"
+        className="w-80 sm:w-96 p-0 gap-0 max-h-[520px] flex flex-col"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Header */}
@@ -173,7 +173,7 @@ export function NotificationBell() {
             <p className="text-xs mt-1">Les nouvelles notifications apparaîtront ici</p>
           </div>
         ) : (
-          <ScrollArea className="max-h-80">
+          <ScrollArea className="flex-1">
             <div className="divide-y">
               {notifications.map((notification) => (
                 <div

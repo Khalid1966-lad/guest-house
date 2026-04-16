@@ -177,6 +177,8 @@ export default function InvoicesPage() {
   const { data: session, status } = useSession()
   const { currency, symbol, formatAmount } = useCurrency()
   const router = useRouter()
+  const userRole = session?.user?.role || ""
+  const canDeleteInvoice = ["owner", "admin"].includes(userRole)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -1189,7 +1191,7 @@ export default function InvoicesPage() {
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
-                          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                          {canDeleteInvoice && invoice.status !== "paid" && invoice.status !== "cancelled" && (
                             <DropdownMenuItem
                               className="text-red-600"
                               onClick={() => handleDeleteClick(invoice)}
@@ -1284,7 +1286,7 @@ export default function InvoicesPage() {
 
       {/* New/Edit Invoice Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" style={{ minWidth: '720px', resize: 'both' }}>
           <DialogHeader>
             <DialogTitle>
               {editingInvoice ? "Modifier la facture" : "Nouvelle facture"}

@@ -207,6 +207,8 @@ export default function RestaurantPage() {
   const [isMenuSaving, setIsMenuSaving] = useState(false)
   const [menuFormError, setMenuFormError] = useState("")
   const [isDeleteMenuDialogOpen, setIsDeleteMenuDialogOpen] = useState(false)
+  const [isDeleteOrderDialogOpen, setIsDeleteOrderDialogOpen] = useState(false)
+  const [orderToDelete, setOrderToDelete] = useState<RestaurantOrder | null>(null)
   const [menuItemToDelete, setMenuItemToDelete] = useState<MenuItem | null>(null)
   const [isDeletingMenu, setIsDeletingMenu] = useState(false)
   
@@ -452,6 +454,22 @@ export default function RestaurantPage() {
       }
     } catch (err) {
       console.error("Erreur mise à jour:", err)
+    }
+  }
+
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete) return
+    try {
+      const response = await fetch(`/api/restaurant-orders/${orderToDelete.id}`, {
+        method: "DELETE",
+      })
+      if (response.ok) {
+        setIsDeleteOrderDialogOpen(false)
+        setOrderToDelete(null)
+        fetchData()
+      }
+    } catch (err) {
+      console.error("Erreur suppression commande:", err)
     }
   }
 
@@ -1010,6 +1028,18 @@ export default function RestaurantPage() {
                                   Annuler
                                 </DropdownMenuItem>
                               )}
+                              {order.status === "cancelled" && (
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => {
+                                    setOrderToDelete(order)
+                                    setIsDeleteOrderDialogOpen(true)
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Supprimer la commande
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -1192,6 +1222,32 @@ export default function RestaurantPage() {
                   Supprimer
                 </>
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Order Dialog */}
+      <AlertDialog open={isDeleteOrderDialogOpen} onOpenChange={setIsDeleteOrderDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la commande</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer la commande{" "}
+              <strong>de {orderToDelete?.guestName || "client"}</strong>
+              {orderToDelete?.orderType === "room" ? " (Service en chambre)" : orderToDelete?.orderType === "table" ? " (Sur place)" : " (À emporter)"} ?
+              <br />
+              <span className="text-red-600 font-medium">Cette action est irréversible.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOrder}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

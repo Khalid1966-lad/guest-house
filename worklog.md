@@ -304,3 +304,22 @@ Stage Summary:
 - Visual distinction: restaurant items have orange/amber tinted backgrounds with lock icon
 - Edit mode also preserves restaurant item lock status
 - Invoice deletion properly resets order paymentStatus to "pending" (was already implemented)
+
+---
+Task ID: multi-fixes-session
+Agent: Main
+Task: Multiple improvements: invoice admin delete, notifications scroll/management, wider dialog, delete cancelled orders
+
+Work Log:
+- **Invoice deletion for admin**: Added `canDeleteInvoice` check on frontend (owner + admin roles), added role check on backend DELETE endpoint returning 403 for unauthorized roles
+- **Notifications scroll**: Added `max-h-[520px] flex flex-col` to PopoverContent, changed ScrollArea to `flex-1` to fill remaining space within constrained popover
+- **Notifications settings page**: Completely rewrote with new "Historique des notifications" card at top showing all notifications with icons, timestamps, delete buttons. Added "Tout lire" and "Tout supprimer" buttons. Delete-one and delete-all confirmation dialogs. Created new API endpoint `DELETE /api/notifications/delete-all`
+- **Invoice dialog resizable**: Changed from `max-w-3xl` to `max-w-4xl` with `minWidth: 720px` and `resize: both` inline style
+- **Delete cancelled restaurant orders**: Added "Supprimer la commande" menu item for cancelled orders, delete confirmation dialog, `handleDeleteOrder` handler calling DELETE API
+
+Stage Summary:
+- Invoice delete: owner and admin can both delete invoices (frontend + backend)
+- Notifications dropdown: properly constrained with vertical scrollbar
+- Settings → Notifications: full notification history with delete-one and delete-all
+- Invoice dialog: wider (max-w-4xl, min 720px) and user-resizable
+- Cancelled restaurant orders can be deleted by owner
