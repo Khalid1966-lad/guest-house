@@ -178,9 +178,9 @@ export async function POST(request: NextRequest) {
 
         const invoiceNumber = `${prefix}${String(nextNum).padStart(5, "0")}`
 
-        // Vérifier que ce numéro n'existe pas déjà
+        // Vérifier que ce numéro n'existe pas déjà pour ce guest house
         const existing = await tx.invoice.findUnique({
-          where: { invoiceNumber },
+          where: { invoiceNumber_guestHouseId: { invoiceNumber, guestHouseId: session.user.guestHouseId } },
         })
         if (existing) {
           // Retrouver un numéro libre en cherchant le max

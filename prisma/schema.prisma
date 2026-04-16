@@ -400,7 +400,7 @@ model Invoice {
   guestHouseId  String
   guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
   
-  invoiceNumber String   @unique
+  invoiceNumber String
   invoiceDate   DateTime @default(now())
   dueDate       DateTime?
   
@@ -429,7 +429,9 @@ model Invoice {
   
   items         InvoiceItem[]
   payments      Payment[]
-  
+
+  @@unique([invoiceNumber, guestHouseId])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
