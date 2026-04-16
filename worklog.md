@@ -169,3 +169,26 @@ Stage Summary:
 - Already-added orders disappear from the available list
 - Invoice detail and print views clearly distinguish restaurant items visually
 - Pushed as commit 18e8cd9
+
+---
+Task ID: favicon-admin-password
+Agent: Main
+Task: Create custom favicon and add admin password reset for guesthouses
+
+Work Log:
+- Generated AI favicon image (1024x1024): house with bed on blue gradient rounded square
+- Created all favicon sizes using sharp: 16x16, 32x32, 180x180 (apple-touch-icon), 192x192, 512x512 (android-chrome), favicon.ico
+- Updated root layout metadata to reference all favicon sizes
+- Added password reset action to PATCH /api/admin/guesthouses/[id] API endpoint
+- Admin API validates: userId exists in guesthouse, password >= 6 chars, hashes with bcrypt (10 rounds)
+- Added admin UI password change dialog with KeyRound icon button per guesthouse card
+- Password dialog includes: new password, confirmation, validation, success/error feedback
+- Dialog auto-closes 2 seconds after successful reset
+- Added KeyRound and CheckCircle icon imports to admin page
+- All lint checks pass
+
+Stage Summary:
+- Professional favicon now displays across all browsers and devices
+- Super admin can reset any guesthouse owner's password from the admin panel
+- Password reset uses secure bcrypt hashing
+- Pushed as commit 5d83a52
