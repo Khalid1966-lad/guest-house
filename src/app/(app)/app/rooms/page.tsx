@@ -454,6 +454,33 @@ export default function RoomsPage() {
     )
   }
 
+  // Get cleaning status badge — always returns a badge (including "Prêt" when none)
+  const getCleaningBadge = (cleaningStatus: string | null, variant: "default" | "outline" = "default") => {
+    if (cleaningStatus) {
+      const cs = cleaningStatuses.find(s => s.value === cleaningStatus)
+      if (cs) {
+        return (
+          <Badge variant={variant} className={cn("text-xs w-fit", cs.color)}>
+            <span className={cn("w-2 h-2 rounded-full mr-1.5 inline-block", {
+              "bg-amber-500": cs.value === "departure",
+              "bg-orange-500": cs.value === "turnover",
+              "bg-sky-500": cs.value === "cleaning",
+              "bg-green-500": cs.value === "clean",
+              "bg-emerald-500": cs.value === "verified",
+            })} />
+            {cs.label}
+          </Badge>
+        )
+      }
+    }
+    return (
+      <Badge variant={variant} className="text-xs w-fit bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+        <span className="w-2 h-2 rounded-full mr-1.5 inline-block bg-gray-400 dark:bg-gray-500" />
+        Prêt
+      </Badge>
+    )
+  }
+
   // Get type label
   const getTypeLabel = (type: string) => {
     return roomTypes.find((t) => t.value === type)?.label || type
@@ -572,10 +599,7 @@ export default function RoomsPage() {
                 )}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                   {getStatusBadge(room.status)}
-                  {room.cleaningStatus && (() => {
-                    const cs = cleaningStatuses.find(s => s.value === room.cleaningStatus)
-                    return cs ? <Badge key={cs.value} className={cn("text-xs", cs.color)}>{cs.label}</Badge> : null
-                  })()}
+                  {getCleaningBadge(room.cleaningStatus)}
                 </div>
                 {getRoomImages(room).length > 1 && (
                   <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
@@ -708,10 +732,7 @@ export default function RoomsPage() {
                     <td className="p-4">
                       <div className="flex flex-col gap-1">
                         {getStatusBadge(room.status)}
-                        {room.cleaningStatus && (() => {
-                          const cs = cleaningStatuses.find(s => s.value === room.cleaningStatus)
-                          return cs ? <Badge key={cs.value} variant="outline" className={cn("text-xs w-fit", cs.color)}>{cs.label}</Badge> : null
-                        })()}
+                        {getCleaningBadge(room.cleaningStatus, "outline")}
                       </div>
                     </td>
                     <td className="p-4">
