@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
+import { APP_VERSION } from "@/lib/version"
 
 const helpCategories = [
   {
@@ -216,7 +217,7 @@ export default function HelpSettingsPage() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>Version de l&apos;application</span>
-            <span className="font-mono">v1.8.1</span>
+            <span className="font-mono">{APP_VERSION}</span>
           </div>
         </CardContent>
       </Card>
