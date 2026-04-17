@@ -1133,3 +1133,17 @@ Stage Summary:
 - Le bouton Transférer apparaît sur les réservations confirmées et en cours
 - Le dashboard affiche les chambres réservées dans les stats
 - Fonction recomputeRoomStatus() garantit la cohérence des statuts
+
+---
+Task ID: fix-transfer-dialog-bug
+Agent: Main
+Task: Fix runtime crash in transfer dialog (booking.checkOut → transferBooking.checkOut)
+
+Work Log:
+- Found bug on line 2256 of bookings/page.tsx: `booking.checkOut` referenced undefined variable
+- Fixed to `transferBooking.checkOut` - the correct state variable for the transfer dialog
+- Lint passes clean, dev server compiles without errors
+
+Stage Summary:
+- Transfer dialog no longer crashes when rendered
+- Both "Reserved" room status and "Transfer" features are fully functional

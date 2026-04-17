@@ -2253,7 +2253,7 @@ export default function BookingsPage() {
                     {transferBooking.guest.firstName} {transferBooking.guest.lastName}
                   </p>
                   <p className="text-xs text-gray-500">
-                    Ch. {transferBooking.room.number} • {format(parseISO(transferBooking.checkIn), "dd/MM/yyyy")} → {format(parseISO(booking.checkOut), "dd/MM/yyyy")}
+                    Ch. {transferBooking.room.number} • {format(parseISO(transferBooking.checkIn), "dd/MM/yyyy")} → {format(parseISO(transferBooking.checkOut), "dd/MM/yyyy")}
                   </p>
                 </div>
               </div>
