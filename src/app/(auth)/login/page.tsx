@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -19,11 +19,26 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") || "/app/dashboard"
   const message = searchParams.get("message")
   
-  // Use a formKey to force remount after logout (clears autofill)
-  const [formKey, setFormKey] = useState(Date.now())
+  const emailRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+
+  // Clear autofilled fields on mount (after browser fills them)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (emailRef.current && emailRef.current.value) {
+        emailRef.current.value = ""
+        setEmail("")
+      }
+      if (passwordRef.current && passwordRef.current.value) {
+        passwordRef.current.value = ""
+        setPassword("")
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
   const [error, setError] = useState(message === "account_created" ? "" : "")
   const [success, setSuccess] = useState(message === "account_created" ? "Compte créé avec succès ! Connectez-vous pour continuer." : "")
   const [isLoading, setIsLoading] = useState(false)
@@ -94,7 +109,7 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit} key={formKey}>
+          <form onSubmit={handleSubmit} autoComplete="off">
             <CardContent className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -111,8 +126,10 @@ function LoginForm() {
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
+                  ref={emailRef}
                   id="email"
                   type="email"
+                  name="email"
                   placeholder="votre@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -135,7 +152,9 @@ function LoginForm() {
                 </div>
                 <div className="relative">
                   <Input
+                    ref={passwordRef}
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
@@ -143,7 +162,7 @@ function LoginForm() {
                     required
                     disabled={isLoading}
                     className="h-11 pr-10"
-                    autoComplete="off"
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
