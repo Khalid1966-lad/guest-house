@@ -321,10 +321,27 @@ export default function BookingsPage() {
   const [transferReason, setTransferReason] = useState("")
   const [isTransferring, setIsTransferring] = useState(false)
   const [transferError, setTransferError] = useState("")
-  // Available rooms for date range
-  const [availableRooms, setAvailableRooms] = useState<Room[]>([])
-  const [isLoadingAvailableRooms, setIsLoadingAvailableRooms] = useState(false)
-  const [datesComplete, setDatesComplete] = useState(false)
+  // Available rooms computed from bookings already loaded in state (no extra API call)
+  const availableRooms = useMemo(() => {
+    if (!formData.checkIn || !formData.checkOut) return []
+    const ci = new Date(formData.checkIn)
+    const co = new Date(formData.checkOut)
+    if (co <= ci) return []
+    const occupiedIds = new Set(
+      bookings
+        .filter((b) => {
+          if (b.status === "cancelled" || b.status === "no_show" || b.status === "checked_out") return false
+          if (editingBooking && b.id === editingBooking.id) return false
+          const bci = new Date(b.checkIn)
+          const bco = new Date(b.checkOut)
+          return bci < co && bco > ci
+        })
+        .map((b) => b.room.id)
+    )
+    return rooms.filter((r) => !occupiedIds.has(r.id))
+  }, [formData.checkIn, formData.checkOut, bookings, rooms, editingBooking])
+
+  const datesComplete = !!(formData.checkIn && formData.checkOut && formData.checkOut > formData.checkIn)
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -469,8 +486,6 @@ export default function BookingsPage() {
     setEditingBooking(null)
     setFormData(defaultFormData)
     setOccupants([])
-    setAvailableRooms([])
-    setDatesComplete(false)
     setFormError("")
     setIsDialogOpen(true)
   }
@@ -502,8 +517,6 @@ export default function BookingsPage() {
     setFormError("")
     setIsDetailOpen(false)
     setIsDialogOpen(true)
-    // Fetch available rooms for the booking's dates (exclude current booking from conflict check)
-    fetchAvailableRooms(checkIn, checkOut, booking.id)
   }
 
   // View booking details
@@ -532,48 +545,13 @@ export default function BookingsPage() {
       return next
     })
 
-    // When dates change, re-fetch available rooms
+    // When dates change, clear room selection if it becomes unavailable
     if (field === "checkIn" || field === "checkOut") {
       const newCheckIn = field === "checkIn" ? value : formData.checkIn
       const newCheckOut = field === "checkOut" ? value : formData.checkOut
-      if (newCheckIn && newCheckOut && newCheckOut > newCheckIn) {
-        fetchAvailableRooms(newCheckIn, newCheckOut, editingBooking?.id)
-        // Check if current room is still available
-        if (formData.roomId && availableRooms.length > 0) {
-          const isStillAvailable = availableRooms.some((r) => r.id === formData.roomId)
-          if (!isStillAvailable) {
-            setFormData((prev) => ({ ...prev, roomId: "", nightlyRate: "" }))
-          }
-        }
-      } else {
-        setAvailableRooms([])
-        setDatesComplete(false)
+      if (!(newCheckIn && newCheckOut && newCheckOut > newCheckIn)) {
         setFormData((prev) => ({ ...prev, roomId: "", nightlyRate: "" }))
       }
-    }
-  }
-
-  // Fetch available rooms based on selected dates
-  const fetchAvailableRooms = async (checkIn: string, checkOut: string, excludeBookingId?: string) => {
-    if (!checkIn || !checkOut) {
-      setAvailableRooms([])
-      setDatesComplete(false)
-      return
-    }
-    setDatesComplete(true)
-    setIsLoadingAvailableRooms(true)
-    try {
-      let url = `/api/rooms/available?checkIn=${checkIn}&checkOut=${checkOut}`
-      if (excludeBookingId) url += `&excludeBookingId=${excludeBookingId}`
-      const res = await fetch(url)
-      if (res.ok) {
-        const data = await res.json()
-        setAvailableRooms(data.rooms || [])
-      }
-    } catch {
-      // Silently fail - user can still submit and get server error
-    } finally {
-      setIsLoadingAvailableRooms(false)
     }
   }
 
@@ -1876,15 +1854,13 @@ export default function BookingsPage() {
               <Select
                 value={formData.roomId}
                 onValueChange={handleRoomSelect}
-                disabled={!datesComplete || isLoadingAvailableRooms}
+                disabled={!datesComplete}
               >
                 <SelectTrigger className="h-12 text-base">
                   <SelectValue placeholder={
                     !datesComplete
                       ? "Saisissez les dates d'abord"
-                      : isLoadingAvailableRooms
-                        ? "Chargement des chambres..."
-                        : availableRooms.length === 0
+                      : availableRooms.length === 0
                           ? "Aucune chambre disponible"
                           : "Sélectionner une chambre"
                   } />
@@ -1901,12 +1877,12 @@ export default function BookingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {datesComplete && !isLoadingAvailableRooms && availableRooms.length === 0 && (
+              {datesComplete && availableRooms.length === 0 && (
                 <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md px-3 py-2">
                   Aucune chambre disponible pour ces dates.
                 </p>
               )}
-              {datesComplete && !isLoadingAvailableRooms && availableRooms.length > 0 && (
+              {datesComplete && availableRooms.length > 0 && (
                 <p className="text-xs text-green-600">
                   ✓ {availableRooms.length} chambre{availableRooms.length > 1 ? "s" : ""} disponible{availableRooms.length > 1 ? "s" : ""}
                 </p>
