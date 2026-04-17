@@ -42,10 +42,10 @@ export function LandingFooter() {
                   <a href="#how-it-works" className="hover:text-white transition-colors">Comment ça marche</a>
                 </li>
                 <li>
-                  <a href="#pricing" className="hover:text-white transition-colors">Tarifs</a>
+                  <a href="#testimonials" className="hover:text-white transition-colors">Témoignages</a>
                 </li>
                 <li>
-                  <a href="#testimonials" className="hover:text-white transition-colors">Témoignages</a>
+                  <a href="#quote" className="hover:text-white transition-colors">Demander un devis</a>
                 </li>
                 <li>
                   <a href="#faq" className="hover:text-white transition-colors">FAQ</a>

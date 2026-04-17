@@ -2,9 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Accordion,
   AccordionContent,
@@ -38,8 +36,10 @@ import {
   ChevronRight,
   Zap,
   Heart,
-  MessageSquare,
-  Lock,
+  Mail,
+  Phone,
+  MapPin,
+  ExternalLink,
 } from "lucide-react"
 import { LandingFooter } from "@/components/layout/footer"
 
@@ -48,7 +48,6 @@ const brand = "text-sky-600"
 const brandBg = "bg-sky-600"
 const brandBgLight = "bg-sky-50"
 const brandBgHover = "hover:bg-sky-700"
-const brandRing = "ring-sky-100"
 
 /* ───────────────────────────────────────────
    DATA
@@ -217,8 +216,6 @@ const faqs = [
   },
 ]
 
-
-
 /* ───────────────────────────────────────────
    COMPONENT
    ─────────────────────────────────────────── */
@@ -292,7 +289,7 @@ export default function LandingPage() {
             className="mb-6 px-4 py-1.5 text-sm font-medium bg-sky-50 text-sky-700 hover:bg-sky-50 border-sky-200"
           >
             <CheckCircle2 className="w-4 h-4 mr-1.5" />
-            14 jours d'essai gratuit — sans carte bancaire
+            14 jours d&apos;essai gratuit — sans carte bancaire
           </Badge>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 leading-[1.1] tracking-tight">
@@ -474,7 +471,6 @@ export default function LandingPage() {
             {/* visual mockup */}
             <div className="relative">
               <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-amber-50 p-8 md:p-10">
-                {/* mini dashboard mockup */}
                 <div className="bg-white rounded-xl shadow-xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="h-4 w-28 bg-gray-900 rounded" />
@@ -486,9 +482,9 @@ export default function LandingPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { label: "Occupation", value: "87%", color: "bg-sky-500" },
-                      { label: "Revenus", value: "12 400 €", color: "bg-emerald-500" },
-                      { label: "Arrivées", value: "4", color: "bg-amber-500" },
+                      { label: "Occupation", value: "87%" },
+                      { label: "Revenus", value: "12 400 €" },
+                      { label: "Arrivées", value: "4" },
                     ].map((kpi) => (
                       <div
                         key={kpi.label}
@@ -583,6 +579,139 @@ export default function LandingPage() {
               </Card>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ─── DEMANDER UN DEVIS ─── */}
+      <section id="quote" className="py-20 md:py-28 px-4 bg-gray-50/70">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-12">
+            <Badge
+              variant="secondary"
+              className="mb-4 bg-sky-50 text-sky-700 border-sky-200"
+            >
+              Devis
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+              Vous avez besoin d&apos;une solution sur mesure ?
+            </h2>
+            <p className="text-gray-500 max-w-xl mx-auto text-lg">
+              Contactez-nous pour discuter de vos besoins. Nous vous
+              proposerons une offre adaptée à votre établissement.
+            </p>
+          </div>
+
+          <Card className="border-gray-200 shadow-xl">
+            <CardContent className="p-8 md:p-10">
+              <div className="grid md:grid-cols-2 gap-10">
+                {/* Left — contact details */}
+                <div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-sky-600 flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg">Jazel Web Agency</h3>
+                      <p className="text-sm text-gray-500">
+                        Développeur de PMS Guest House
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-5">
+                    <a
+                      href="mailto:contact@jazelwebagency.com"
+                      className="flex items-start gap-4 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center flex-shrink-0 group-hover:bg-sky-100 transition-colors">
+                        <Mail className="w-5 h-5 text-sky-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400 mb-0.5">Email</p>
+                        <p className="text-sm font-medium text-gray-700 group-hover:text-sky-600 transition-colors">
+                          contact@jazelwebagency.com
+                        </p>
+                      </div>
+                    </a>
+
+                    <a
+                      href="tel:+212662425890"
+                      className="flex items-start gap-4 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center flex-shrink-0 group-hover:bg-sky-100 transition-colors">
+                        <Phone className="w-5 h-5 text-sky-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400 mb-0.5">Téléphone</p>
+                        <p className="text-sm font-medium text-gray-700 group-hover:text-sky-600 transition-colors">
+                          +212 6 62 42 58 90
+                        </p>
+                      </div>
+                    </a>
+
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-sky-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400 mb-0.5">Adresse</p>
+                        <p className="text-sm font-medium text-gray-700">
+                          Marrakech, Maroc
+                        </p>
+                      </div>
+                    </div>
+
+                    <a
+                      href="https://jazelwebagency.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-4 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center flex-shrink-0 group-hover:bg-sky-100 transition-colors">
+                        <ExternalLink className="w-5 h-5 text-sky-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400 mb-0.5">Site web</p>
+                        <p className="text-sm font-medium text-gray-700 group-hover:text-sky-600 transition-colors">
+                          jazelwebagency.com
+                        </p>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Right — quick form CTA */}
+                <div className="flex flex-col justify-center">
+                  <div className="rounded-2xl bg-gradient-to-br from-sky-600 to-sky-800 p-8 text-white">
+                    <h3 className="text-xl font-bold mb-3">
+                      Demandez votre devis
+                    </h3>
+                    <p className="text-sky-100 text-sm mb-6 leading-relaxed">
+                      Envoyez-nous un email ou appelez-nous directement. Nous
+                      répondons sous 24h avec une proposition personnalisée.
+                    </p>
+                    <div className="space-y-3">
+                      <a href="mailto:contact@jazelwebagency.com">
+                        <Button className="w-full bg-white text-sky-700 hover:bg-sky-50 font-semibold h-11">
+                          <Mail className="w-4 h-4 mr-2" />
+                          Envoyer un email
+                        </Button>
+                      </a>
+                      <a href="tel:+212662425890">
+                        <Button
+                          variant="outline"
+                          className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white font-semibold h-11"
+                        >
+                          <Phone className="w-4 h-4 mr-2" />
+                          Appeler maintenant
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 

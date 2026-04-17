@@ -37,10 +37,12 @@ export const metadata: Metadata = {
     siteName: "PMS Guest House",
     images: [
       {
-        url: `${process.env.NEXT_PUBLIC_APP_URL || "https://pms-guesthouse.vercel.app"}/og-image.png`,
-        width: 1344,
-        height: 768,
+        url: "https://pms-guesthouse.vercel.app/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "PMS Guest House - Logiciel de gestion hôtelière",
+        secureUrl: "https://pms-guesthouse.vercel.app/og-image.png",
+        type: "image/png",
       },
     ],
     locale: "fr_FR",
@@ -50,7 +52,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "PMS Guest House - Gestion de Maisons d'Hôtes",
     description: "Solution SaaS complète pour la gestion de maisons d'hôtes.",
-    images: [`${process.env.NEXT_PUBLIC_APP_URL || "https://pms-guesthouse.vercel.app"}/og-image.png`],
+    images: ["https://pms-guesthouse.vercel.app/og-image.png"],
   },
   other: {
     "application-name": "PMS Guest House",
