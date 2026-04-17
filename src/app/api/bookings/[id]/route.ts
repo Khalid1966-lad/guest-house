@@ -100,7 +100,7 @@ export async function PUT(
         id: { not: id },
         roomId,
         guestHouseId: session.user.guestHouseId,
-        status: { notIn: ["cancelled", "no_show"] },
+        status: { notIn: ["cancelled", "no_show", "checked_out"] },
         OR: [
           {
             checkIn: { lt: new Date(checkOut) },
