@@ -60,7 +60,6 @@ import {
   KeyRound,
   UserCheck,
   UserX,
-  Broom,
   Eye,
 } from "lucide-react"
 import Link from "next/link"
@@ -115,7 +114,7 @@ const ROLES = [
   {
     value: "femmeDeMenage",
     label: "Femme de ménage",
-    icon: Broom,
+    icon: Sparkles,
     badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
     avatar: "bg-rose-500",
   },
