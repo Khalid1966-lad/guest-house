@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireSuperAdmin } from "@/lib/session"
+import { requireRole } from "@/lib/session"
 
 export const dynamic = "force-dynamic"
 
@@ -11,7 +11,7 @@ interface RouteParams {
 // GET /api/admin/subscriptions/[id] — get single subscription
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    await requireSuperAdmin()
+    await requireRole(["super_admin"])
     const { id } = await params
 
     const result = await db.$queryRawUnsafe(
@@ -39,7 +39,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 // PATCH /api/admin/subscriptions/[id] — update subscription
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const admin = await requireSuperAdmin()
+    const admin = await requireRole(["super_admin"])
     const { id } = await params
 
     const body = await request.json()
@@ -73,7 +73,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     // Always update changedBy and changedAt
     fields.push(`"changedBy" = $${paramIndex++}`)
-    values.push(admin.user?.id || "super_admin")
+    values.push(admin.id || "super_admin")
     fields.push(`"changedAt" = $${paramIndex++}`)
     values.push(new Date())
 

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireSuperAdmin } from "@/lib/session"
+import { requireRole } from "@/lib/session"
 
 export const dynamic = "force-dynamic"
 
 // GET /api/admin/subscriptions — list all subscriptions with guesthouse info
 export async function GET(request: Request) {
   try {
-    await requireSuperAdmin()
+    const session = await requireRole(["super_admin"])
 
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get("filter") || "all"
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
 // POST /api/admin/subscriptions — create a subscription for a guesthouse
 export async function POST(request: Request) {
   try {
-    await requireSuperAdmin()
+    await requireRole(["super_admin"])
 
     const body = await request.json()
     const { guestHouseId, plan, status, expiresAt, lastPaymentAt, lastPaymentRef, trialEndsAt, notes } = body
