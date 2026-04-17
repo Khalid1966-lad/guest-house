@@ -129,6 +129,8 @@ export default function AdminBackupPage() {
   const [selectedGuestHouseId, setSelectedGuestHouseId] = useState("")
   const [isRestoring, setIsRestoring] = useState(false)
   const [restoreResult, setRestoreResult] = useState<string | null>(null)
+  const [isValidating, setIsValidating] = useState(false)
+  const [validationResult, setValidationResult] = useState<{ ok: boolean; message: string; recordCount: number; tableCount: number; issues: string[] } | null>(null)
 
   // Import backup
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -222,6 +224,49 @@ export default function AdminBackupPage() {
     }
   }
 
+  // Validate backup (dry-run)
+  const handleValidate = async () => {
+    if (!restoreDialogId) return
+    setIsValidating(true)
+    setValidationResult(null)
+
+    try {
+      const params = new URLSearchParams()
+      params.append("id", restoreDialogId)
+      params.append("dryRun", "true")
+      if (restoreMode === "guesthouse" && selectedGuestHouseId) {
+        params.append("guestHouseId", selectedGuestHouseId)
+      }
+
+      const res = await fetch(`/api/admin/backup/restore?${params.toString()}`, {
+        method: "POST",
+      })
+      const data = await res.json()
+
+      if (res.ok && data.validation) {
+        setValidationResult({
+          ok: data.success && data.validation.issues.length === 0,
+          message: data.message || "",
+          recordCount: data.validation.totalRecords,
+          tableCount: data.validation.tableCount,
+          issues: data.validation.issues || [],
+        })
+      } else {
+        setValidationResult({
+          ok: false,
+          message: data.error || "Erreur de validation",
+          recordCount: 0,
+          tableCount: 0,
+          issues: [data.error || "Erreur inconnue"],
+        })
+      }
+    } catch {
+      setValidationResult({ ok: false, message: "Erreur réseau", recordCount: 0, tableCount: 0, issues: ["Erreur réseau"] })
+    } finally {
+      setIsValidating(false)
+    }
+  }
+
   const handleRestore = async () => {
     if (!restoreDialogId) return
     setIsRestoring(true)
@@ -240,12 +285,16 @@ export default function AdminBackupPage() {
       const data = await res.json()
 
       if (res.ok) {
-        setRestoreResult(data.message)
+        const warningsMsg = data.warnings && data.warnings.length > 0
+          ? ` (${data.warnings.length} avertissement(s))`
+          : ""
+        setRestoreResult(`${data.message}${warningsMsg}`)
         setTimeout(() => {
           setRestoreDialogId(null)
           setRestoreResult(null)
           setRestoreMode("full")
           setSelectedGuestHouseId("")
+          setValidationResult(null)
           fetchBackups()
         }, 3000)
       } else {
@@ -875,6 +924,60 @@ export default function AdminBackupPage() {
                 </div>
               )}
 
+              {/* Validation section */}
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full border-dashed"
+                  onClick={handleValidate}
+                  disabled={isValidating || (restoreMode === "guesthouse" && !selectedGuestHouseId)}
+                >
+                  {isValidating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Vérification en cours...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2 text-sky-600" />
+                      Vérifier l&apos;intégrité de la sauvegarde
+                    </>
+                  )}
+                </Button>
+
+                {validationResult && (
+                  <div className={`p-3 rounded-lg border text-sm ${
+                    validationResult.ok
+                      ? "bg-green-50 border-green-200"
+                      : "bg-amber-50 border-amber-200"
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      {validationResult.ok ? (
+                        <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      )}
+                      <p className={`font-medium ${validationResult.ok ? "text-green-700" : "text-amber-700"}`}>
+                        {validationResult.ok ? "Sauvegarde valide" : "Problèmes détectés"}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-600 ml-6">
+                      {validationResult.recordCount} enregistrements dans {validationResult.tableCount} tables
+                    </p>
+                    {validationResult.issues.length > 0 && (
+                      <ul className="mt-2 ml-6 space-y-1">
+                        {validationResult.issues.map((issue, i) => (
+                          <li key={i} className="text-xs text-amber-700 flex items-start gap-1">
+                            <span className="shrink-0">•</span>
+                            <span>{issue}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Warning */}
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
                 <Shield className="w-4 h-4 shrink-0 mt-0.5" />
@@ -894,6 +997,7 @@ export default function AdminBackupPage() {
                   onClick={() => {
                     setRestoreDialogId(null)
                     setRestoreResult(null)
+                    setValidationResult(null)
                   }}
                   disabled={isRestoring}
                 >
