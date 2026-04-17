@@ -647,3 +647,38 @@ Work Log:
 Stage Summary:
 - Global backup creation, listing, and deletion fully functional
 - Backup stores compressed data, table summary, guesthouse list for selective restore
+
+---
+Task ID: 3
+Agent: Main
+Task: Complete backup system - download, restore (full + guesthouse), import, admin UI
+
+Work Log:
+- Created GET /api/admin/backup/[id]/download — serves backup as downloadable .json.gz file with proper Content-Disposition header
+- Created POST /api/admin/backup/[id]/restore — full database restore (clear all tables in reverse FK order, then insert all in dependency order, batched in 100s)
+- Created POST /api/admin/backup/[id]/restore?guestHouseId=xxx — individual guesthouse restore (filters backup data by guestHouseId including child tables via parent ID collection, deletes existing guesthouse with cascade, inserts filtered data)
+- Created POST /api/admin/backup/import — uploads .json.gz file from PC, validates gzip/JSON structure, stores as new Backup record
+- Fixed SQLite compatibility: removed skipDuplicates from createMany (not supported by SQLite)
+- Fixed TypeScript errors: removed non-existent version field from Backup select, fixed FormData append type
+- Created full backup management UI at /app/admin/backup/page.tsx:
+  - Stats cards (total, manual, auto, total size)
+  - Info banner explaining global backup capabilities
+  - Backup list with expand/collapse details per backup
+  - Guesthouse list per backup with badges
+  - Table details grid with record counts
+  - Create backup dialog with optional label
+  - Delete backup confirmation dialog
+  - Restore dialog with mode selection (full vs individual guesthouse)
+  - Guesthouse selector dropdown for individual restore
+  - Warning banners for irreversible operations
+  - Import section with file picker, label input, progress feedback
+  - Result banners (success/error) with auto-dismiss
+- Added "Sauvegardes" navigation button in admin guesthouses header (Database icon, emerald color)
+- All lint checks pass, no backup-related TypeScript errors
+
+Stage Summary:
+- Complete backup/restore system implemented with 6 API endpoints and full admin UI
+- Backup operations: create, list, download, delete, full restore, individual guesthouse restore, import from file
+- Auto retention: max 5 auto backups, unlimited manual
+- Individual guesthouse restore filters all related tables (GuestHouse, Users, Roles, Rooms, RoomPrices, Amenities, Guests, Bookings, Invoices, InvoiceItems, Payments, MenuItems, Orders, OrderItems, Expenses, Tasks, TaskItems, Notifications, AuditLogs)
+- Admin page accessible from "Sauvegardes" button in admin panel header

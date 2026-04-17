@@ -27,6 +27,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import Link from "next/link"
 import {
   Building2,
   Users,
@@ -52,6 +53,7 @@ import {
   KeyRound,
   CheckCircle,
   Info,
+  Database,
 } from "lucide-react"
 
 // Types
@@ -407,6 +409,12 @@ export default function AdminGuestHousesPage() {
             <p className="text-sm text-gray-500">Gestion des maisons d'hôtes</p>
           </div>
         </div>
+        <Link href="/app/admin/backup">
+          <Button variant="outline" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">
+            <Database className="w-4 h-4 mr-2" />
+            Sauvegardes
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Cards */}

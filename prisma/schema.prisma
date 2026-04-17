@@ -724,15 +724,15 @@ model AuditLog {
 model Backup {
   id            String   @id @default(cuid())
   label         String?
-  type          String   @default("manual")  // manual | auto
-  version       String   @default("v2.5.0")
-
-  compressedData String   @db.Text
+  type          String   @default("manual") // "manual" | "auto"
+  
+  compressedData String  // Compressed backup data (gzip base64)
   sizeKo        Int
   tableCount    Int
+  
   tableSummary  String   @default("{}")  // JSON: { GuestHouse: 5, Room: 20, ... }
-  guestHouseList String  @default("[]")  // JSON: [{ id, name, slug }, ... ]
-
+  guestHouseList String  @default("[]")  // JSON: [{id, name, slug}] for selective restore
+  
   createdBy     String
   createdAt     DateTime @default(now())
 }

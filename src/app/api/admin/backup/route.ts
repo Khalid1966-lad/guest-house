@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
+import { APP_VERSION } from "@/lib/version"
 
 // ============================================
 // Super Admin guard
@@ -16,40 +17,108 @@ async function requireSuperAdmin() {
 }
 
 // ============================================
-// Table export order (dependency-safe)
+// Table export order (dependency-safe for insert)
 // ============================================
 const TABLES_ORDER = [
-  'GuestHouse', 'GuestHouseSetting', 'User', 'Role', 'Room', 'RoomPrice',
-  'Amenity', 'Guest', 'Booking', 'Invoice', 'InvoiceItem', 'Payment',
-  'MenuItem', 'RestaurantOrder', 'OrderItem', 'Expense',
-  'CleaningTask', 'CleaningTaskItem', 'Notification', 'AuditLog',
+  "GuestHouse",
+  "GuestHouseSetting",
+  "User",
+  "Role",
+  "Room",
+  "RoomPrice",
+  "Amenity",
+  "Guest",
+  "Booking",
+  "Invoice",
+  "InvoiceItem",
+  "Payment",
+  "MenuItem",
+  "RestaurantOrder",
+  "OrderItem",
+  "Expense",
+  "CleaningTask",
+  "CleaningTaskItem",
+  "Notification",
+  "AuditLog",
 ]
 
 // ============================================
-// Export all data from every table
+// Table delete order (reverse dependencies)
+// ============================================
+const TABLES_DELETE_ORDER = [
+  "Notification",
+  "AuditLog",
+  "CleaningTaskItem",
+  "CleaningTask",
+  "Expense",
+  "OrderItem",
+  "RestaurantOrder",
+  "Payment",
+  "InvoiceItem",
+  "Invoice",
+  "Booking",
+  "Guest",
+  "MenuItem",
+  "RoomPrice",
+  "Amenity",
+  "Room",
+  "Role",
+  "GuestHouseSetting",
+  "User",
+  "GuestHouse",
+]
+
+// ============================================
+// Export all data using Prisma queries (portable)
 // ============================================
 async function exportAllData() {
   const tables: Record<string, unknown[]> = {}
   const tableSummary: Record<string, number> = {}
   let guestHouseList: { id: string; name: string; slug: string }[] = []
 
-  for (const table of TABLES_ORDER) {
-    const rows = await db.$queryRawUnsafe<{ data: unknown }[]>(
-      `SELECT row_to_json(t) as data FROM "${table}" t`
-    )
-    tables[table] = rows.map((r) => r.data)
-    tableSummary[table] = rows.length
+  // Use Prisma model queries — portable across SQLite and PostgreSQL
+  const queries: Record<string, () => Promise<unknown[]>> = {
+    GuestHouse: () => db.guestHouse.findMany(),
+    GuestHouseSetting: () => db.guestHouseSetting.findMany(),
+    User: () => db.user.findMany(),
+    Role: () => db.role.findMany(),
+    Room: () => db.room.findMany(),
+    RoomPrice: () => db.roomPrice.findMany(),
+    Amenity: () => db.amenity.findMany(),
+    Guest: () => db.guest.findMany(),
+    Booking: () => db.booking.findMany(),
+    Invoice: () => db.invoice.findMany(),
+    InvoiceItem: () => db.invoiceItem.findMany(),
+    Payment: () => db.payment.findMany(),
+    MenuItem: () => db.menuItem.findMany(),
+    RestaurantOrder: () => db.restaurantOrder.findMany(),
+    OrderItem: () => db.orderItem.findMany(),
+    Expense: () => db.expense.findMany(),
+    CleaningTask: () => db.cleaningTask.findMany(),
+    CleaningTaskItem: () => db.cleaningTaskItem.findMany(),
+    Notification: () => db.notification.findMany(),
+    AuditLog: () => db.auditLog.findMany(),
+  }
 
-    // Extract guest house list from the GuestHouse table
-    if (table === "GuestHouse") {
-      guestHouseList = rows.map((r) => {
-        const row = r.data as Record<string, unknown>
-        return {
-          id: row.id as string,
-          name: row.name as string,
-          slug: row.slug as string,
-        }
-      })
+  for (const table of TABLES_ORDER) {
+    const query = queries[table]
+    if (!query) continue
+    try {
+      const rows = await query()
+      tables[table] = rows as unknown[]
+      tableSummary[table] = rows.length
+
+      if (table === "GuestHouse") {
+        guestHouseList = (rows as Record<string, unknown>[]).map((r) => ({
+          id: r.id as string,
+          name: r.name as string,
+          slug: r.slug as string,
+        }))
+      }
+    } catch (err) {
+      console.error(`Erreur export table ${table}:`, err)
+      tables[table] = []
+      tableSummary[table] = 0
     }
   }
 
@@ -84,8 +153,8 @@ export async function GET() {
     // Parse JSON fields
     const parsedBackups = backups.map((b) => ({
       ...b,
-      tableSummary: JSON.parse(b.tableSummary),
-      guestHouseList: JSON.parse(b.guestHouseList),
+      tableSummary: JSON.parse(b.tableSummary || "{}"),
+      guestHouseList: JSON.parse(b.guestHouseList || "[]"),
     }))
 
     return NextResponse.json({ backups: parsedBackups })
@@ -114,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     // Build backup payload
     const payload = {
-      version: "v2.5.0",
+      version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       tables,
       meta: {
@@ -123,13 +192,13 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // Compress with gzip + base64
+    // Compress with gzip → base64
     const jsonString = JSON.stringify(payload)
     const compressed = zlib.gzipSync(Buffer.from(jsonString))
     const compressedBase64 = compressed.toString("base64")
 
-    // Calculate size in Ko from base64 string length
-    const sizeKo = Math.round(compressedBase64.length / 1024)
+    // Calculate size in Ko
+    const sizeKo = Math.round(Buffer.byteLength(compressedBase64, "base64") / 1024)
 
     // Save to DB
     const backup = await db.backup.create({
@@ -182,7 +251,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================
-// DELETE - Delete a backup
+// DELETE - Delete a backup (by query param ?id=)
 // ============================================
 export async function DELETE(request: NextRequest) {
   const user = await requireSuperAdmin()
@@ -198,7 +267,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id requis" }, { status: 400 })
     }
 
-    // Verify backup exists
     const backup = await db.backup.findUnique({
       where: { id },
       select: { id: true, label: true, createdAt: true },
@@ -208,7 +276,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Backup non trouvé" }, { status: 404 })
     }
 
-    // Delete
     await db.backup.delete({ where: { id } })
 
     return NextResponse.json({
