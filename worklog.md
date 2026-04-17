@@ -585,3 +585,36 @@ Work Log:
 Stage Summary:
 - No code changes needed - redirect logic already works correctly
 - When Dashboard is not in user's menuAccess, middleware redirects to first authorized menu
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix registration flow - auto sign-in after account creation
+
+Work Log:
+- Identified root cause: Register page created user but did NOT sign them in before redirecting to /onboarding
+- Onboarding page checks `status === "unauthenticated"` and redirects to /login, so the user never saw the onboarding form
+- Fix: Added `signIn("credentials", { redirect: false })` in register page after successful API call
+- If auto sign-in fails, shows error message asking user to login manually
+- Changed redirect from `/onboarding?userId=${data.userId}` to `/onboarding` (userId not needed since session is available)
+- Reduced timeout from 2000ms to 1500ms
+
+Stage Summary:
+- Registration flow now: create account → auto sign-in → show success → redirect to onboarding
+- Onboarding page works correctly with session data (no userId param needed)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Show pending registrations in admin panel
+
+Work Log:
+- Identified root cause: Admin panel only queries GuestHouse records; users without guestHouseId are invisible
+- Updated `/api/admin/guesthouses` GET endpoint to also fetch `pendingUsers` (role=owner, guestHouseId=null)
+- Added `PendingUser` interface in admin guesthouses page
+- Added yellow-themed "Inscriptions en attente" card section between stats and filters
+- Each pending user shows: avatar initial, name, email, registration date, active/inactive badge
+- Scrollable list (max-h-64) with responsive layout
+
+Stage Summary:
+- Admin panel now shows a dedicated section for users who registered but haven't completed onboarding
+- New accounts are visible immediately after registration

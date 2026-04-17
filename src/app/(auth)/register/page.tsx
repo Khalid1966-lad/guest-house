@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -84,12 +85,26 @@ export default function RegisterPage() {
         return
       }
 
+      // Connexion automatique après inscription
+      const signInResult = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      })
+
+      if (signInResult?.error) {
+        // Si la connexion auto échoue, rediriger vers login
+        setError("Compte créé mais la connexion automatique a échoué. Veuillez vous connecter manuellement.")
+        setIsLoading(false)
+        return
+      }
+
       setIsSuccess(true)
       
-      // Rediriger vers l'onboarding après 2 secondes
+      // Rediriger vers l'onboarding après 1.5 secondes
       setTimeout(() => {
-        router.push(`/onboarding?userId=${data.userId}`)
-      }, 2000)
+        router.push("/onboarding")
+      }, 1500)
       
     } catch (err) {
       setError("Une erreur inattendue s'est produite")

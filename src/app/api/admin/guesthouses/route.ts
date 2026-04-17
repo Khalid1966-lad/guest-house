@@ -106,9 +106,29 @@ export async function GET(request: NextRequest) {
     const blocked = guestHouses.filter((gh) => gh.status === "blocked").length
     const suspended = guestHouses.filter((gh) => gh.status === "suspended").length
 
+    // Récupérer les utilisateurs inscrits mais sans maison d'hôtes (inscriptions en attente)
+    const pendingUsers = await db.user.findMany({
+      where: {
+        role: "owner",
+        guestHouseId: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
     return NextResponse.json({
       guestHouses: guestHousesWithStats,
       stats: { total, active, pending, blocked, suspended },
+      pendingUsers,
     })
   } catch (error) {
     console.error("Erreur récupération maisons d'hôtes admin:", error)

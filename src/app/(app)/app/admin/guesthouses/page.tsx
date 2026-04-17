@@ -92,6 +92,17 @@ interface GuestHouseItem {
   counts: GuestHouseCounts
 }
 
+interface PendingUser {
+  id: string
+  name: string | null
+  firstName: string | null
+  lastName: string | null
+  email: string
+  phone: string | null
+  isActive: boolean
+  createdAt: string
+}
+
 interface AdminStats {
   total: number
   active: number
@@ -133,6 +144,7 @@ export default function AdminGuestHousesPage() {
   const router = useRouter()
 
   const [guestHouses, setGuestHouses] = useState<GuestHouseItem[]>([])
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -176,6 +188,7 @@ export default function AdminGuestHousesPage() {
       if (res.ok) {
         setGuestHouses(data.guestHouses)
         setStats(data.stats)
+        setPendingUsers(data.pendingUsers || [])
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -347,6 +360,51 @@ export default function AdminGuestHousesPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Inscriptions en attente (utilisateurs sans maison d'hôtes) */}
+      {pendingUsers.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50/50 dark:border-yellow-900 dark:bg-yellow-950/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="w-5 h-5 text-yellow-600" />
+              Inscriptions en attente
+              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300" variant="outline">
+                {pendingUsers.length}
+              </Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Utilisateurs inscrits qui n&apos;ont pas encore créé leur maison d&apos;hôtes
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {pendingUsers.map((pu) => (
+                <div key={pu.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                  <div className="w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center text-sm font-medium shrink-0">
+                    {(pu.firstName?.[0] || pu.name?.[0] || "U").toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {pu.firstName} {pu.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{pu.email}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(pu.createdAt).toLocaleDateString("fr-FR")}
+                    </p>
+                    {pu.isActive ? (
+                      <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0" variant="outline">Actif</Badge>
+                    ) : (
+                      <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0" variant="outline">Inactif</Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Filtres */}
