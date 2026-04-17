@@ -4,53 +4,82 @@ import { requireRole } from "@/lib/session"
 
 export const dynamic = "force-dynamic"
 
-// GET /api/admin/subscriptions — list all subscriptions with guesthouse info
+// GET /api/admin/subscriptions — list ALL guesthouses with their subscription info
 export async function GET(request: Request) {
   try {
-    const session = await requireRole(["super_admin"])
+    await requireRole(["super_admin"])
 
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get("filter") || "all"
 
-    const subscriptions = await db.$queryRawUnsafe(`
+    // LEFT JOIN: all guesthouses, even those without a subscription
+    const rows = await db.$queryRawUnsafe(`
       SELECT 
-        s.*,
+        gh."id" as "guestHouseId",
         gh."name" as "guestHouseName",
         gh."code" as "guestHouseCode",
         gh."email" as "guestHouseEmail",
         gh."city" as "guestHouseCity",
         gh."isActive" as "guestHouseActive",
         gh."createdAt" as "guestHouseCreatedAt",
+        gh."status" as "guestHouseStatus",
         u."email" as "ownerEmail",
-        u."name" as "ownerName"
-      FROM "Subscription" s
-      JOIN "GuestHouse" gh ON s."guestHouseId" = gh."id"
+        u."name" as "ownerName",
+        u."id" as "ownerId",
+        s."id" as "subscriptionId",
+        s."plan" as "plan",
+        s."status" as "subscriptionStatus",
+        s."startedAt" as "startedAt",
+        s."expiresAt" as "expiresAt",
+        s."lastPaymentAt" as "lastPaymentAt",
+        s."lastPaymentRef" as "lastPaymentRef",
+        s."trialEndsAt" as "trialEndsAt",
+        s."gracePeriodDays" as "gracePeriodDays",
+        s."notes" as "subscriptionNotes",
+        s."changedAt" as "changedAt"
+      FROM "GuestHouse" gh
       LEFT JOIN "User" u ON u."guestHouseId" = gh."id" AND u."role" = 'owner'
-      ORDER BY s."updatedAt" DESC
+      LEFT JOIN "Subscription" s ON s."guestHouseId" = gh."id"
+      ORDER BY gh."createdAt" DESC
     `)
 
-    const all = subscriptions as Record<string, unknown>[]
+    const all = rows as Record<string, unknown>[]
 
-    // Filter by raw status
-    const filtered = filter === "all" ? all : all.filter((sub: Record<string, unknown>) => {
-      return (sub.status as string) === filter
-    })
+    // Filter: use subscriptionStatus (null = no subscription)
+    let filtered = all
+    if (filter === "none") {
+      filtered = all.filter(r => !r.subscriptionId)
+    } else if (filter !== "all") {
+      filtered = all.filter(r => (r.subscriptionStatus as string) === filter)
+    }
 
-    // Add computed effective status for each
+    // Add computed info for those with subscriptions
     const { buildSubscriptionInfo } = await import("@/lib/subscription")
-    const enriched = filtered.map((sub: Record<string, unknown>) => ({
-      ...sub,
-      computed: buildSubscriptionInfo(sub),
-    }))
+    const enriched = filtered.map((row) => {
+      const hasSubscription = !!row.subscriptionId
+      const subForCompute = hasSubscription ? row : {
+        plan: "free",
+        status: "none",
+        expiresAt: null,
+        trialEndsAt: null,
+        gracePeriodDays: 7,
+      }
+      return {
+        ...row,
+        hasSubscription,
+        computed: buildSubscriptionInfo(subForCompute),
+      }
+    })
 
     // Stats
     const stats = {
       total: all.length,
-      active: all.filter(s => s.status === "active").length,
-      trial: all.filter(s => s.status === "trial").length,
-      expired: all.filter(s => s.status === "expired").length,
-      grace_period: all.filter(s => s.status === "grace_period").length,
-      cancelled: all.filter(s => s.status === "cancelled").length,
+      active: all.filter(r => r.subscriptionStatus === "active").length,
+      trial: all.filter(r => r.subscriptionStatus === "trial").length,
+      expired: all.filter(r => r.subscriptionStatus === "expired").length,
+      grace_period: all.filter(r => r.subscriptionStatus === "grace_period").length,
+      cancelled: all.filter(r => r.subscriptionStatus === "cancelled").length,
+      none: all.filter(r => !r.subscriptionId).length,
     }
 
     return NextResponse.json({ subscriptions: enriched, stats })

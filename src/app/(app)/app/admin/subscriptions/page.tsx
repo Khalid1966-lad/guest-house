@@ -43,10 +43,12 @@ import {
   Building2,
   Clock,
   CreditCardIcon,
+  Plus,
+  XCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { STATUS_COLORS, STATUS_LABELS, PLAN_LABELS } from "@/lib/subscription"
-import type { SubscriptionStatus, PlanType } from "@/lib/subscription"
+import type { SubscriptionStatus } from "@/lib/subscription"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,24 +61,30 @@ interface ComputedInfo {
 }
 
 interface SubscriptionItem {
-  id: string
   guestHouseId: string
-  plan: string
-  status: string
-  startedAt: string
+  guestHouseName: string
+  guestHouseCode: string | null
+  guestHouseEmail: string | null
+  guestHouseCity: string | null
+  guestHouseActive: boolean
+  guestHouseCreatedAt: string
+  guestHouseStatus: string
+  ownerEmail: string | null
+  ownerName: string | null
+  ownerId: string | null
+  hasSubscription: boolean
+  subscriptionId: string | null
+  plan: string | null
+  subscriptionStatus: string | null
+  startedAt: string | null
   expiresAt: string | null
   lastPaymentAt: string | null
   lastPaymentRef: string | null
   trialEndsAt: string | null
-  gracePeriodDays: number
-  guestHouseName: string
-  guestHouseCode: string | null
-  guestHouseEmail: string | null
-  ownerEmail: string | null
-  ownerName: string | null
-  guestHouseCreatedAt: string
+  gracePeriodDays: number | null
+  subscriptionNotes: string | null
+  changedAt: string | null
   computed: ComputedInfo
-  notes?: string | null
 }
 
 interface Stats {
@@ -86,6 +94,7 @@ interface Stats {
   expired: number
   grace_period: number
   cancelled: number
+  none: number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -104,21 +113,21 @@ const PLAN_COLOR_MAP: Record<string, { bg: string; text: string }> = {
 }
 
 const STAT_CARDS: { key: keyof Stats; label: string; colorClass: string; iconBg: string }[] = [
-  { key: "total", label: "Total", colorClass: "text-gray-900 dark:text-white", iconBg: "bg-sky-100 dark:bg-sky-900/30 text-sky-600" },
+  { key: "total", label: "Total GH", colorClass: "text-gray-900 dark:text-white", iconBg: "bg-sky-100 dark:bg-sky-900/30 text-sky-600" },
   { key: "active", label: "Actifs", colorClass: "text-green-600", iconBg: "bg-green-100 dark:bg-green-900/30 text-green-600" },
   { key: "trial", label: "Essai", colorClass: "text-emerald-600", iconBg: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600" },
   { key: "expired", label: "Expirés", colorClass: "text-red-600", iconBg: "bg-red-100 dark:bg-red-900/30 text-red-600" },
-  { key: "grace_period", label: "Période de grâce", colorClass: "text-amber-600", iconBg: "bg-amber-100 dark:bg-amber-900/30 text-amber-600" },
-  { key: "cancelled", label: "Annulés", colorClass: "text-gray-500", iconBg: "bg-gray-100 dark:bg-gray-800 text-gray-500" },
+  { key: "none", label: "Non abonnés", colorClass: "text-amber-600", iconBg: "bg-amber-100 dark:bg-amber-900/30 text-amber-600" },
+  { key: "grace_period", label: "Période de grâce", colorClass: "text-amber-700", iconBg: "bg-amber-100 dark:bg-amber-900/30 text-amber-700" },
 ]
 
 const FILTER_TABS: { value: string; label: string }[] = [
-  { value: "all", label: "Tous" },
+  { value: "all", label: "Toutes les GH" },
   { value: "active", label: "Actifs" },
   { value: "trial", label: "Essai" },
   { value: "expired", label: "Expirés" },
   { value: "grace_period", label: "Période de grâce" },
-  { value: "cancelled", label: "Annulés" },
+  { value: "none", label: "Non abonnées" },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -126,11 +135,7 @@ const FILTER_TABS: { value: string; label: string }[] = [
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—"
   const d = new Date(dateStr)
-  return d.toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
 function toISODateValue(dateStr: string | null | undefined): string {
@@ -155,17 +160,15 @@ export default function AdminSubscriptionsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
 
-  // Data state
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("all")
 
-  // Edit dialog state
   const [editingSub, setEditingSub] = useState<SubscriptionItem | null>(null)
   const [editForm, setEditForm] = useState({
-    plan: "",
-    status: "",
+    plan: "premium",
+    status: "active",
     expiresAt: "",
     lastPaymentAt: "",
     lastPaymentRef: "",
@@ -193,7 +196,6 @@ export default function AdminSubscriptionsPage() {
       const url = `/api/admin/subscriptions${params.toString() ? `?${params.toString()}` : ""}`
       const res = await fetch(url)
       const data = await res.json()
-
       if (res.ok) {
         setSubscriptions(data.subscriptions || [])
         setStats(data.stats || null)
@@ -209,24 +211,37 @@ export default function AdminSubscriptionsPage() {
   }, [activeFilter])
 
   useEffect(() => {
-    if (session?.user?.role === "super_admin") {
-      fetchData()
-    }
+    if (session?.user?.role === "super_admin") fetchData()
   }, [session, fetchData])
 
-  // ─── Edit dialog ─────────────────────────────────────────────────────────
+  // ─── Edit / Create dialog ───────────────────────────────────────────────
 
   const openEditDialog = (sub: SubscriptionItem) => {
     setEditingSub(sub)
-    setEditForm({
-      plan: sub.plan,
-      status: sub.status,
-      expiresAt: toISODateValue(sub.expiresAt),
-      lastPaymentAt: toISODateValue(sub.lastPaymentAt),
-      lastPaymentRef: sub.lastPaymentRef || "",
-      trialEndsAt: toISODateValue(sub.trialEndsAt),
-      notes: (sub as Record<string, unknown>).notes as string || "",
-    })
+    if (sub.hasSubscription) {
+      // Editing existing subscription
+      setEditForm({
+        plan: sub.plan || "free",
+        status: sub.subscriptionStatus || "active",
+        expiresAt: toISODateValue(sub.expiresAt),
+        lastPaymentAt: toISODateValue(sub.lastPaymentAt),
+        lastPaymentRef: sub.lastPaymentRef || "",
+        trialEndsAt: toISODateValue(sub.trialEndsAt),
+        notes: sub.subscriptionNotes || "",
+      })
+    } else {
+      // Creating new subscription — default to premium trial 14 days
+      const trialEnd = addDays(new Date().toISOString(), 14)
+      setEditForm({
+        plan: "premium",
+        status: "trial",
+        expiresAt: "",
+        lastPaymentAt: "",
+        lastPaymentRef: "",
+        trialEndsAt: trialEnd,
+        notes: "",
+      })
+    }
   }
 
   const closeEditDialog = () => {
@@ -235,8 +250,7 @@ export default function AdminSubscriptionsPage() {
   }
 
   const handleExtend = (days: number) => {
-    const currentExpiresAt = editForm.expiresAt
-    const newDate = addDays(currentExpiresAt || new Date().toISOString(), days)
+    const newDate = addDays(editForm.expiresAt || new Date().toISOString(), days)
     setEditForm((prev) => ({ ...prev, expiresAt: newDate }))
   }
 
@@ -244,35 +258,63 @@ export default function AdminSubscriptionsPage() {
     if (!editingSub) return
     setIsSaving(true)
     try {
-      const body: Record<string, unknown> = {
-        plan: editForm.plan,
-        status: editForm.status,
-        expiresAt: editForm.expiresAt || null,
-        lastPaymentAt: editForm.lastPaymentAt || null,
-        lastPaymentRef: editForm.lastPaymentRef || null,
-        trialEndsAt: editForm.trialEndsAt || null,
-        notes: editForm.notes || null,
-      }
-
-      const res = await fetch(`/api/admin/subscriptions/${editingSub.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-
-      if (res.ok) {
-        toast.success("Abonnement modifié", {
-          description: `L'abonnement de ${editingSub.guestHouseName} a été mis à jour.`,
+      if (editingSub.hasSubscription) {
+        // PATCH existing
+        const body: Record<string, unknown> = {
+          plan: editForm.plan,
+          status: editForm.status,
+          expiresAt: editForm.expiresAt || null,
+          lastPaymentAt: editForm.lastPaymentAt || null,
+          lastPaymentRef: editForm.lastPaymentRef || null,
+          trialEndsAt: editForm.trialEndsAt || null,
+          notes: editForm.notes || null,
+        }
+        const res = await fetch(`/api/admin/subscriptions/${editingSub.subscriptionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         })
-        closeEditDialog()
-        fetchData()
+        const data = await res.json()
+        if (res.ok) {
+          toast.success("Abonnement modifié", {
+            description: `L'abonnement de ${editingSub.guestHouseName} a été mis à jour.`,
+          })
+          closeEditDialog()
+          fetchData()
+        } else {
+          toast.error("Erreur", { description: data.error || "Impossible de modifier" })
+        }
       } else {
-        toast.error("Erreur", { description: data.error || "Impossible de modifier l'abonnement" })
+        // POST create new
+        const body: Record<string, unknown> = {
+          guestHouseId: editingSub.guestHouseId,
+          plan: editForm.plan,
+          status: editForm.status,
+          expiresAt: editForm.expiresAt || null,
+          lastPaymentAt: editForm.lastPaymentAt || null,
+          lastPaymentRef: editForm.lastPaymentRef || null,
+          trialEndsAt: editForm.trialEndsAt || null,
+          notes: editForm.notes || null,
+        }
+        const res = await fetch("/api/admin/subscriptions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (res.ok) {
+          toast.success("Abonnement créé", {
+            description: `L'abonnement de ${editingSub.guestHouseName} a été créé.`,
+          })
+          closeEditDialog()
+          fetchData()
+        } else {
+          toast.error("Erreur", { description: data.error || "Impossible de créer" })
+        }
       }
     } catch (err) {
-      console.error("Erreur sauvegarde abonnement:", err)
-      toast.error("Erreur réseau", { description: "Impossible de joindre le serveur" })
+      console.error("Erreur sauvegarde:", err)
+      toast.error("Erreur réseau")
     } finally {
       setIsSaving(false)
     }
@@ -288,9 +330,7 @@ export default function AdminSubscriptionsPage() {
     )
   }
 
-  if (!session || session.user.role !== "super_admin") {
-    return null
-  }
+  if (!session || session.user.role !== "super_admin") return null
 
   // ─── Main render ─────────────────────────────────────────────────────────
 
@@ -321,19 +361,12 @@ export default function AdminSubscriptionsPage() {
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {STAT_CARDS.map(({ key, label, colorClass, iconBg }) => (
-            <Card
-              key={key}
-              className="bg-white dark:bg-gray-900 border dark:border-gray-800"
-            >
+            <Card key={key} className="bg-white dark:bg-gray-900 border dark:border-gray-800">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className={`text-2xl font-bold ${colorClass}`}>
-                      {stats[key]}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {label}
-                    </p>
+                    <p className={`text-2xl font-bold ${colorClass}`}>{stats[key]}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
                   </div>
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${iconBg}`}>
                     <CreditCardIcon className="w-4 h-4" />
@@ -355,19 +388,12 @@ export default function AdminSubscriptionsPage() {
                 key={value}
                 size="sm"
                 variant={activeFilter === value ? "default" : "outline"}
-                className={
-                  activeFilter === value
-                    ? "bg-sky-600 hover:bg-sky-700 text-white shrink-0"
-                    : "shrink-0"
-                }
+                className={activeFilter === value ? "bg-sky-600 hover:bg-sky-700 text-white shrink-0" : "shrink-0"}
                 onClick={() => setActiveFilter(value)}
               >
                 {label}
                 {stats && value !== "all" && (
-                  <Badge
-                    variant="secondary"
-                    className="ml-1.5 text-[10px] px-1.5 py-0 bg-white/20 text-inherit"
-                  >
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 bg-white/20 text-inherit">
                     {stats[value as keyof Stats]}
                   </Badge>
                 )}
@@ -377,16 +403,14 @@ export default function AdminSubscriptionsPage() {
         </CardContent>
       </Card>
 
-      {/* Subscriptions Table */}
+      {/* Table */}
       <Card className="bg-white dark:bg-gray-900 border dark:border-gray-800">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Building2 className="w-5 h-5 text-gray-400" />
-            Abonnements
+            Maisons d&apos;hôtes
             {subscriptions.length > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {subscriptions.length}
-              </Badge>
+              <Badge variant="secondary" className="text-xs">{subscriptions.length}</Badge>
             )}
           </CardTitle>
         </CardHeader>
@@ -394,25 +418,22 @@ export default function AdminSubscriptionsPage() {
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
-              <span className="ml-3 text-gray-500 dark:text-gray-400">Chargement des abonnements...</span>
+              <span className="ml-3 text-gray-500 dark:text-gray-400">Chargement...</span>
             </div>
           ) : subscriptions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <CreditCard className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-3" />
-              <p className="text-gray-500 dark:text-gray-400">Aucun abonnement trouvé</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                Aucun abonnement ne correspond à ce filtre.
-              </p>
+              <p className="text-gray-500 dark:text-gray-400">Aucune maison d&apos;hôtes trouvée</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b dark:border-gray-800">
-                    <TableHead className="min-w-[180px]">GuestHouse</TableHead>
+                    <TableHead className="min-w-[180px]">Maison d&apos;hôtes</TableHead>
                     <TableHead className="min-w-[160px]">Propriétaire</TableHead>
                     <TableHead className="min-w-[100px]">Plan</TableHead>
-                    <TableHead className="min-w-[130px]">Statut</TableHead>
+                    <TableHead className="min-w-[140px]">Statut</TableHead>
                     <TableHead className="min-w-[100px]">Inscription</TableHead>
                     <TableHead className="min-w-[110px]">Dernier paiement</TableHead>
                     <TableHead className="min-w-[110px]">Expiration</TableHead>
@@ -421,14 +442,13 @@ export default function AdminSubscriptionsPage() {
                 </TableHeader>
                 <TableBody>
                   {subscriptions.map((sub) => {
-                    const statusColor = STATUS_COLORS[sub.status] || STATUS_COLORS.cancelled
-                    const planColor = PLAN_COLOR_MAP[sub.plan] || PLAN_COLOR_MAP.free
                     const computedColor = COMPUTED_COLOR_MAP[sub.computed.color] || COMPUTED_COLOR_MAP.gray
+                    const hasSub = sub.hasSubscription
 
                     return (
                       <TableRow
-                        key={sub.id}
-                        className="border-b dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                        key={sub.guestHouseId}
+                        className={`border-b dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${!hasSub ? "opacity-80" : ""}`}
                       >
                         {/* GuestHouse */}
                         <TableCell>
@@ -456,22 +476,28 @@ export default function AdminSubscriptionsPage() {
 
                         {/* Plan */}
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`${planColor.bg} ${planColor.text} border-0`}
-                          >
-                            {PLAN_LABELS[sub.plan] || sub.plan}
-                          </Badge>
+                          {hasSub ? (
+                            <Badge variant="outline" className={`${PLAN_COLOR_MAP[sub.plan || "free"]?.bg || ""} ${PLAN_COLOR_MAP[sub.plan || "free"]?.text || ""} border-0`}>
+                              {PLAN_LABELS[sub.plan || "free"] || "Gratuit"}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-0">
+                              —
+                            </Badge>
+                          )}
                         </TableCell>
 
-                        {/* Statut (computed label) */}
+                        {/* Statut */}
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`${computedColor.bg} ${computedColor.text} border-0`}
-                          >
-                            {sub.computed.label}
-                          </Badge>
+                          {hasSub ? (
+                            <Badge variant="outline" className={`${computedColor.bg} ${computedColor.text} border-0`}>
+                              {sub.computed.label}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-0">
+                              Non abonnée
+                            </Badge>
+                          )}
                         </TableCell>
 
                         {/* Inscription */}
@@ -484,27 +510,44 @@ export default function AdminSubscriptionsPage() {
                         {/* Dernier paiement */}
                         <TableCell>
                           <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {formatDate(sub.lastPaymentAt)}
+                            {hasSub ? formatDate(sub.lastPaymentAt) : "—"}
                           </span>
                         </TableCell>
 
                         {/* Expiration */}
                         <TableCell>
-                          <span className={`text-sm ${sub.computed.daysUntilExpiry !== null && sub.computed.daysUntilExpiry <= 7 ? "text-red-600 dark:text-red-400 font-medium" : "text-gray-600 dark:text-gray-400"}`}>
-                            {formatDate(sub.expiresAt)}
-                          </span>
+                          {hasSub ? (
+                            <span className={`text-sm ${sub.computed.daysUntilExpiry !== null && sub.computed.daysUntilExpiry <= 7 ? "text-red-600 dark:text-red-400 font-medium" : "text-gray-600 dark:text-gray-400"}`}>
+                              {formatDate(sub.expiresAt)}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">—</span>
+                          )}
                         </TableCell>
 
                         {/* Actions */}
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-sky-900/20 dark:hover:text-sky-400"
-                            onClick={() => openEditDialog(sub)}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
+                          {hasSub ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-sky-900/20 dark:hover:text-sky-400"
+                              onClick={() => openEditDialog(sub)}
+                              title="Modifier l'abonnement"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                              onClick={() => openEditDialog(sub)}
+                              title="Créer un abonnement"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     )
@@ -516,18 +559,27 @@ export default function AdminSubscriptionsPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
+      {/* Edit / Create Dialog */}
       <Dialog open={!!editingSub} onOpenChange={(open) => { if (!open) closeEditDialog() }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-sky-600" />
-              Modifier l&apos;abonnement
+              {editingSub?.hasSubscription ? (
+                <>
+                  <Pencil className="w-5 h-5 text-sky-600" />
+                  Modifier l&apos;abonnement
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 text-emerald-600" />
+                  Créer un abonnement
+                </>
+              )}
             </DialogTitle>
             <DialogDescription>
               {editingSub && (
                 <>
-                  Modifier l&apos;abonnement de{" "}
+                  {editingSub.hasSubscription ? "Modifier" : "Créer un abonnement pour"}{" "}
                   <strong className="text-gray-900 dark:text-white">{editingSub.guestHouseName}</strong>
                   {editingSub.guestHouseCode && (
                     <span className="text-gray-400"> ({editingSub.guestHouseCode})</span>
@@ -538,24 +590,20 @@ export default function AdminSubscriptionsPage() {
           </DialogHeader>
 
           <div className="space-y-5 pt-2">
-            {/* Current computed status display */}
-            {editingSub && (
+            {/* Current status display (only for existing) */}
+            {editingSub?.hasSubscription && (
               <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border dark:border-gray-700">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Statut calculé actuel</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Statut actuel</p>
                 <Badge
                   variant="outline"
-                  className={`${
-                    COMPUTED_COLOR_MAP[editingSub.computed.color]?.bg || ""
-                  } ${
-                    COMPUTED_COLOR_MAP[editingSub.computed.color]?.text || ""
-                  } border-0`}
+                  className={`${COMPUTED_COLOR_MAP[editingSub.computed.color]?.bg || ""} ${COMPUTED_COLOR_MAP[editingSub.computed.color]?.text || ""} border-0`}
                 >
                   {editingSub.computed.label}
                 </Badge>
               </div>
             )}
 
-            {/* Plan selector */}
+            {/* Plan */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Plan</Label>
               <Select
@@ -568,23 +616,19 @@ export default function AdminSubscriptionsPage() {
                 <SelectContent>
                   <SelectItem value="free">
                     <span className="flex items-center gap-2">
-                      <Badge variant="outline" className={`${PLAN_COLOR_MAP.free.bg} ${PLAN_COLOR_MAP.free.text} border-0`}>
-                        Gratuit
-                      </Badge>
+                      <Badge variant="outline" className={`${PLAN_COLOR_MAP.free.bg} ${PLAN_COLOR_MAP.free.text} border-0`}>Gratuit</Badge>
                     </span>
                   </SelectItem>
                   <SelectItem value="premium">
                     <span className="flex items-center gap-2">
-                      <Badge variant="outline" className={`${PLAN_COLOR_MAP.premium.bg} ${PLAN_COLOR_MAP.premium.text} border-0`}>
-                        Premium
-                      </Badge>
+                      <Badge variant="outline" className={`${PLAN_COLOR_MAP.premium.bg} ${PLAN_COLOR_MAP.premium.text} border-0`}>Premium</Badge>
                     </span>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Status selector */}
+            {/* Status */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Statut</Label>
               <Select
@@ -598,10 +642,7 @@ export default function AdminSubscriptionsPage() {
                   {Object.entries(STATUS_LABELS).map(([key, label]) => (
                     <SelectItem key={key} value={key}>
                       <span className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={`${STATUS_COLORS[key]?.bg} ${STATUS_COLORS[key]?.text} border-0`}
-                        >
+                        <Badge variant="outline" className={`${STATUS_COLORS[key]?.bg} ${STATUS_COLORS[key]?.text} border-0`}>
                           {label}
                         </Badge>
                       </span>
@@ -621,47 +662,26 @@ export default function AdminSubscriptionsPage() {
               />
             </div>
 
-            {/* Quick extend buttons */}
+            {/* Quick extend */}
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-1.5">
                 <CalendarPlus className="w-4 h-4 text-gray-400" />
                 Prolonger
               </Label>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleExtend(30)}
-                >
-                  <Clock className="w-3.5 h-3.5 mr-1.5" />
-                  +30 jours
+                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => handleExtend(30)}>
+                  <Clock className="w-3.5 h-3.5 mr-1.5" />+30 jours
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleExtend(90)}
-                >
-                  <Clock className="w-3.5 h-3.5 mr-1.5" />
-                  +90 jours
+                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => handleExtend(90)}>
+                  <Clock className="w-3.5 h-3.5 mr-1.5" />+90 jours
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleExtend(365)}
-                >
-                  <Clock className="w-3.5 h-3.5 mr-1.5" />
-                  +1 an
+                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => handleExtend(365)}>
+                  <Clock className="w-3.5 h-3.5 mr-1.5" />+1 an
                 </Button>
               </div>
             </div>
 
-            {/* Last payment date */}
+            {/* Last payment */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Date dernier paiement</Label>
               <Input
@@ -671,7 +691,7 @@ export default function AdminSubscriptionsPage() {
               />
             </div>
 
-            {/* Payment reference */}
+            {/* Payment ref */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Référence paiement</Label>
               <Input
@@ -682,7 +702,7 @@ export default function AdminSubscriptionsPage() {
               />
             </div>
 
-            {/* Trial end date */}
+            {/* Trial end */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Fin d&apos;essai</Label>
               <Input
@@ -703,26 +723,17 @@ export default function AdminSubscriptionsPage() {
               />
             </div>
 
-            {/* Dialog actions */}
+            {/* Actions */}
             <div className="flex justify-end gap-3 pt-2 border-t dark:border-gray-700">
               <Button variant="outline" onClick={closeEditDialog} disabled={isSaving}>
+                <XCircle className="w-4 h-4 mr-2" />
                 Annuler
               </Button>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-sky-600 hover:bg-sky-700 text-white"
-              >
+              <Button onClick={handleSave} disabled={isSaving} className="bg-sky-600 hover:bg-sky-700 text-white">
                 {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Enregistrement...
-                  </>
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Enregistrement...</>
                 ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Enregistrer
-                  </>
+                  <><CheckCircle className="w-4 h-4 mr-2" />{editingSub?.hasSubscription ? "Enregistrer" : "Créer l'abonnement"}</>
                 )}
               </Button>
             </div>
