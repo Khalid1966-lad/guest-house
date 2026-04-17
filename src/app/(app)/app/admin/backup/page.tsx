@@ -86,6 +86,7 @@ const tableLabels: Record<string, string> = {
   CleaningTaskItem: "Points contrôle",
   Notification: "Notifications",
   AuditLog: "Logs audit",
+  Subscription: "Abonnements",
 }
 
 function formatSize(ko: number): string {
