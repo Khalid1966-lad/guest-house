@@ -5,6 +5,9 @@ import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
 import { APP_VERSION } from "@/lib/version"
 
+// Force dynamic rendering (no caching)
+export const dynamic = "force-dynamic"
+
 // ============================================
 // Super Admin guard
 // ============================================
@@ -162,7 +165,9 @@ export async function GET() {
       guestHouseList: JSON.parse(b.guestHouseList || "[]"),
     }))
 
-    return NextResponse.json({ backups: parsedBackups })
+    return NextResponse.json({ backups: parsedBackups }, {
+      headers: { "Cache-Control": "no-store, must-revalidate" },
+    })
   } catch (error) {
     console.error("Erreur récupération backups:", error)
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
