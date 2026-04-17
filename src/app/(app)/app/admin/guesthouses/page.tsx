@@ -23,6 +23,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Building2,
   Users,
   Lock,
@@ -46,6 +51,7 @@ import {
   Clock,
   KeyRound,
   CheckCircle,
+  Info,
 } from "lucide-react"
 
 // Types
@@ -163,6 +169,16 @@ export default function AdminGuestHousesPage() {
   const [passwordError, setPasswordError] = useState("")
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [isResettingPassword, setIsResettingPassword] = useState(false)
+
+  // Pending user actions state
+  const [deletePendingDialog, setDeletePendingDialog] = useState<PendingUser | null>(null)
+  const [pendingPasswordDialog, setPendingPasswordDialog] = useState<PendingUser | null>(null)
+  const [isDeletingPending, setIsDeletingPending] = useState(false)
+  const [pendingPwdError, setPendingPwdError] = useState("")
+  const [pendingPwdSuccess, setPendingPwdSuccess] = useState(false)
+  const [isResettingPendingPwd, setIsResettingPendingPwd] = useState(false)
+  const [pendingNewPwd, setPendingNewPwd] = useState("")
+  const [pendingConfirmPwd, setPendingConfirmPwd] = useState("")
 
   // Vérifier que l'utilisateur est super_admin
   useEffect(() => {
@@ -303,6 +319,73 @@ export default function AdminGuestHousesPage() {
     }
   }
 
+  // ─── Pending user actions ───────────────────────────────────────────────
+
+  const handleDeletePendingUser = async () => {
+    if (!deletePendingDialog) return
+    setIsDeletingPending(true)
+    try {
+      const res = await fetch(`/api/admin/guesthouses?userId=${deletePendingDialog.id}`, {
+        method: "DELETE",
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setDeletePendingDialog(null)
+        await fetchData()
+      } else {
+        console.error("Erreur suppression:", data.error)
+      }
+    } catch (err) {
+      console.error("Erreur suppression:", err)
+    } finally {
+      setIsDeletingPending(false)
+    }
+  }
+
+  const handleOpenPendingPassword = (pu: PendingUser) => {
+    setPendingPasswordDialog(pu)
+    setPendingNewPwd("")
+    setPendingConfirmPwd("")
+    setPendingPwdError("")
+    setPendingPwdSuccess(false)
+  }
+
+  const handleResetPendingPassword = async () => {
+    setPendingPwdError("")
+    setPendingPwdSuccess(false)
+    if (!pendingPasswordDialog) return
+    if (!pendingNewPwd || pendingNewPwd.length < 6) {
+      setPendingPwdError("Le mot de passe doit contenir au moins 6 caractères")
+      return
+    }
+    if (pendingNewPwd !== pendingConfirmPwd) {
+      setPendingPwdError("Les mots de passe ne correspondent pas")
+      return
+    }
+    setIsResettingPendingPwd(true)
+    try {
+      const res = await fetch("/api/admin/guesthouses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: pendingPasswordDialog.id,
+          newPassword: pendingNewPwd,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPendingPwdSuccess(true)
+        setTimeout(() => setPendingPasswordDialog(null), 2000)
+      } else {
+        setPendingPwdError(data.error || "Erreur lors de la réinitialisation")
+      }
+    } catch {
+      setPendingPwdError("Erreur réseau. Veuillez réessayer.")
+    } finally {
+      setIsResettingPendingPwd(false)
+    }
+  }
+
   if (sessionStatus === "loading" || isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -373,15 +456,17 @@ export default function AdminGuestHousesPage() {
                 {pendingUsers.length}
               </Badge>
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Utilisateurs inscrits qui n&apos;ont pas encore créé leur maison d&apos;hôtes
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5" />
+              Ces utilisateurs peuvent terminer leur inscription en se connectant sur la page de connexion.
+              Ils seront automatiquement redirigés vers la création de leur maison d&apos;hôtes.
             </p>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2 max-h-96 overflow-y-auto">
               {pendingUsers.map((pu) => (
                 <div key={pu.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-lg border">
-                  <div className="w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center text-sm font-medium shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center text-sm font-medium shrink-0">
                     {(pu.firstName?.[0] || pu.name?.[0] || "U").toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -390,7 +475,7 @@ export default function AdminGuestHousesPage() {
                     </p>
                     <p className="text-xs text-muted-foreground truncate">{pu.email}</p>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 hidden sm:block">
                     <p className="text-xs text-muted-foreground">
                       {new Date(pu.createdAt).toLocaleDateString("fr-FR")}
                     </p>
@@ -399,6 +484,36 @@ export default function AdminGuestHousesPage() {
                     ) : (
                       <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0" variant="outline">Inactif</Badge>
                     )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 text-sky-600 hover:bg-sky-50 hover:text-sky-700"
+                          onClick={() => handleOpenPendingPassword(pu)}
+                          title="Réinitialiser le mot de passe"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Réinitialiser le mot de passe</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setDeletePendingDialog(pu)}
+                          title="Supprimer l'inscription"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Supprimer l&apos;inscription</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               ))}
@@ -708,6 +823,101 @@ export default function AdminGuestHousesPage() {
               {isUpdating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Supprimer définitivement
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de suppression utilisateur en attente */}
+      <Dialog open={!!deletePendingDialog} onOpenChange={() => setDeletePendingDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Supprimer l&apos;inscription en attente
+            </DialogTitle>
+            <DialogDescription>
+              Supprimer définitivement le compte de{" "}
+              <strong>{deletePendingDialog?.firstName} {deletePendingDialog?.lastName}</strong>{" "}
+              ({deletePendingDialog?.email}) ?<br />
+              Cet utilisateur n&apos;a pas encore créé de maison d&apos;hôtes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setDeletePendingDialog(null)}>
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isDeletingPending}
+              onClick={handleDeletePendingUser}
+            >
+              {isDeletingPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Supprimer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de réinitialisation mot de passe utilisateur en attente */}
+      <Dialog open={!!pendingPasswordDialog} onOpenChange={(open) => { if (!open) setPendingPasswordDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-sky-600" />
+              Réinitialiser le mot de passe
+            </DialogTitle>
+            <DialogDescription>
+              Définir un nouveau mot de passe pour{" "}
+              <strong>{pendingPasswordDialog?.firstName} {pendingPasswordDialog?.lastName}</strong>
+              {" "}({pendingPasswordDialog?.email}).<br />
+              L&apos;utilisateur devra se connecter avec ce nouveau mot de passe pour terminer son inscription.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nouveau mot de passe</label>
+              <Input
+                type="password"
+                placeholder="Minimum 6 caractères"
+                value={pendingNewPwd}
+                onChange={(e) => setPendingNewPwd(e.target.value)}
+                disabled={isResettingPendingPwd || pendingPwdSuccess}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confirmer le mot de passe</label>
+              <Input
+                type="password"
+                placeholder="Confirmer le mot de passe"
+                value={pendingConfirmPwd}
+                onChange={(e) => setPendingConfirmPwd(e.target.value)}
+                disabled={isResettingPendingPwd || pendingPwdSuccess}
+              />
+            </div>
+            {pendingPwdError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                {pendingPwdError}
+              </div>
+            )}
+            {pendingPwdSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Mot de passe réinitialisé avec succès !
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setPendingPasswordDialog(null)} disabled={isResettingPendingPwd}>
+                Annuler
+              </Button>
+              <Button
+                onClick={handleResetPendingPassword}
+                disabled={isResettingPendingPwd || pendingPwdSuccess || !pendingNewPwd || !pendingConfirmPwd}
+                className="bg-sky-600 hover:bg-sky-700"
+              >
+                {isResettingPendingPwd && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Réinitialiser
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

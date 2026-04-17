@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Prisma } from "@prisma/client"
+import bcrypt from "bcryptjs"
 
 async function requireSuperAdmin() {
   const session = await getServerSession(authOptions)
@@ -132,6 +133,108 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("Erreur récupération maisons d'hôtes admin:", error)
+    return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
+  }
+}
+
+// Supprimer un utilisateur inscrit en attente (sans maison d'hôtes)
+export async function DELETE(request: NextRequest) {
+  const admin = await requireSuperAdmin()
+  if (!admin) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
+  }
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get("userId")
+
+    if (!userId) {
+      return NextResponse.json({ error: "userId requis" }, { status: 400 })
+    }
+
+    // Vérifier que l'utilisateur existe et n'a PAS de maison d'hôtes
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, guestHouseId: true, name: true, email: true },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
+    }
+
+    if (user.guestHouseId) {
+      return NextResponse.json(
+        { error: "Impossible de supprimer un utilisateur lié à une maison d'hôtes. Supprimez d'abord la maison d'hôtes." },
+        { status: 400 }
+      )
+    }
+
+    if (user.role !== "owner") {
+      return NextResponse.json(
+        { error: "Seuls les comptes propriétaires en attente peuvent être supprimés" },
+        { status: 400 }
+      )
+    }
+
+    // Supprimer l'utilisateur
+    await db.user.delete({ where: { id: userId } })
+
+    return NextResponse.json({
+      success: true,
+      message: `Utilisateur ${user.email} supprimé avec succès`,
+    })
+  } catch (error) {
+    console.error("Erreur suppression utilisateur en attente:", error)
+    return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
+  }
+}
+
+// Réinitialiser le mot de passe d'un utilisateur en attente
+export async function PATCH(request: NextRequest) {
+  const admin = await requireSuperAdmin()
+  if (!admin) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
+  }
+
+  try {
+    const body = await request.json()
+    const { userId, newPassword } = body
+
+    if (!userId || !newPassword) {
+      return NextResponse.json({ error: "userId et newPassword requis" }, { status: 400 })
+    }
+
+    if (newPassword.length < 6) {
+      return NextResponse.json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, { status: 400 })
+    }
+
+    // Vérifier que l'utilisateur existe et n'a PAS de maison d'hôtes
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, guestHouseId: true, role: true },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 })
+    }
+
+    if (user.guestHouseId) {
+      return NextResponse.json(
+        { error: "Utilisez la gestion de la maison d'hôtes pour réinitialiser ce mot de passe" },
+        { status: 400 }
+      )
+    }
+
+    // Hasher et mettre à jour le mot de passe
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
+    await db.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    })
+
+    return NextResponse.json({ success: true, message: "Mot de passe réinitialisé avec succès" })
+  } catch (error) {
+    console.error("Erreur reset mot de passe utilisateur en attente:", error)
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
   }
 }
