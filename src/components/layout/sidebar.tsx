@@ -50,6 +50,7 @@ import {
   UserCog,
   Sparkles,
   Database,
+  BookOpen,
   Crown,
   type LucideIcon,
 } from "lucide-react"
@@ -350,6 +351,17 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
             >
               <Database className="h-5 w-5 flex-shrink-0 text-amber-500 sidebar-icon icon-slide" />
               {!collapsed && <span className="ml-3">Sauvegardes</span>}
+            </Link>
+            <Link
+              href="/app/admin/guide"
+              onClick={onNavigate}
+              className={cn(
+                "sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-teal-50 dark:text-gray-400 dark:hover:bg-teal-950/60",
+                pathname === "/app/admin/guide" && "bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 font-semibold shadow-sm"
+              )}
+            >
+              <BookOpen className="h-5 w-5 flex-shrink-0 text-teal-500 sidebar-icon icon-bounce" />
+              {!collapsed && <span className="ml-3">Guide Admin</span>}
             </Link>
           </>
         ) : (
