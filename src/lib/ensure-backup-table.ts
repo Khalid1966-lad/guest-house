@@ -30,7 +30,7 @@ export async function ensureBackupTable() {
         "tableSummary" TEXT NOT NULL DEFAULT '{}',
         "guestHouseList" TEXT NOT NULL DEFAULT '[]',
         "createdBy" TEXT NOT NULL,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `)
     console.log("[ensureBackupTable] Backup table verified/created.")
