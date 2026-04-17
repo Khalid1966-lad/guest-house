@@ -8,11 +8,16 @@ import zlib from "zlib"
 // Super Admin guard
 // ============================================
 async function requireSuperAdmin() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user || session.user.role !== "super_admin") {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || session.user.role !== "super_admin") {
+      return null
+    }
+    return session.user
+  } catch (error) {
+    console.error("Erreur session backup import:", error)
     return null
   }
-  return session.user
 }
 
 // ============================================

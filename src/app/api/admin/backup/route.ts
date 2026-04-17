@@ -9,11 +9,16 @@ import { APP_VERSION } from "@/lib/version"
 // Super Admin guard
 // ============================================
 async function requireSuperAdmin() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user || session.user.role !== "super_admin") {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || session.user.role !== "super_admin") {
+      return null
+    }
+    return session.user
+  } catch (error) {
+    console.error("Erreur session backup:", error)
     return null
   }
-  return session.user
 }
 
 // ============================================
@@ -246,7 +251,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Erreur création backup:", error)
-    return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Erreur interne du serveur"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
