@@ -57,6 +57,7 @@ model GuestHouse {
   roles          Role[]
   notifications  Notification[]
   cleaningTasks  CleaningTask[]
+  subscription   Subscription?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -716,6 +717,33 @@ model AuditLog {
   userAgent     String?
   
   createdAt DateTime @default(now())
+}
+
+// ============================================
+// ABONNEMENTS
+// ============================================
+model Subscription {
+  id              String   @id @default(cuid())
+  guestHouseId    String   @unique
+  guestHouse      GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+
+  plan            String   @default("free")       // free, premium
+  status          String   @default("trial")       // trial, active, expired, grace_period, cancelled
+
+  startedAt       DateTime @default(now())          // Début de l'abonnement actuel
+  expiresAt       DateTime?                        // Date d'expiration
+  lastPaymentAt   DateTime?                        // Date du dernier paiement
+  lastPaymentRef  String?                          // Référence du paiement (facture)
+  trialEndsAt     DateTime?                        // Fin de la période d'essai
+
+  gracePeriodDays Int      @default(7)             // Jours de grâce après expiration
+
+  notes           String?                          // Notes du super admin
+  changedBy       String?                          // ID du super admin dernier modificateur
+  changedAt       DateTime?                        // Date de dernière modification
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // ============================================

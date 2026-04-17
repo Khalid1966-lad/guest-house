@@ -135,6 +135,19 @@ export async function POST(request: NextRequest) {
         })),
       })
 
+      // 5. Créer l'abonnement d'essai (14 jours premium)
+      const trialEnd = new Date()
+      trialEnd.setDate(trialEnd.getDate() + 14)
+      await tx.subscription.create({
+        data: {
+          guestHouseId: newGuestHouse.id,
+          plan: "premium",
+          status: "trial",
+          trialEndsAt: trialEnd,
+          startedAt: new Date(),
+        },
+      })
+
       return newGuestHouse
     })
 

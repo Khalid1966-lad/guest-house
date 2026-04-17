@@ -682,3 +682,29 @@ Stage Summary:
 - Auto retention: max 5 auto backups, unlimited manual
 - Individual guesthouse restore filters all related tables (GuestHouse, Users, Roles, Rooms, RoomPrices, Amenities, Guests, Bookings, Invoices, InvoiceItems, Payments, MenuItems, Orders, OrderItems, Expenses, Tasks, TaskItems, Notifications, AuditLogs)
 - Admin page accessible from "Sauvegardes" button in admin panel header
+
+---
+Task ID: 7
+Agent: Main
+Task: Système d'abonnement complet (Subscription)
+
+Work Log:
+- Ajout du modèle Subscription aux 3 schemas Prisma (schema.prisma, schema.sqlite.prisma, schema.postgresql.prisma)
+- db push sur SQLite local
+- Ajout de Subscription dans backup-models.ts DEPENDENCIES
+- Création de src/lib/subscription.ts (computeEffectiveStatus, buildSubscriptionInfo, plan/status labels/colors)
+- Création de GET/POST /api/admin/subscriptions (liste avec stats, création avec sync GuestHouse)
+- Création de GET/PATCH /api/admin/subscriptions/[id] (détail, modification dynamique avec historique)
+- Création de GET /api/subscription (endpoint propriétaire)
+- Création de la page admin /app/admin/subscriptions/page.tsx (stats, filtres, tableau, dialog modification, prolongation rapide)
+- Création de src/components/subscription/subscription-banner.tsx (bandeau contextuel dans layout)
+- Mise à jour du AppFooter avec infos abonnement (plan, inscription, dernier paiement, expiration)
+- Ajout du lien "Abonnements" (Crown icon) et "Sauvegardes" (Database icon) dans le sidebar super admin
+- Auto-trial 14 jours premium lors de la création d'une guesthouse (onboarding)
+- SubscriptionBanner intégré dans src/app/(app)/app/layout.tsx
+
+Stage Summary:
+- Modèle Subscription: id, guestHouseId, plan (free/premium), status (trial/active/expired/grace_period/cancelled), expiresAt, lastPaymentAt, lastPaymentRef, trialEndsAt, gracePeriodDays, notes, changedBy, changedAt
+- Les abonnements sont automatiquement sauvegardés/restaurés avec le système de backup
+- Le super admin a un panel complet pour gérer les abonnements avec prolongation rapide (+30j, +90j, +1an)
+- Les propriétaires voient leur date d'expiration dans le footer et un bandeau d'alerte en cas de problème

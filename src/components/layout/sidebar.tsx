@@ -49,6 +49,8 @@ import {
   Lock,
   UserCog,
   Sparkles,
+  Database,
+  Crown,
   type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -315,14 +317,41 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto overflow-x-hidden">
         {isSuperAdmin ? (
-          <Link
-            href="/app/admin/guesthouses"
-            onClick={onNavigate}
-            className="sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:bg-sky-950/60"
-          >
-            <Building2 className="h-5 w-5 flex-shrink-0 text-sky-500 sidebar-icon icon-glow" />
-            {!collapsed && <span className="ml-3">Maisons d&apos;hôtes</span>}
-          </Link>
+          <>
+            <Link
+              href="/app/admin/guesthouses"
+              onClick={onNavigate}
+              className={cn(
+                "sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:bg-sky-950/60",
+                pathname === "/app/admin/guesthouses" && "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 font-semibold shadow-sm"
+              )}
+            >
+              <Building2 className="h-5 w-5 flex-shrink-0 text-sky-500 sidebar-icon icon-glow" />
+              {!collapsed && <span className="ml-3">Maisons d&apos;hôtes</span>}
+            </Link>
+            <Link
+              href="/app/admin/subscriptions"
+              onClick={onNavigate}
+              className={cn(
+                "sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-violet-50 dark:text-gray-400 dark:hover:bg-violet-950/60",
+                pathname === "/app/admin/subscriptions" && "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 font-semibold shadow-sm"
+              )}
+            >
+              <Crown className="h-5 w-5 flex-shrink-0 text-violet-500 sidebar-icon icon-pop" />
+              {!collapsed && <span className="ml-3">Abonnements</span>}
+            </Link>
+            <Link
+              href="/app/admin/backup"
+              onClick={onNavigate}
+              className={cn(
+                "sidebar-nav-item flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors text-gray-600 hover:bg-amber-50 dark:text-gray-400 dark:hover:bg-amber-950/60",
+                pathname === "/app/admin/backup" && "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-semibold shadow-sm"
+              )}
+            >
+              <Database className="h-5 w-5 flex-shrink-0 text-amber-500 sidebar-icon icon-slide" />
+              {!collapsed && <span className="ml-3">Sauvegardes</span>}
+            </Link>
+          </>
         ) : (
           filteredNavigation.map((item) => {
             const permitted = hasPermission(item)

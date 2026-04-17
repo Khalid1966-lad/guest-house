@@ -1,19 +1,21 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { Hotel, Mail, Phone, MapPin, Globe } from "lucide-react"
+import { Hotel, Mail, Phone, MapPin, Globe, Crown } from "lucide-react"
 import { APP_VERSION, COPYRIGHT_YEAR } from "@/lib/version"
+import { PLAN_LABELS, STATUS_LABELS } from "@/lib/subscription"
 
 // ============================================
 // FOOTER LANDING PAGE (public)
-// Footer complet pour la page d'accueil
 // ============================================
 export function LandingFooter() {
   return (
     <footer className="bg-gray-900 text-gray-400">
-      {/* Section principale */}
       <div className="py-12 px-4">
         <div className="container mx-auto">
           <div className="grid md:grid-cols-4 gap-10">
-            {/* Colonne 1 - Logo et description */}
             <div className="md:col-span-1">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center">
@@ -30,7 +32,6 @@ export function LandingFooter() {
               </div>
             </div>
 
-            {/* Colonne 2 - Produit */}
             <div>
               <h4 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Produit</h4>
               <ul className="space-y-3 text-sm">
@@ -50,7 +51,6 @@ export function LandingFooter() {
               </ul>
             </div>
 
-            {/* Colonne 3 - Contact */}
             <div id="contact">
               <h4 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Contact</h4>
               <ul className="space-y-3 text-sm">
@@ -83,7 +83,6 @@ export function LandingFooter() {
               </ul>
             </div>
 
-            {/* Colonne 4 - Légal */}
             <div>
               <h4 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Légal</h4>
               <ul className="space-y-3 text-sm">
@@ -102,7 +101,6 @@ export function LandingFooter() {
         </div>
       </div>
 
-      {/* Barre du bas */}
       <div className="border-t border-gray-800">
         <div className="container mx-auto px-4 py-5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-sm">
@@ -126,7 +124,6 @@ export function LandingFooter() {
 
 // ============================================
 // FOOTER AUTH (login, register)
-// Footer compact pour les pages d'authentification
 // ============================================
 export function AuthFooter() {
   return (
@@ -150,17 +147,87 @@ export function AuthFooter() {
 
 // ============================================
 // FOOTER APP DASHBOARD (authenticated)
-// Footer minimal pour l'espace application
+// Shows subscription expiration for owners
 // ============================================
 export function AppFooter() {
+  const { data: session } = useSession()
+  const [subInfo, setSubInfo] = useState<{
+    plan: string
+    effectiveStatus: string
+    expiresAt: string | null
+    label: string
+    color: string
+    inscriptionDate: string | null
+    lastPaymentAt: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    if (session?.user?.role === "super_admin" || !session?.user?.guestHouseId) return
+
+    fetch("/api/subscription")
+      .then(res => res.json())
+      .then(data => {
+        if (data.subscription) {
+          setSubInfo(data.subscription)
+        }
+      })
+      .catch(() => {})
+  }, [session])
+
+  const isSuperAdmin = session?.user?.role === "super_admin"
+
+  // Subscription status colors
+  const statusColors: Record<string, string> = {
+    green: "text-emerald-600 dark:text-emerald-400",
+    yellow: "text-amber-600 dark:text-amber-400",
+    orange: "text-orange-600 dark:text-orange-400",
+    red: "text-red-600 dark:text-red-400",
+    gray: "text-gray-500 dark:text-gray-400",
+  }
+
   return (
     <footer className="py-3 px-4 lg:px-6 border-t bg-white dark:bg-gray-900 dark:border-gray-800">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-gray-400">
-        <span className="font-mono">{APP_VERSION}</span>
-        <span className="hidden sm:inline">&bull;</span>
-        <span>PMS Guest House &mdash; Développé par <a href="https://jazelwebagency.com" target="_blank" rel="noopener noreferrer" className="text-sky-500 hover:text-sky-400 transition-colors">Jazel Web Agency</a></span>
-        <span className="hidden sm:inline">&bull;</span>
-        <span>&copy; {COPYRIGHT_YEAR}</span>
+      <div className="flex flex-col gap-1">
+        {/* Subscription info bar — only for regular users with subscription */}
+        {!isSuperAdmin && subInfo && (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1 pb-1 border-b dark:border-gray-800">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <Crown className="w-3 h-3" />
+                {PLAN_LABELS[subInfo.plan] || subInfo.plan}
+              </span>
+              {subInfo.inscriptionDate && (
+                <span>
+                  Inscrit le {new Date(subInfo.inscriptionDate).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+              {subInfo.lastPaymentAt && (
+                <span>
+                  Dernier paiement: {new Date(subInfo.lastPaymentAt).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {subInfo.expiresAt && (
+                <span className={statusColors[subInfo.color] || statusColors.gray}>
+                  Expire le {new Date(subInfo.expiresAt).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+              <span className={statusColors[subInfo.color] || statusColors.gray}>
+                {subInfo.label}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Main footer bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-gray-400">
+          <span className="font-mono">{APP_VERSION}</span>
+          <span className="hidden sm:inline">&bull;</span>
+          <span>PMS Guest House &mdash; Développé par <a href="https://jazelwebagency.com" target="_blank" rel="noopener noreferrer" className="text-sky-500 hover:text-sky-400 transition-colors">Jazel Web Agency</a></span>
+          <span className="hidden sm:inline">&bull;</span>
+          <span>&copy; {COPYRIGHT_YEAR}</span>
+        </div>
       </div>
     </footer>
   )

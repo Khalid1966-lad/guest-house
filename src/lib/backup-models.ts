@@ -76,6 +76,7 @@ export const DEPENDENCIES: Record<string, Set<string>> = {
   CleaningTaskItem: new Set(["CleaningTask"]),
   Notification: new Set(["GuestHouse", "User"]),
   AuditLog: new Set(["GuestHouse", "User"]),
+  Subscription: new Set(["GuestHouse"]),
 }
 
 /**

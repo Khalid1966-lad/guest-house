@@ -2,6 +2,7 @@
 
 import { Sidebar, Header } from "@/components/layout/sidebar"
 import { AppFooter } from "@/components/layout/footer"
+import { SubscriptionBanner } from "@/components/subscription/subscription-banner"
 import { SessionProvider } from "next-auth/react"
 import { ThemeProvider } from "next-themes"
 import { useSidebarStore } from "@/stores/sidebar-store"
@@ -18,6 +19,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
         collapsed ? "lg:pl-[68px]" : "lg:pl-64"
       )}>
         <Header />
+        <SubscriptionBanner />
         <main className="p-4 lg:p-6 flex-1">
           {children}
         </main>
