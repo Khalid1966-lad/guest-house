@@ -955,12 +955,17 @@ export default function HousekeepingPage() {
                   )}
 
                   {/* Assigned person */}
-                  {taskInfo?.assignedTo && (
+                  {taskInfo?.assignedTo ? (
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <User className="w-3.5 h-3.5" />
                       <span className="truncate">{taskInfo.assignedTo.name}</span>
                     </div>
-                  )}
+                  ) : taskInfo && isFullAccess ? (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                      <CircleAlert className="w-3.5 h-3.5" />
+                      <span>Non assigné</span>
+                    </div>
+                  ) : null}
 
                   {/* Progress bar */}
                   {taskInfo && (

@@ -431,6 +431,15 @@ export default function BookingsPage() {
       })
 
       if (response.ok) {
+        const data = await response.json()
+
+        // Show housekeeping warning if any (e.g., no agent available)
+        if (data.housekeepingWarning) {
+          setTimeout(() => {
+            alert(data.housekeepingWarning)
+          }, 500)
+        }
+
         setIsDetailOpen(false)
         fetchData()
       }

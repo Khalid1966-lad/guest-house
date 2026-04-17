@@ -221,6 +221,9 @@ export async function PATCH(
       cancelledBy?: string
     } = {}
 
+    // Variable to hold housekeeping warning for the response
+    let housekeepingWarning: string | null = null
+
     if (status) {
       updateData.status = status
 
@@ -273,10 +276,15 @@ export async function PATCH(
           console.warn("[checkout] Could not set cleaningStatus (migration may be missing):", (cleaningErr as Error).message)
         }
 
-        // Auto-assign housekeeping task (fire-and-forget, non-blocking)
-        autoAssignCleaning(existingBooking.roomId, session.user.guestHouseId).catch((err) => {
+        // Auto-assign housekeeping task (await to capture warnings for the response)
+        try {
+          const assignResult = await autoAssignCleaning(existingBooking.roomId, session.user.guestHouseId)
+          if (assignResult.unassigned && assignResult.warning) {
+            housekeepingWarning = assignResult.warning
+          }
+        } catch (err) {
           console.warn("[checkout] Auto-assign housekeeping failed:", err)
-        })
+        }
       }
 
       if (status === "cancelled") {
@@ -311,7 +319,7 @@ export async function PATCH(
       notifyBookingCancelled({ ...notifParams, guestName, roomNumber, reason: body.reason }).catch(console.error)
     }
 
-    return NextResponse.json({ booking })
+    return NextResponse.json({ booking, housekeepingWarning })
   } catch (error) {
     console.error("Erreur mise à jour réservation:", error)
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })

@@ -896,3 +896,35 @@ Files modified:
 - src/lib/db.ts
 - src/lib/backup-models.ts
 - src/app/(app)/app/housekeeping/page.tsx
+
+---
+Task ID: housekeeping-unassigned
+Agent: Main
+Task: Handle unassigned housekeeping tasks when no agent is available
+
+Work Log:
+- Modified `src/lib/housekeeping-assign.ts`:
+  - Added `AutoAssignResult` type with `unassigned` and `warning` fields
+  - When no agent is found, task is still created but WITHOUT assignedToId
+  - Added diagnostic logic to determine WHY no agent is available (4 specific reasons):
+    1. No housekeeping staff registered in the establishment
+    2. No schedules configured for agents
+    3. No agents scheduled for today
+    4. No agents on duty at this hour
+  - Room stays in "departure" status (not auto-started) when unassigned
+  - Console.warn logs the reason for server-side visibility
+- Modified `src/app/api/bookings/[id]/route.ts`:
+  - Changed auto-assign from fire-and-forget to `await` to capture result
+  - Added `housekeepingWarning` field in PATCH response when task is unassigned
+- Modified `src/app/(app)/app/bookings/page.tsx`:
+  - Updated `handleUpdateStatus` to parse response and show `housekeepingWarning` via alert
+- Modified `src/app/(app)/app/housekeeping/page.tsx`:
+  - Added amber "Non assigné" badge with CircleAlert icon on room cards when task exists but no agent assigned
+  - Badge visible only to full-access roles (owner/admin/manager/gouvernante)
+
+Stage Summary:
+- When no housekeeping agent is available at checkout, a task is still created (unassigned) instead of being silently dropped
+- Room stays in "departure" status, alerting the manager to manually assign
+- Checkout response includes a warning message explaining the reason
+- Housekeeping page now shows amber "Non assigné" indicator on unassigned task cards
+- 4 diagnostic messages cover all edge cases (no staff, no schedules, not today, not now)

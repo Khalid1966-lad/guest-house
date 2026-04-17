@@ -181,12 +181,16 @@ async function findBestAgent(
 
 // ── Public API: called from checkout route ────────────────────────
 
-export async function autoAssignCleaning(roomId: string, guestHouseId: string): Promise<{
+export type AutoAssignResult = {
   success: boolean
   taskId?: string
   assignedTo?: string | null
+  unassigned?: boolean
+  warning?: string
   message?: string
-}> {
+}
+
+export async function autoAssignCleaning(roomId: string, guestHouseId: string): Promise<AutoAssignResult> {
   try {
     // 1. Check if auto-assign is enabled
     const settings = await db.guestHouseSetting.findUnique({
@@ -234,19 +238,54 @@ export async function autoAssignCleaning(roomId: string, guestHouseId: string): 
       (settings.autoAssignMode as "zone" | "round_robin") || "zone"
     )
 
+    // 5. Determine the reason if no agent found
+    let unassignedReason = ""
     if (!agent) {
-      return { success: false, message: "Aucun agent de ménage disponible" }
+      // Diagnose why no agent is available
+      const staffCount = await db.user.count({
+        where: { guestHouseId, role: { in: HOUSEKEEPING_ROLES }, isActive: true },
+      })
+
+      if (staffCount === 0) {
+        unassignedReason = "Aucun agent de ménage enregistré dans l'établissement"
+      } else {
+        const todaySchedules = await db.staffSchedule.findMany({
+          where: {
+            user: { guestHouseId, role: { in: HOUSEKEEPING_ROLES }, isActive: true },
+            dayOfWeek: new Date().getDay(),
+          },
+        })
+
+        if (todaySchedules.length === 0) {
+          unassignedReason = "Aucun emploi du temps configuré pour les agents"
+        } else {
+          const now = new Date()
+          const currentTime = getCurrentTimeStr()
+          const onDutyToday = todaySchedules.filter((s) => s.isAvailable).length
+          const onDutyNow = todaySchedules.filter(
+            (s) => s.isAvailable && timeLeq(s.startTime, currentTime) && timeLeq(currentTime, s.endTime)
+          ).length
+
+          if (onDutyToday === 0) {
+            unassignedReason = "Aucun agent de ménage prévu aujourd'hui"
+          } else if (onDutyNow === 0) {
+            unassignedReason = "Aucun agent de ménage en service à cette heure"
+          } else {
+            unassignedReason = "Aucun agent de ménage disponible"
+          }
+        }
+      }
     }
 
-    // 5. Create the CleaningTask with checklist
+    // 6. Create the CleaningTask with checklist (assigned or unassigned)
     const task = await db.cleaningTask.create({
       data: {
         guestHouseId,
         roomId,
-        assignedToId: agent.id,
+        assignedToId: agent?.id ?? null,
         priority: settings.defaultCleaningPriority || "normal",
-        status: settings.autoStartCleaning ? "in_progress" : "pending",
-        startedAt: settings.autoStartCleaning ? new Date() : null,
+        status: agent && settings.autoStartCleaning ? "in_progress" : "pending",
+        startedAt: agent && settings.autoStartCleaning ? new Date() : null,
         items: {
           create: CLEANING_CHECKLIST.map((item, index) => ({
             label: item.label,
@@ -261,8 +300,9 @@ export async function autoAssignCleaning(roomId: string, guestHouseId: string): 
       },
     })
 
-    // 6. Update room cleaning status
-    const newStatus = settings.autoStartCleaning ? "cleaning" : "departure"
+    // 7. Update room cleaning status
+    // If unassigned, always keep as "departure" so the manager notices
+    const newStatus = agent && settings.autoStartCleaning ? "cleaning" : "departure"
     await db.room.update({
       where: { id: roomId },
       data: {
@@ -271,15 +311,29 @@ export async function autoAssignCleaning(roomId: string, guestHouseId: string): 
       },
     })
 
-    console.log(
-      `[housekeeping-auto] Task ${task.id} created for room ${room.number}, ` +
-      `assigned to ${agent.name || agent.id}, status: ${task.status}`
-    )
-
-    return {
-      success: true,
-      taskId: task.id,
-      assignedTo: agent.name,
+    if (agent) {
+      console.log(
+        `[housekeeping-auto] Task ${task.id} created for room ${room.number}, ` +
+        `assigned to ${agent.name || agent.id}, status: ${task.status}`
+      )
+      return {
+        success: true,
+        taskId: task.id,
+        assignedTo: agent.name,
+      }
+    } else {
+      console.warn(
+        `[housekeeping-auto] Task ${task.id} created for room ${room.number} — UNASSIGNED. ` +
+        `Reason: ${unassignedReason}`
+      )
+      return {
+        success: true,
+        taskId: task.id,
+        assignedTo: null,
+        unassigned: true,
+        warning: `⚠️ Chambre ${room.number} : ${unassignedReason}. Tâche créée sans assignation.`,
+        message: unassignedReason,
+      }
     }
   } catch (error) {
     console.error("[housekeeping-auto] Error:", error)
