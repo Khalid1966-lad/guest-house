@@ -227,7 +227,8 @@ export default function AdminBackupPage() {
         params.append("guestHouseId", selectedGuestHouseId)
       }
 
-      const res = await fetch(`/api/admin/backup/${restoreDialogId}/restore?${params.toString()}`, {
+      params.append("id", restoreDialogId)
+      const res = await fetch(`/api/admin/backup/restore?${params.toString()}`, {
         method: "POST",
       })
       const data = await res.json()
@@ -253,7 +254,7 @@ export default function AdminBackupPage() {
 
   const handleDownload = async (backup: BackupItem) => {
     try {
-      const res = await fetch(`/api/admin/backup/${backup.id}/download`)
+      const res = await fetch(`/api/admin/backup/download?id=${backup.id}`)
       if (!res.ok) {
         const data = await res.json().catch(() => null)
         alert(data?.error || `Erreur ${res.status}: Impossible de télécharger`)

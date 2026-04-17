@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
 
+// Force dynamic rendering (no caching)
+export const dynamic = "force-dynamic"
+
 // ============================================
 // Super Admin guard
 // ============================================
@@ -15,7 +18,7 @@ async function requireSuperAdmin() {
     }
     return session.user
   } catch (error) {
-    console.error("Erreur session backup restore:", error)
+    console.error("[backup/restore] Session error:", error)
     return null
   }
 }
@@ -46,9 +49,6 @@ const TABLES_INSERT_ORDER = [
   "AuditLog",
 ]
 
-// ============================================
-// Table delete order (reverse dependencies)
-// ============================================
 const TABLES_DELETE_ORDER = [
   "Notification",
   "AuditLog",
@@ -75,11 +75,7 @@ const TABLES_DELETE_ORDER = [
 // ============================================
 // Parse backup data from compressed base64
 // ============================================
-function parseBackupData(compressedBase64: string): {
-  tables: Record<string, unknown[]>
-  version: string
-  exportedAt: string
-} {
+function parseBackupData(compressedBase64: string) {
   const compressedBuffer = Buffer.from(compressedBase64, "base64")
   const jsonString = zlib.gunzipSync(compressedBuffer).toString("utf-8")
   const payload = JSON.parse(jsonString)
@@ -133,8 +129,6 @@ async function clearAllTables() {
 // Insert all data (full restore)
 // ============================================
 async function insertAllTables(tables: Record<string, unknown[]>) {
-  // Note: skipDuplicates removed — not supported by SQLite's createMany.
-  // Since we clear tables before inserting, duplicates aren't possible.
   const insertOps: Record<string, (rows: unknown[]) => Promise<unknown>> = {
     GuestHouse: (rows) => db.guestHouse.createMany({ data: rows as any[] }),
     GuestHouseSetting: (rows) => db.guestHouseSetting.createMany({ data: rows as any[] }),
@@ -170,13 +164,11 @@ async function insertAllTables(tables: Record<string, unknown[]>) {
     }
 
     try {
-      // SQLite has a limit on createMany — insert in batches of 100
       const BATCH_SIZE = 100
       let inserted = 0
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = rows.slice(i, i + BATCH_SIZE)
         const result = await op(batch)
-        // createMany returns { count } in SQLite
         if (result && typeof result === "object" && "count" in result) {
           inserted += (result as { count: number }).count
         } else {
@@ -203,148 +195,54 @@ function filterByGuestHouse(
 ): Record<string, unknown[]> {
   const filtered: Record<string, unknown[]> = {}
 
-  // Collect parent IDs from filtered parent tables
-  const guestHouseIds = new Set<string>([guestHouseId])
-  const userIds = new Set<string>()
   const roomIds = new Set<string>()
   const guestIds = new Set<string>()
-  const bookingIds = new Set<string>()
   const invoiceIds = new Set<string>()
-  const menuItemIds = new Set<string>()
   const orderIds = new Set<string>()
   const taskIds = new Set<string>()
+  const menuItemIds = new Set<string>()
 
-  // Filter GuestHouse
-  filtered.GuestHouse = (tables.GuestHouse || []).filter(
-    (r: any) => r.id === guestHouseId
-  )
-
-  // Filter GuestHouseSetting
-  filtered.GuestHouseSetting = (tables.GuestHouseSetting || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
-
-  // Filter Users
+  filtered.GuestHouse = (tables.GuestHouse || []).filter((r: any) => r.id === guestHouseId)
+  filtered.GuestHouseSetting = (tables.GuestHouseSetting || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.User = (tables.User || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      userIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) return true
     return false
   })
-
-  // Filter Roles
-  filtered.Role = (tables.Role || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
-
-  // Filter Rooms
+  filtered.Role = (tables.Role || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.Room = (tables.Room || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      roomIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) { roomIds.add(r.id); return true }
     return false
   })
-
-  // Filter RoomPrices
-  filtered.RoomPrice = (tables.RoomPrice || []).filter(
-    (r: any) => roomIds.has(r.roomId)
-  )
-
-  // Filter Amenities
-  filtered.Amenity = (tables.Amenity || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
-
-  // Filter Guests
+  filtered.RoomPrice = (tables.RoomPrice || []).filter((r: any) => roomIds.has(r.roomId))
+  filtered.Amenity = (tables.Amenity || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.Guest = (tables.Guest || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      guestIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) { guestIds.add(r.id); return true }
     return false
   })
-
-  // Filter Bookings
-  filtered.Booking = (tables.Booking || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      bookingIds.add(r.id)
-      return true
-    }
-    return false
-  })
-
-  // Filter Invoices
+  filtered.Booking = (tables.Booking || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.Invoice = (tables.Invoice || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      invoiceIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) { invoiceIds.add(r.id); return true }
     return false
   })
-
-  // Filter InvoiceItems
-  filtered.InvoiceItem = (tables.InvoiceItem || []).filter(
-    (r: any) => invoiceIds.has(r.invoiceId)
-  )
-
-  // Filter Payments
-  filtered.Payment = (tables.Payment || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
-
-  // Filter MenuItems
+  filtered.InvoiceItem = (tables.InvoiceItem || []).filter((r: any) => invoiceIds.has(r.invoiceId))
+  filtered.Payment = (tables.Payment || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.MenuItem = (tables.MenuItem || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      menuItemIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) { menuItemIds.add(r.id); return true }
     return false
   })
-
-  // Filter RestaurantOrders
   filtered.RestaurantOrder = (tables.RestaurantOrder || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      orderIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) { orderIds.add(r.id); return true }
     return false
   })
-
-  // Filter OrderItems
-  filtered.OrderItem = (tables.OrderItem || []).filter(
-    (r: any) => orderIds.has(r.orderId)
-  )
-
-  // Filter Expenses
-  filtered.Expense = (tables.Expense || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
-
-  // Filter CleaningTasks
+  filtered.OrderItem = (tables.OrderItem || []).filter((r: any) => orderIds.has(r.orderId))
+  filtered.Expense = (tables.Expense || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.CleaningTask = (tables.CleaningTask || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) {
-      taskIds.add(r.id)
-      return true
-    }
+    if (r.guestHouseId === guestHouseId) { taskIds.add(r.id); return true }
     return false
   })
-
-  // Filter CleaningTaskItems
-  filtered.CleaningTaskItem = (tables.CleaningTaskItem || []).filter(
-    (r: any) => taskIds.has(r.taskId)
-  )
-
-  // Filter Notifications
-  filtered.Notification = (tables.Notification || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
-
-  // Filter AuditLogs (guestHouseId is nullable)
-  filtered.AuditLog = (tables.AuditLog || []).filter(
-    (r: any) => r.guestHouseId === guestHouseId
-  )
+  filtered.CleaningTaskItem = (tables.CleaningTaskItem || []).filter((r: any) => taskIds.has(r.taskId))
+  filtered.Notification = (tables.Notification || []).filter((r: any) => r.guestHouseId === guestHouseId)
+  filtered.AuditLog = (tables.AuditLog || []).filter((r: any) => r.guestHouseId === guestHouseId)
 
   return filtered
 }
@@ -352,46 +250,34 @@ function filterByGuestHouse(
 // ============================================
 // POST - Restore from backup
 // ============================================
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest) {
   const user = await requireSuperAdmin()
   if (!user) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
   }
 
-  const { id } = await params
-  const { searchParams } = new URL(request.url)
-  const guestHouseId = searchParams.get("guestHouseId")
+  const id = request.nextUrl.searchParams.get("id")
+  const guestHouseId = request.nextUrl.searchParams.get("guestHouseId")
+
+  if (!id) {
+    return NextResponse.json({ error: "id requis" }, { status: 400 })
+  }
 
   try {
-    // Fetch backup
-    const backup = await db.backup.findUnique({
+    const backup = await db.backup.findFirst({
       where: { id },
-      select: {
-        id: true,
-        label: true,
-        type: true,
-        compressedData: true,
-        createdAt: true,
-        tableSummary: true,
-        guestHouseList: true,
-      },
     })
 
     if (!backup) {
       return NextResponse.json({ error: "Backup non trouvé" }, { status: 404 })
     }
 
-    // Parse backup data
     const { tables, version, exportedAt } = parseBackupData(backup.compressedData)
 
     if (guestHouseId) {
       // ─── Individual guesthouse restore ───────────────────────
       const filteredTables = filterByGuestHouse(tables, guestHouseId)
 
-      // Check if guesthouse exists in backup
       if (filteredTables.GuestHouse.length === 0) {
         return NextResponse.json(
           { error: "Cette maison d'hôtes n'existe pas dans cette sauvegarde" },
@@ -399,63 +285,40 @@ export async function POST(
         )
       }
 
-      // Delete existing guesthouse (cascade will delete all related data)
       const existingGh = await db.guestHouse.findUnique({
         where: { id: guestHouseId },
-        select: { id: true, name: true },
+        select: { id: true },
       })
 
       if (existingGh) {
         await db.guestHouse.delete({ where: { id: guestHouseId } })
       }
 
-      // Insert filtered data
       const { totalInserted, details } = await insertAllTables(filteredTables)
 
       return NextResponse.json({
         success: true,
-        message: `Maison d'hôtes "${(filteredTables.GuestHouse[0] as any)?.name || guestHouseId}" restaurée avec succès`,
+        message: `Maison d'hôtes "${(filteredTables.GuestHouse[0] as any)?.name || guestHouseId}" restaurée`,
         mode: "guesthouse",
-        guestHouseId,
-        guestHouseName: (filteredTables.GuestHouse[0] as any)?.name,
-        stats: {
-          totalInserted,
-          details,
-        },
-        meta: {
-          backupLabel: backup.label,
-          backupDate: exportedAt,
-          backupVersion: version,
-        },
+        stats: { totalInserted, details },
+        meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })
     } else {
       // ─── Full restore ─────────────────────────────────────────
-      // Clear all tables
       await clearAllTables()
-
-      // Insert all data
       const { totalInserted, details } = await insertAllTables(tables)
 
       return NextResponse.json({
         success: true,
-        message: "Restauration complète terminée avec succès",
+        message: "Restauration complète terminée",
         mode: "full",
-        stats: {
-          totalInserted,
-          details,
-        },
-        meta: {
-          backupLabel: backup.label,
-          backupDate: exportedAt,
-          backupVersion: version,
-        },
+        stats: { totalInserted, details },
+        meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })
     }
   } catch (error) {
-    console.error("Erreur restauration backup:", error)
-    return NextResponse.json(
-      { error: `Erreur lors de la restauration: ${error instanceof Error ? error.message : "Erreur interne"}` },
-      { status: 500 }
-    )
+    console.error("[backup/restore] Error:", error)
+    const message = error instanceof Error ? error.message : "Erreur interne du serveur"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
