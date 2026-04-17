@@ -60,6 +60,8 @@ import {
   KeyRound,
   UserCheck,
   UserX,
+  Broom,
+  Eye,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -111,11 +113,25 @@ const ROLES = [
     avatar: "bg-amber-500",
   },
   {
-    value: "housekeeping",
-    label: "Ménage",
-    icon: Sparkles,
+    value: "femmeDeMenage",
+    label: "Femme de ménage",
+    icon: Broom,
     badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
     avatar: "bg-rose-500",
+  },
+  {
+    value: "gouvernant",
+    label: "Gouvernant",
+    icon: Eye,
+    badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+    avatar: "bg-orange-500",
+  },
+  {
+    value: "gouvernante",
+    label: "Gouvernante",
+    icon: Eye,
+    badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+    avatar: "bg-orange-500",
   },
 ] as const
 
@@ -831,7 +847,18 @@ export default function UsersSettingsPage() {
               <Label htmlFor="role">Rôle</Label>
               <Select
                 value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value })}
+                onValueChange={(value) => {
+                  // Auto-fill menuAccess for housekeeping roles
+                  let newMenuAccess = { ...formData.menuAccess }
+                  if (value === "femmeDeMenage") {
+                    // Femme de ménage: only housekeeping
+                    newMenuAccess = { housekeeping: true }
+                  } else if (value === "gouvernant" || value === "gouvernante") {
+                    // Gouvernant(e): housekeeping + dashboard
+                    newMenuAccess = { housekeeping: true, dashboard: true }
+                  }
+                  setFormData({ ...formData, role: value, menuAccess: newMenuAccess })
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un rôle" />

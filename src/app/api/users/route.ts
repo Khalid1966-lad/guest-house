@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Un utilisateur avec cet email existe déjà" }, { status: 400 })
     }
 
-    const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping"]
+    const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping", "femmeDeMenage", "gouvernant", "gouvernante"]
     const userRole = role || "receptionist"
     if (!validRoles.includes(userRole)) {
       return NextResponse.json({ error: "Rôle invalide" }, { status: 400 })

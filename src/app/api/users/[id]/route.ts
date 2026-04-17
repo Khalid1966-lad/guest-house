@@ -97,7 +97,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     if (data.role) {
-      const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping"]
+      const validRoles = ["owner", "manager", "receptionist", "accountant", "housekeeping", "femmeDeMenage", "gouvernant", "gouvernante"]
       if (!validRoles.includes(data.role)) {
         return NextResponse.json({ error: "Rôle invalide" }, { status: 400 })
       }
