@@ -198,17 +198,12 @@ const faqs = [
   {
     question: "Combien de chambres puis-je gérer ?",
     answer:
-      "Avec l'offre gratuite, vous pouvez gérer jusqu'à 5 chambres. L'offre Premium vous offre un nombre illimité de chambres et de maisons d'hôtes.",
+      "Le nombre de chambres est illimité, même en version gratuite. Vous pouvez gérer toutes vos chambres sans aucune limitation, quel que soit votre forfait.",
   },
   {
     question: "Mes données sont-elles sécurisées ?",
     answer:
       "Absolument. Vos données sont chiffrées, sauvegardées automatiquement chaque jour, et hébergées sur des serveurs sécurisés en Europe. Vous pouvez aussi exporter vos données à tout moment.",
-  },
-  {
-    question: "Puis-je gérer plusieurs établissements ?",
-    answer:
-      "Oui, l'offre Premium vous permet de gérer plusieurs maisons d'hôtes ou riads depuis un seul compte. Chaque établissement a ses propres données et paramètres.",
   },
   {
     question: "Comment fonctionne le ménage automatique ?",
@@ -756,8 +751,7 @@ export default function LandingPage() {
                       </a>
                       <a href="tel:+212662425890">
                         <Button
-                          variant="outline"
-                          className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white font-semibold h-11"
+                          className="w-full bg-white/10 text-gray-900 hover:bg-white hover:text-white font-semibold h-11 border border-white/20 transition-all"
                         >
                           <Phone className="w-4 h-4 mr-2" />
                           Appeler maintenant
