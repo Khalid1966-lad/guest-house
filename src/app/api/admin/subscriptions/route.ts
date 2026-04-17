@@ -13,37 +13,72 @@ export async function GET(request: Request) {
     const filter = searchParams.get("filter") || "all"
 
     // LEFT JOIN: all guesthouses, even those without a subscription
-    const rows = await db.$queryRawUnsafe(`
-      SELECT 
-        gh."id" as "guestHouseId",
-        gh."name" as "guestHouseName",
-        gh."code" as "guestHouseCode",
-        gh."email" as "guestHouseEmail",
-        gh."city" as "guestHouseCity",
-        gh."isActive" as "guestHouseActive",
-        gh."createdAt" as "guestHouseCreatedAt",
-        gh."status" as "guestHouseStatus",
-        u."email" as "ownerEmail",
-        u."name" as "ownerName",
-        u."id" as "ownerId",
-        s."id" as "subscriptionId",
-        s."plan" as "plan",
-        s."status" as "subscriptionStatus",
-        s."startedAt" as "startedAt",
-        s."expiresAt" as "expiresAt",
-        s."lastPaymentAt" as "lastPaymentAt",
-        s."lastPaymentRef" as "lastPaymentRef",
-        s."trialEndsAt" as "trialEndsAt",
-        s."gracePeriodDays" as "gracePeriodDays",
-        s."notes" as "subscriptionNotes",
-        s."changedAt" as "changedAt"
-      FROM "GuestHouse" gh
-      LEFT JOIN "User" u ON u."guestHouseId" = gh."id" AND u."role" = 'owner'
-      LEFT JOIN "Subscription" s ON s."guestHouseId" = gh."id"
-      ORDER BY gh."createdAt" DESC
-    `)
+    // Fallback to query without Subscription table if it doesn't exist yet
+    let rows: Record<string, unknown>[]
+    try {
+      rows = await db.$queryRawUnsafe(`
+        SELECT 
+          gh."id" as "guestHouseId",
+          gh."name" as "guestHouseName",
+          gh."code" as "guestHouseCode",
+          gh."email" as "guestHouseEmail",
+          gh."city" as "guestHouseCity",
+          gh."isActive" as "guestHouseActive",
+          gh."createdAt" as "guestHouseCreatedAt",
+          gh."status" as "guestHouseStatus",
+          u."email" as "ownerEmail",
+          u."name" as "ownerName",
+          u."id" as "ownerId",
+          s."id" as "subscriptionId",
+          s."plan" as "plan",
+          s."status" as "subscriptionStatus",
+          s."startedAt" as "startedAt",
+          s."expiresAt" as "expiresAt",
+          s."lastPaymentAt" as "lastPaymentAt",
+          s."lastPaymentRef" as "lastPaymentRef",
+          s."trialEndsAt" as "trialEndsAt",
+          s."gracePeriodDays" as "gracePeriodDays",
+          s."notes" as "subscriptionNotes",
+          s."changedAt" as "changedAt"
+        FROM "GuestHouse" gh
+        LEFT JOIN "User" u ON u."guestHouseId" = gh."id" AND u."role" = 'owner'
+        LEFT JOIN "Subscription" s ON s."guestHouseId" = gh."id"
+        ORDER BY gh."createdAt" DESC
+      `) as Record<string, unknown>[]
+    } catch {
+      // Subscription table might not exist yet, fallback without it
+      console.log("[subscriptions] Subscription table not found, using fallback query without it")
+      rows = await db.$queryRawUnsafe(`
+        SELECT 
+          gh."id" as "guestHouseId",
+          gh."name" as "guestHouseName",
+          gh."code" as "guestHouseCode",
+          gh."email" as "guestHouseEmail",
+          gh."city" as "guestHouseCity",
+          gh."isActive" as "guestHouseActive",
+          gh."createdAt" as "guestHouseCreatedAt",
+          gh."status" as "guestHouseStatus",
+          u."email" as "ownerEmail",
+          u."name" as "ownerName",
+          u."id" as "ownerId",
+          NULL as "subscriptionId",
+          NULL as "plan",
+          NULL as "subscriptionStatus",
+          NULL as "startedAt",
+          NULL as "expiresAt",
+          NULL as "lastPaymentAt",
+          NULL as "lastPaymentRef",
+          NULL as "trialEndsAt",
+          NULL as "gracePeriodDays",
+          NULL as "subscriptionNotes",
+          NULL as "changedAt"
+        FROM "GuestHouse" gh
+        LEFT JOIN "User" u ON u."guestHouseId" = gh."id" AND u."role" = 'owner'
+        ORDER BY gh."createdAt" DESC
+      `) as Record<string, unknown>[]
+    }
 
-    const all = rows as Record<string, unknown>[]
+    const all = rows
 
     // Filter: use subscriptionStatus (null = no subscription)
     let filtered = all
