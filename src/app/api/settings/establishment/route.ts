@@ -112,6 +112,11 @@ export async function PUT(request: NextRequest) {
           restaurantEnabled: data.settings.restaurantEnabled,
           restaurantOpenTime: data.settings.restaurantOpenTime,
           restaurantCloseTime: data.settings.restaurantCloseTime,
+          // Housekeeping auto-assignment settings
+          autoAssignHousekeeping: data.settings.autoAssignHousekeeping,
+          autoAssignMode: data.settings.autoAssignMode,
+          autoStartCleaning: data.settings.autoStartCleaning,
+          defaultCleaningPriority: data.settings.defaultCleaningPriority,
         },
         create: {
           guestHouseId: session.user.guestHouseId,
@@ -125,6 +130,11 @@ export async function PUT(request: NextRequest) {
           restaurantEnabled: data.settings.restaurantEnabled ?? true,
           restaurantOpenTime: data.settings.restaurantOpenTime || "07:00",
           restaurantCloseTime: data.settings.restaurantCloseTime || "22:00",
+          // Housekeeping auto-assignment defaults
+          autoAssignHousekeeping: data.settings.autoAssignHousekeeping ?? false,
+          autoAssignMode: data.settings.autoAssignMode || "zone",
+          autoStartCleaning: data.settings.autoStartCleaning ?? false,
+          defaultCleaningPriority: data.settings.defaultCleaningPriority || "normal",
         },
       })
     }

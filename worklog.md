@@ -817,3 +817,82 @@ FILES TO MODIFY (when coding):
 - src/app/api/bookings/[id]/route.ts: Add auto-assignment logic after checkout
 - src/app/(app)/app/housekeeping/page.tsx: Show "Assigné automatiquement" badge
 - src/app/api/settings/route.ts: Add auto-assignment settings endpoints
+
+---
+Task ID: 5
+Agent: Main
+Task: Housekeeping auto-assignment settings UI (3-tab Sheet)
+
+Work Log:
+- Read existing housekeeping page (`src/app/(app)/app/housekeeping/page.tsx`) for patterns and imports
+- Verified existing API routes: `/api/settings/establishment` (GET/PUT), `/api/housekeeping/zones` (GET/POST/DELETE), `/api/housekeeping/schedule` (GET/PUT/DELETE)
+- Confirmed settings fields already exist in establishment API: `autoAssignHousekeeping`, `autoAssignMode`, `autoStartCleaning`, `defaultCleaningPriority`
+- Created components directory: `src/app/(app)/app/housekeeping/components/`
+- Built `housekeeping-settings.tsx` component (700+ lines) with:
+  - **Tab 1 (Auto-assignation)**: Toggle to enable auto-assignment on checkout, RadioGroup for assignment mode (zone/round-robin), Switch for auto-start cleaning, Select for default priority (Basse/Normale/Haute)
+  - **Tab 2 (Zones d'assignation)**: List of existing zones with agent name, zone type badge, zone details (floor/rooms); inline edit mode for each zone; new zone form with agent dropdown, zone type select, floor number input, room multi-select, optional zone name; delete button per zone
+  - **Tab 3 (Emploi du temps)**: Per-staff-member weekly schedule grid (Mon-Sun) with available toggle per day, start/end time inputs, save button per staff member; default Mon-Sat available, Sunday off
+- Edited housekeeping page to integrate settings:
+  - Added `Settings` icon import from lucide-react
+  - Added `HousekeepingSettingsSheet` component import
+  - Added `settingsOpen` state variable
+  - Added pink-themed "Paramètres" button next to "Actualiser" in header, visible only to `isFullAccess` roles
+  - Passed `staffList` to settings component for filtering housekeeping staff
+- All lint checks pass (zero errors)
+
+Stage Summary:
+- Full housekeeping settings Sheet with 3 tabs accessible from gear icon button in header
+- Tab 1: Configure auto-assignment on checkout (toggle, mode, auto-start, priority)
+- Tab 2: Manage zone assignments per housekeeping staff member (floor/room/custom zones)
+- Tab 3: Configure weekly work schedules per staff member (available days, start/end times)
+- Only visible to full-access roles (owner, admin, manager, gouvernant, gouvernante)
+- Pink/rose accent color scheme matching existing housekeeping page
+- Loading states, toast notifications for all CRUD operations
+- French UI throughout
+
+---
+Task ID: 4-5-6-7
+Agent: Main Agent + Fullstack subagent
+Task: Implement full housekeeping auto-assignment system
+
+Work Log:
+- Verified Prisma schema already had StaffSchedule + HousekeepingZone models + GuestHouseSetting fields
+- Created src/lib/housekeeping-assign.ts (auto-assignment engine):
+  - findBestAgent(): zone matching (room > floor > default) + schedule check + round-robin fallback
+  - autoAssignCleaning(): full flow from settings check → agent selection → task creation with checklist
+- Updated src/app/api/bookings/[id]/route.ts: added autoAssignCleaning() call after checkout (fire-and-forget)
+- Created src/app/api/housekeeping/zones/route.ts: GET/POST/DELETE for zone management
+- Created src/app/api/housekeeping/schedule/route.ts: GET/PUT/DELETE for staff schedule management
+- Updated src/app/api/settings/establishment/route.ts: added 4 new housekeeping settings fields
+- Created src/lib/ensure-housekeeping-tables.ts: auto-create tables + add columns on Vercel cold start
+- Updated src/lib/db.ts: registered ensureHousekeepingTables()
+- Updated src/lib/backup-models.ts: added HousekeepingZone + StaffSchedule dependencies
+- Created housekeeping settings UI component (1362 lines) with 3 tabs:
+  - Tab 1: Auto-assignation toggle, mode selection, auto-start, default priority
+  - Tab 2: Zone management (assign agent to floor/rooms), inline edit, delete
+  - Tab 3: Staff schedule (weekly grid Mon-Sun, time inputs, availability toggles)
+- Updated housekeeping page: added Settings button (pink, only for full-access roles)
+- Ran bun run lint — zero errors
+- Ran bun run db:push — SQLite schema in sync
+
+Stage Summary:
+- Complete auto-assignment system: checkout → auto-create CleaningTask → assign best agent
+- Zone-based or round-robin assignment with schedule awareness
+- Full CRUD API for zones and schedules
+- Professional UI with 3-tab settings sheet
+- All tables auto-created on Vercel (ensure-housekeeping-tables.ts)
+- Backup system includes new tables
+
+Files created:
+- src/lib/housekeeping-assign.ts
+- src/lib/ensure-housekeeping-tables.ts
+- src/app/api/housekeeping/zones/route.ts
+- src/app/api/housekeeping/schedule/route.ts
+- src/app/(app)/app/housekeeping/components/housekeeping-settings.tsx
+
+Files modified:
+- src/app/api/bookings/[id]/route.ts
+- src/app/api/settings/establishment/route.ts
+- src/lib/db.ts
+- src/lib/backup-models.ts
+- src/app/(app)/app/housekeeping/page.tsx

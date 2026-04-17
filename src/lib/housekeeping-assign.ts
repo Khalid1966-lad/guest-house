@@ -1,15 +1,15 @@
+// ──────────────────────────────────────────────────────────────────
+// Housekeeping Auto-Assignment Engine
+// ──────────────────────────────────────────────────────────────────
+// Called after a guest checks out.
+// Finds the best available housekeeping agent and creates a CleaningTask.
+// ──────────────────────────────────────────────────────────────────
+
 import { db } from "@/lib/db"
 
-// Roles that can be assigned housekeeping tasks
-const HOUSEKEEPING_ROLES = [
-  "femmeDeMenage",
-  "gouvernant",
-  "gouvernante",
-  "housekeeping",
-  "manager",
-]
+// ── Checklist template (same as in tasks/route.ts) ────────────────
 
-const CLEANING_CHECKLIST_TEMPLATE = [
+const CLEANING_CHECKLIST = [
   { label: "Objets perdus / oubliés (recherche sous le lit, tiroirs, placard, salle de bain)", category: "verification" },
   { label: "Détection de dégradations (mobilier, murs, literie, équipements)", category: "verification" },
   { label: "Gestion du linge (retrait des draps, serviettes, tri éventuel)", category: "linge" },
@@ -22,128 +22,68 @@ const CLEANING_CHECKLIST_TEMPLATE = [
   { label: "Contrôle final (lumière, odeur, fonctionnement TV/clim/prises)", category: "verification" },
 ]
 
-export interface AutoAssignResult {
-  success: boolean
-  taskId?: string
-  assignedToId?: string | null
-  assignedToName?: string | null
-  error?: string
+// ── Housekeeping roles ────────────────────────────────────────────
+
+const HOUSEKEEPING_ROLES = ["femmeDeMenage", "gouvernant", "gouvernante"]
+
+// ── Day-of-week labels (French) ───────────────────────────────────
+
+export const DAY_LABELS: Record<number, string> = {
+  0: "Dimanche",
+  1: "Lundi",
+  2: "Mardi",
+  3: "Mercredi",
+  4: "Jeudi",
+  5: "Vendredi",
+  6: "Samedi",
 }
 
-/**
- * Auto-assign a cleaning task after checkout.
- * Called from the checkout PATCH handler.
- */
-export async function autoAssignCleaningTask(params: {
-  guestHouseId: string
-  roomId: string
-  roomFloor?: number | null
-}): Promise<AutoAssignResult> {
-  const { guestHouseId, roomId, roomFloor } = params
-
-  try {
-    // 1. Check if auto-assignment is enabled for this guest house
-    const settings = await db.guestHouseSetting.findUnique({
-      where: { guestHouseId },
-    })
-
-    if (!settings?.autoAssignHousekeeping) {
-      return { success: false, error: "Auto-assignation désactivée" }
-    }
-
-    // 2. Check if there's already an active task for this room
-    const existingTask = await db.cleaningTask.findFirst({
-      where: {
-        roomId,
-        status: { in: ["pending", "in_progress"] },
-      },
-    })
-
-    if (existingTask) {
-      return { success: false, error: "Tâche active existe déjà pour cette chambre" }
-    }
-
-    // 3. Find the best agent to assign
-    const assignedTo = await findBestAgent({
-      guestHouseId,
-      roomId,
-      roomFloor,
-      mode: settings.autoAssignMode || "zone",
-    })
-
-    // 4. Create the cleaning task
-    const taskStatus = settings.autoStartCleaning ? "in_progress" : "pending"
-    const priority = settings.defaultCleaningPriority || "normal"
-
-    const taskData: Record<string, unknown> = {
-      guestHouseId,
-      roomId,
-      priority,
-      status: taskStatus,
-      items: {
-        create: CLEANING_CHECKLIST_TEMPLATE.map((item, index) => ({
-          label: item.label,
-          category: item.category,
-          sortOrder: index + 1,
-        })),
-      },
-    }
-
-    if (assignedTo?.userId) {
-      taskData.assignedToId = assignedTo.userId
-    }
-
-    if (taskStatus === "in_progress") {
-      taskData.startedAt = new Date()
-    }
-
-    const cleaningTask = await db.cleaningTask.create({
-      data: taskData,
-      include: {
-        assignedTo: { select: { id: true, name: true } },
-      },
-    })
-
-    // 5. Update room cleaning status
-    await db.room.update({
-      where: { id: roomId },
-      data: {
-        cleaningStatus: taskStatus === "in_progress" ? "cleaning" : "departure",
-        cleaningUpdatedAt: new Date(),
-      },
-    })
-
-    console.log(
-      `[auto-assign] Task ${cleaningTask.id} created for room ${roomId}, assigned to ${assignedTo?.userName || "unassigned"} (mode: ${settings.autoAssignMode})`
-    )
-
-    return {
-      success: true,
-      taskId: cleaningTask.id,
-      assignedToId: assignedTo?.userId || null,
-      assignedToName: assignedTo?.userName || null,
-    }
-  } catch (error) {
-    console.error("[auto-assign] Error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Erreur auto-assignation",
-    }
-  }
+export const DAY_SHORT: Record<number, string> = {
+  0: "Dim",
+  1: "Lun",
+  2: "Mar",
+  3: "Mer",
+  4: "Jeu",
+  5: "Ven",
+  6: "Sam",
 }
 
-/**
- * Find the best available agent based on the configured mode.
- */
-async function findBestAgent(params: {
-  guestHouseId: string
-  roomId: string
-  roomFloor?: number | null
-  mode: string
-}): Promise<{ userId: string; userName: string | null } | null> {
-  const { guestHouseId, roomId, roomFloor, mode } = params
+// ── Helper: get current time as "HH:MM" ──────────────────────────
 
-  // Get all active housekeeping staff for this guest house
+function getCurrentTimeStr(): string {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+}
+
+// ── Helper: is time1 <= time2 ? ──────────────────────────────────
+
+function timeLeq(a: string, b: string): boolean {
+  const [ah, am] = a.split(":").map(Number)
+  const [bh, bm] = b.split(":").map(Number)
+  return ah * 60 + am <= bh * 60 + bm
+}
+
+// ── Helper: count active tasks for a user ─────────────────────────
+
+async function countActiveTasks(userId: string, guestHouseId: string): Promise<number> {
+  return db.cleaningTask.count({
+    where: {
+      guestHouseId,
+      assignedToId: userId,
+      status: { in: ["pending", "in_progress"] },
+    },
+  })
+}
+
+// ── Core: find the best agent for a room ──────────────────────────
+
+async function findBestAgent(
+  guestHouseId: string,
+  roomId: string,
+  roomFloor: number | null,
+  mode: "zone" | "round_robin"
+): Promise<{ id: string; name: string | null } | null> {
+  // 1. Fetch all active housekeeping staff in this GH
   const staff = await db.user.findMany({
     where: {
       guestHouseId,
@@ -153,16 +93,14 @@ async function findBestAgent(params: {
     select: { id: true, name: true },
   })
 
-  if (staff.length === 0) {
-    console.log("[auto-assign] No housekeeping staff found")
-    return null
-  }
+  if (staff.length === 0) return null
 
-  // Filter by today's schedule availability
+  // 2. Filter by schedule (who is working right now?)
   const now = new Date()
-  const dayOfWeek = now.getDay() // 0=Sun, 6=Sat
-  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+  const dayOfWeek = now.getDay() // 0=Sun ... 6=Sat
+  const currentTime = getCurrentTimeStr()
 
+  // Fetch all schedules for these staff members for today
   const schedules = await db.staffSchedule.findMany({
     where: {
       userId: { in: staff.map((s) => s.id) },
@@ -170,136 +108,181 @@ async function findBestAgent(params: {
     },
   })
 
-  // Build set of available user IDs
-  const staffIds = new Set(staff.map((s) => s.id))
-  const scheduledIds = new Set(schedules.filter((s) => s.isAvailable).map((s) => s.userId))
+  // Staff IDs that have a schedule for today and are within working hours
+  const availableStaffIds = new Set(
+    schedules
+      .filter((s) => s.isAvailable && timeLeq(s.startTime, currentTime) && timeLeq(currentTime, s.endTime))
+      .map((s) => s.userId)
+  )
 
-  // Filter: only include staff who have a schedule for today AND are available
-  // If no schedule exists for a staff member, consider them available (lenient default)
-  const availableStaffIds = staff
-    .filter((s) => {
-      const schedule = schedules.find((sch) => sch.userId === s.id)
-      if (!schedule) return true // No schedule = available
-      if (!schedule.isAvailable) return false // Explicitly unavailable today
-      return true
-    })
-    .map((s) => s.id)
+  // If no one has a schedule at all, consider everyone available (schedule feature not set up yet)
+  const hasAnySchedule = schedules.length > 0
 
-  if (availableStaffIds.length === 0) {
-    console.log("[auto-assign] No available staff today")
-    return null
+  let candidates: typeof staff
+  if (hasAnySchedule) {
+    candidates = staff.filter((s) => availableStaffIds.has(s.id))
+    if (candidates.length === 0) return null // Nobody available right now
+  } else {
+    candidates = staff // No schedule configured = everyone available
   }
 
-  // Count active tasks per available staff member
-  const taskCounts = await db.cleaningTask.groupBy({
-    by: ["assignedToId"],
-    where: {
-      guestHouseId,
-      assignedToId: { in: availableStaffIds },
-      status: { in: ["pending", "in_progress"] },
-    },
-    _count: true,
-  })
+  // 3. Zone-based matching (if mode is "zone")
+  if (mode === "zone") {
+    // Fetch all zones for this guesthouse
+    const zones = await db.housekeepingZone.findMany({
+      where: { guestHouseId },
+      include: { user: { select: { id: true, name: true } } },
+    })
 
-  const taskCountMap = new Map<string, number>()
-  for (const tc of taskCounts) {
-    if (tc.assignedToId) {
-      taskCountMap.set(tc.assignedToId, tc._count)
+    if (zones.length > 0) {
+      // Priority 1: Room-specific assignment
+      const roomZone = zones.find((z) => {
+        if (z.zoneType !== "room") return false
+        try {
+          const ids: string[] = JSON.parse(z.roomIds)
+          return ids.includes(roomId)
+        } catch {
+          return false
+        }
+      })
+
+      if (roomZone) {
+        const agent = candidates.find((c) => c.id === roomZone.user.id)
+        if (agent) return agent
+      }
+
+      // Priority 2: Floor-specific assignment
+      if (roomFloor !== null) {
+        const floorZone = zones.find(
+          (z) => z.zoneType === "floor" && z.floorNumber === roomFloor
+        )
+        if (floorZone) {
+          const agent = candidates.find((c) => c.id === floorZone.user.id)
+          if (agent) return agent
+        }
+      }
     }
   }
 
-  if (mode === "zone") {
-    // Zone-based assignment
-    const zoneAgent = await findZoneAgent({
+  // 4. Fallback: round-robin — pick the agent with the fewest active tasks
+  let bestCandidate: { id: string; name: string | null } | null = null
+  let lowestCount = Infinity
+
+  for (const candidate of candidates) {
+    const count = await countActiveTasks(candidate.id, guestHouseId)
+    if (count < lowestCount) {
+      lowestCount = count
+      bestCandidate = candidate
+    }
+  }
+
+  return bestCandidate
+}
+
+// ── Public API: called from checkout route ────────────────────────
+
+export async function autoAssignCleaning(roomId: string, guestHouseId: string): Promise<{
+  success: boolean
+  taskId?: string
+  assignedTo?: string | null
+  message?: string
+}> {
+  try {
+    // 1. Check if auto-assign is enabled
+    const settings = await db.guestHouseSetting.findUnique({
+      where: { guestHouseId },
+      select: {
+        autoAssignHousekeeping: true,
+        autoAssignMode: true,
+        autoStartCleaning: true,
+        defaultCleaningPriority: true,
+      },
+    })
+
+    if (!settings || !settings.autoAssignHousekeeping) {
+      return { success: false, message: "Auto-assignation désactivée" }
+    }
+
+    // 2. Check if there's already an active task for this room
+    const existingTask = await db.cleaningTask.findFirst({
+      where: {
+        roomId,
+        guestHouseId,
+        status: { in: ["pending", "in_progress"] },
+      },
+    })
+
+    if (existingTask) {
+      return { success: false, message: "Une tâche est déjà active pour cette chambre" }
+    }
+
+    // 3. Get room info (for floor)
+    const room = await db.room.findUnique({
+      where: { id: roomId },
+      select: { id: true, number: true, floor: true },
+    })
+
+    if (!room) {
+      return { success: false, message: "Chambre introuvable" }
+    }
+
+    // 4. Find the best agent
+    const agent = await findBestAgent(
       guestHouseId,
       roomId,
-      roomFloor,
-      availableStaffIds,
+      room.floor,
+      (settings.autoAssignMode as "zone" | "round_robin") || "zone"
+    )
+
+    if (!agent) {
+      return { success: false, message: "Aucun agent de ménage disponible" }
+    }
+
+    // 5. Create the CleaningTask with checklist
+    const task = await db.cleaningTask.create({
+      data: {
+        guestHouseId,
+        roomId,
+        assignedToId: agent.id,
+        priority: settings.defaultCleaningPriority || "normal",
+        status: settings.autoStartCleaning ? "in_progress" : "pending",
+        startedAt: settings.autoStartCleaning ? new Date() : null,
+        items: {
+          create: CLEANING_CHECKLIST.map((item, index) => ({
+            label: item.label,
+            category: item.category,
+            sortOrder: index + 1,
+          })),
+        },
+      },
+      include: {
+        assignedTo: { select: { id: true, name: true } },
+        room: { select: { id: true, number: true, name: true } },
+      },
     })
-    if (zoneAgent) return zoneAgent
 
-    // Fallback to least-busy
-    return findLeastBusyAgent(availableStaffIds, taskCountMap, staff)
-  }
+    // 6. Update room cleaning status
+    const newStatus = settings.autoStartCleaning ? "cleaning" : "departure"
+    await db.room.update({
+      where: { id: roomId },
+      data: {
+        cleaningStatus: newStatus,
+        cleaningUpdatedAt: new Date(),
+      },
+    })
 
-  if (mode === "round_robin") {
-    // Least busy = round-robin approximation
-    return findLeastBusyAgent(availableStaffIds, taskCountMap, staff)
-  }
+    console.log(
+      `[housekeeping-auto] Task ${task.id} created for room ${room.number}, ` +
+      `assigned to ${agent.name || agent.id}, status: ${task.status}`
+    )
 
-  // manual_only — don't auto-assign
-  return null
-}
-
-/**
- * Find agent based on zone assignment (floor/room).
- */
-async function findZoneAgent(params: {
-  guestHouseId: string
-  roomId: string
-  roomFloor?: number | null
-  availableStaffIds: string[]
-}): Promise<{ userId: string; userName: string | null } | null> {
-  const { guestHouseId, roomId, roomFloor, availableStaffIds } = params
-
-  const zones = await db.housekeepingZone.findMany({
-    where: {
-      guestHouseId,
-      userId: { in: availableStaffIds },
-    },
-  })
-
-  if (zones.length === 0) return null
-
-  // Priority 1: Room-level match
-  for (const zone of zones) {
-    if (zone.zoneType === "room") {
-      try {
-        const assignedRoomIds: string[] = JSON.parse(zone.roomIds || "[]")
-        if (assignedRoomIds.includes(roomId)) {
-          const user = await db.user.findUnique({ where: { id: zone.userId }, select: { id: true, name: true } })
-          if (user) return { userId: user.id, userName: user.name }
-        }
-      } catch {
-        // ignore JSON parse errors
-      }
+    return {
+      success: true,
+      taskId: task.id,
+      assignedTo: agent.name,
     }
+  } catch (error) {
+    console.error("[housekeeping-auto] Error:", error)
+    return { success: false, message: "Erreur lors de l'auto-assignation" }
   }
-
-  // Priority 2: Floor-level match
-  if (roomFloor != null) {
-    for (const zone of zones) {
-      if (zone.zoneType === "floor" && zone.floorNumber === roomFloor) {
-        const user = await db.user.findUnique({ where: { id: zone.userId }, select: { id: true, name: true } })
-        if (user) return { userId: user.id, userName: user.name }
-      }
-    }
-  }
-
-  return null
-}
-
-/**
- * Find the staff member with the fewest active tasks.
- */
-function findLeastBusyAgent(
-  availableStaffIds: string[],
-  taskCountMap: Map<string, number>,
-  staff: { id: string; name: string | null }[]
-): { userId: string; userName: string | null } | null {
-  let bestId: string | null = null
-  let bestCount = Infinity
-
-  for (const id of availableStaffIds) {
-    const count = taskCountMap.get(id) || 0
-    if (count < bestCount) {
-      bestCount = count
-      bestId = id
-    }
-  }
-
-  if (!bestId) return null
-
-  const user = staff.find((s) => s.id === bestId)
-  return user ? { userId: user.id, userName: user.name } : null
 }

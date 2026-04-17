@@ -57,7 +57,9 @@ import {
   CircleAlert,
   History,
   ArrowUpCircle,
+  Settings,
 } from "lucide-react"
+import HousekeepingSettingsSheet from "./components/housekeeping-settings"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow, format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -361,6 +363,9 @@ export default function HousekeepingPage() {
 
   // Staff list
   const [staffList, setStaffList] = useState<StaffUser[]>([])
+
+  // Settings sheet
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // ── Helpers ──
   const userCanVerify = isFullAccess
@@ -767,15 +772,35 @@ export default function HousekeepingPage() {
             Gestion du nettoyage et des tâches de ménage
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchRooms(true)}
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={cn("w-4 h-4 mr-1.5", isRefreshing && "animate-spin")} />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-2">
+          {isFullAccess && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSettingsOpen(true)}
+                className="text-pink-600 dark:text-pink-400 border-pink-200 dark:border-pink-800 hover:bg-pink-50 dark:hover:bg-pink-950/30"
+              >
+                <Settings className="w-4 h-4 mr-1.5" />
+                Paramètres
+              </Button>
+              <HousekeepingSettingsSheet
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+                staffList={staffList}
+              />
+            </>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchRooms(true)}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-1.5", isRefreshing && "animate-spin")} />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Error */}

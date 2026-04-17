@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { notifyCheckIn, notifyCheckOut, notifyBookingCancelled } from "@/lib/notifications"
+import { autoAssignCleaning } from "@/lib/housekeeping-assign"
 
 // GET - Get a single booking
 export async function GET(
@@ -271,6 +272,11 @@ export async function PATCH(
         } catch (cleaningErr) {
           console.warn("[checkout] Could not set cleaningStatus (migration may be missing):", (cleaningErr as Error).message)
         }
+
+        // Auto-assign housekeeping task (fire-and-forget, non-blocking)
+        autoAssignCleaning(existingBooking.roomId, session.user.guestHouseId).catch((err) => {
+          console.warn("[checkout] Auto-assign housekeeping failed:", err)
+        })
       }
 
       if (status === "cancelled") {

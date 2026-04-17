@@ -74,6 +74,8 @@ export const DEPENDENCIES: Record<string, Set<string>> = {
   Expense: new Set(["GuestHouse", "User"]),
   CleaningTask: new Set(["GuestHouse", "Room", "User"]),
   CleaningTaskItem: new Set(["CleaningTask"]),
+  HousekeepingZone: new Set(["GuestHouse", "User"]),
+  StaffSchedule: new Set(["GuestHouse", "User"]),
   Notification: new Set(["GuestHouse", "User"]),
   AuditLog: new Set(["GuestHouse", "User"]),
   Subscription: new Set(["GuestHouse"]),
