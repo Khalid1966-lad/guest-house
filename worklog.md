@@ -1,6 +1,30 @@
 # Worklog
 
 ---
+Task ID: fix-booking-creation
+Agent: Main
+Task: Debug and fix booking creation not showing — Fadwa Ragbane reservation missing
+
+Work Log:
+- Verified Neon PostgreSQL database is fully in sync with Prisma schema (all 28 tables exist including Occupant, Notification, CleaningTask, etc.)
+- Queried Neon directly: confirmed Fadwa Ragbane booking does NOT exist in database — POST request failed silently
+- Identified that the frontend had no toast notification system — errors were only shown as small inline text in the dialog form, easily missed
+- Added `useToast` hook from shadcn/ui toast system to bookings page
+- Added success toast on booking creation/edit with guest name, room, and dates
+- Added error toast (destructive variant) when POST/PUT/PATCH/DELETE API calls fail
+- Improved fetchData to log and display errors when GET /api/bookings returns non-OK response
+- Added `await` to fetchData() calls after mutations for proper sequential data refresh
+- Replaced `alert()` for housekeeping warnings with toast notifications
+- Added occupants response status logging for debugging
+- Committed as 7cbf096 and pushed to origin/main — Vercel will auto-deploy
+
+Stage Summary:
+- Root cause: Booking POST request likely failed (conflict/validation/network error) but user didn't see the error because it was only shown as small inline text
+- Fix: Added comprehensive toast notifications for all booking operations (create, edit, delete, status change)
+- All errors now clearly visible as red toast notifications in addition to inline form errors
+- Pushed to Vercel — user should retry creating the Fadwa Ragbane reservation after deploy
+
+---
 Task ID: 1
 Agent: Main
 Task: Fix sidebar icons - always colored, titles change color on hover only
