@@ -68,6 +68,7 @@ import {
   XCircle,
   Star,
   UserPlus,
+  ArrowRightLeft,
 } from "lucide-react"
 import { getNationality, searchNationalities, nationalities } from "@/lib/nationalities"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -313,6 +314,13 @@ export default function BookingsPage() {
   const [occupants, setOccupants] = useState<Occupant[]>([])
   const [nationalitySearch, setNationalitySearch] = useState("")
   const [showNationalitySelect, setShowNationalitySelect] = useState<string | null>(null)
+  // Transfer dialog state
+  const [isTransferOpen, setIsTransferOpen] = useState(false)
+  const [transferBooking, setTransferBooking] = useState<Booking | null>(null)
+  const [transferRoomId, setTransferRoomId] = useState("")
+  const [transferReason, setTransferReason] = useState("")
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [transferError, setTransferError] = useState("")
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -662,8 +670,15 @@ export default function BookingsPage() {
     }
   }
 
-  // Update booking status (check-in, check-out, cancel)
+  // Update booking status (check-in, check-out, cancel, transfer)
   const handleUpdateStatus = async (bookingId: string, newStatus: string) => {
+    // Transfer is handled by opening the transfer dialog
+    if (newStatus === "transfer") {
+      const booking = bookings.find((b) => b.id === bookingId)
+      if (booking) handleOpenTransfer(booking)
+      return
+    }
+
     try {
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: "PATCH",
@@ -774,10 +789,14 @@ export default function BookingsPage() {
       if (canCheckIn) {
         actions.push({ status: "checked_in", label: "Check-in", icon: <LogIn className="w-4 h-4 mr-2" /> })
       }
+      // Transfer button for confirmed bookings
+      actions.push({ status: "transfer", label: "Transférer", icon: <ArrowRightLeft className="w-4 h-4 mr-2" />, className: "text-violet-600" })
     }
     
     if (booking.status === "checked_in") {
       actions.push({ status: "checked_out", label: "Check-out", icon: <LogOut className="w-4 h-4 mr-2" /> })
+      // Transfer button for checked-in guests
+      actions.push({ status: "transfer", label: "Transférer", icon: <ArrowRightLeft className="w-4 h-4 mr-2" />, className: "text-violet-600" })
     }
     
     if (!["cancelled", "checked_out"].includes(booking.status)) {
@@ -789,6 +808,67 @@ export default function BookingsPage() {
     }
     
     return actions
+  }
+
+  // Open transfer dialog
+  const handleOpenTransfer = (booking: Booking) => {
+    setTransferBooking(booking)
+    setTransferRoomId("")
+    setTransferReason("")
+    setTransferError("")
+    setIsTransferOpen(true)
+    setIsDetailOpen(false)
+  }
+
+  // Execute transfer
+  const handleConfirmTransfer = async () => {
+    if (!transferBooking || !transferRoomId) {
+      setTransferError("Veuillez sélectionner une chambre")
+      return
+    }
+
+    setIsTransferring(true)
+    setTransferError("")
+
+    try {
+      const response = await fetch(`/api/bookings/${transferBooking.id}/transfer`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newRoomId: transferRoomId,
+          reason: transferReason || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: "Erreur serveur" }))
+        setTransferError(data.error || "Erreur lors du transfert")
+        setIsTransferring(false)
+        return
+      }
+
+      const data = await response.json()
+      const fromRoom = data.transfer?.fromRoom || "?"
+      const toRoom = data.transfer?.toRoom || "?"
+
+      toast({
+        title: "Transfert effectué",
+        description: `Ch. ${fromRoom} → Ch. ${toRoom} (${transferBooking.guest.firstName} ${transferBooking.guest.lastName})`,
+      })
+
+      if (data.transfer?.housekeepingWarning) {
+        setTimeout(() => {
+          toast({ title: "Ménage", description: data.transfer.housekeepingWarning })
+        }, 500)
+      }
+
+      setIsTransferOpen(false)
+      setIsTransferring(false)
+      await fetchData()
+    } catch (err) {
+      setTransferError("Une erreur inattendue s'est produite")
+      setIsTransferring(false)
+    }
   }
 
   // Check if user needs onboarding
@@ -2147,6 +2227,107 @@ export default function BookingsPage() {
               )}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Dialog */}
+      <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-violet-600" />
+              Transfert de chambre
+            </DialogTitle>
+            <DialogDescription>
+              Déplacez la réservation vers une autre chambre
+            </DialogDescription>
+          </DialogHeader>
+
+          {transferBooking && (
+            <div className="space-y-4 py-2">
+              {/* Current booking summary */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-200">
+                <BedDouble className="w-5 h-5 text-violet-600" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">
+                    {transferBooking.guest.firstName} {transferBooking.guest.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ch. {transferBooking.room.number} • {format(parseISO(transferBooking.checkIn), "dd/MM/yyyy")} → {format(parseISO(booking.checkOut), "dd/MM/yyyy")}
+                  </p>
+                </div>
+              </div>
+
+              {transferError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
+                  {transferError}
+                </div>
+              )}
+
+              {/* New room selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Nouvelle chambre <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={transferRoomId}
+                  onValueChange={setTransferRoomId}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sélectionnez une chambre..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rooms
+                      .filter((r) => r.id !== transferBooking.room.id)
+                      .map((room) => (
+                        <SelectItem key={room.id} value={room.id}>
+                          Ch. {room.number}{room.name ? ` — ${room.name}` : ""} ({roomTypes[room.type] || room.type})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Reason */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Raison du transfert (optionnel)</Label>
+                <Textarea
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  placeholder="Ex: problème de plomberie..."
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsTransferOpen(false)}
+              disabled={isTransferring}
+            >
+              Annuler
+            </Button>
+            <Button
+              className="bg-violet-600 hover:bg-violet-700"
+              onClick={handleConfirmTransfer}
+              disabled={isTransferring || !transferRoomId}
+            >
+              {isTransferring ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Transfert en cours...
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft className="w-4 h-4 mr-2" />
+                  Effectuer le transfert
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

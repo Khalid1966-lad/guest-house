@@ -114,10 +114,11 @@ const cleaningStatuses = [
 
 // Status
 const roomStatuses = [
-  { value: "available", label: "Disponible", color: "bg-sky-100 text-sky-700" },
-  { value: "occupied", label: "Occupée", color: "bg-blue-100 text-blue-700" },
-  { value: "maintenance", label: "Maintenance", color: "bg-yellow-100 text-yellow-700" },
-  { value: "out_of_order", label: "Hors service", color: "bg-red-100 text-red-700" },
+  { value: "available", label: "Disponible", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" },
+  { value: "reserved", label: "Réservée", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
+  { value: "occupied", label: "Occupée", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  { value: "maintenance", label: "Maintenance", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300" },
+  { value: "out_of_order", label: "Hors service", color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
 ]
 
 // Default form data

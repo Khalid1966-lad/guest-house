@@ -274,6 +274,12 @@ export async function POST(request: NextRequest) {
     const finalNightlyRate = parseFloat(nightlyRate) || room.basePrice
     const finalTotalPrice = parseFloat(totalPrice) || (nights * finalNightlyRate)
 
+    // Mettre à jour le statut de la chambre en « réservée »
+    await db.room.update({
+      where: { id: roomId },
+      data: { status: "reserved" },
+    })
+
     // Créer la réservation
     const booking = await db.booking.create({
       data: {

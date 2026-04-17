@@ -1107,3 +1107,29 @@ Stage Summary:
 - package.json scripts cleaned up: build, postinstall, db:push, db:generate all use default schema.prisma
 - User.menuAccess field properly uses Json? type (PostgreSQL native JSON, not String? like SQLite)
 - Ready for Vercel deployment — just need to set DATABASE_URL env var in Vercel dashboard
+
+---
+Task ID: 1
+Agent: Main
+Task: Point 1 - Ajouter le statut "reserved" aux chambres + Point 2 - Feature Transfert
+
+Work Log:
+- Ajouté le statut "reserved" (violet) à la liste des statuts de chambre dans rooms/page.tsx
+- Backend POST /api/bookings: à la création d'une réservation, la chambre passe automatiquement en statut "reserved"
+- Backend PATCH /api/bookings/[id]: ajouté la fonction recomputeRoomStatus() qui calcule le bon statut de la chambre en fonction des réservations actives restantes
+- Géré les transitions: cancelled → libérer chambre, no_show → libérer chambre, confirmed → réservée, checked_in → occupée, checked_out → disponible
+- Backend DELETE: libère la chambre après suppression d'une réservation
+- Créé l'endpoint /api/bookings/[id]/transfer (PATCH) pour le transfert de chambre
+- Le transfert libère l'ancienne chambre et assigne la nouvelle (occupied si check-in, reserved si confirmée)
+- Auto-assignation du ménage sur l'ancienne chambre si le client était check-in
+- Frontend: ajout du bouton "Transférer" (violet) sur les réservations confirmed et checked_in
+- Ajout d'un Dialog de transfert avec sélection de chambre et raison optionnelle
+- Dashboard: ajout de "Réservées" (violet) dans l'état des chambres
+- Dashboard: taux d'occupation inclut maintenant les chambres réservées
+
+Stage Summary:
+- 6 fichiers modifiés
+- Les chambres affichent maintenant 5 statuts: Disponible, Réservée, Occupée, Maintenance, Hors service
+- Le bouton Transférer apparaît sur les réservations confirmées et en cours
+- Le dashboard affiche les chambres réservées dans les stats
+- Fonction recomputeRoomStatus() garantit la cohérence des statuts

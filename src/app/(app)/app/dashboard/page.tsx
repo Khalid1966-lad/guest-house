@@ -37,6 +37,7 @@ interface Statistics {
   rooms: {
     total: number
     available: number
+    reserved: number
     occupied: number
     maintenance: number
     outOfOrder: number
@@ -176,7 +177,7 @@ export default function DashboardPage() {
             </div>
             <Progress value={stats?.performance.occupancyRate || 0} className="h-2 mt-2" />
             <p className="text-xs text-gray-500 mt-2">
-              {stats?.rooms.occupied || 0}/{stats?.rooms.total || 0} chambres occupées
+              {stats?.rooms.occupied || 0} occupée{((stats?.rooms.occupied || 0) > 1 ? "s" : "")} / {stats?.rooms.reserved || 0} réservée{((stats?.rooms.reserved || 0) > 1 ? "s" : "")}
             </p>
           </CardContent>
         </Card>
@@ -353,12 +354,19 @@ export default function DashboardPage() {
             <CardDescription>Répartition actuelle</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-sky-50 dark:bg-sky-950 rounded-lg">
               <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full" />
+                <div className="w-3 h-3 bg-sky-500 rounded-full" />
                 <span className="text-sm">Disponibles</span>
               </div>
               <span className="font-semibold">{stats?.rooms.available || 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-950 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-violet-500 rounded-full" />
+                <span className="text-sm">Réservées</span>
+              </div>
+              <span className="font-semibold">{stats?.rooms.reserved || 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
               <div className="flex items-center gap-3">

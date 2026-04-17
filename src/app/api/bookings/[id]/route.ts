@@ -5,6 +5,28 @@ import { db } from "@/lib/db"
 import { notifyCheckIn, notifyCheckOut, notifyBookingCancelled } from "@/lib/notifications"
 import { autoAssignCleaning } from "@/lib/housekeeping-assign"
 
+/**
+ * Helper: compute the correct room status based on remaining active bookings.
+ * Returns "reserved" if there are confirmed/pending bookings, "occupied" if checked_in, else "available".
+ */
+async function recomputeRoomStatus(roomId: string, guestHouseId: string): Promise<string> {
+  const activeBookings = await db.booking.findMany({
+    where: {
+      roomId,
+      guestHouseId,
+      status: { in: ["confirmed", "checked_in", "pending"] },
+    },
+    select: { status: true },
+  })
+
+  if (activeBookings.length === 0) return "available"
+
+  const hasCheckedIn = activeBookings.some((b) => b.status === "checked_in")
+  if (hasCheckedIn) return "occupied"
+
+  return "reserved"
+}
+
 // GET - Get a single booking
 export async function GET(
   request: NextRequest,
@@ -234,7 +256,7 @@ export async function PATCH(
         updateData.actualCheckIn = new Date()
         updateData.checkedInBy = session.user.id
 
-        // Update room status and reset cleaning status (room is now occupied)
+        // Update room status to occupied
         await db.room.update({
           where: { id: existingBooking.roomId },
           data: { status: "occupied" },
@@ -258,15 +280,18 @@ export async function PATCH(
         updateData.actualCheckOut = new Date()
         updateData.checkedOutBy = session.user.id
 
-        // Update room status (always succeeds)
+        // Recompute room status (may stay reserved if other bookings exist)
+        const newRoomStatus = await recomputeRoomStatus(
+          existingBooking.roomId,
+          session.user.guestHouseId
+        )
+
         await db.room.update({
           where: { id: existingBooking.roomId },
-          data: {
-            status: "available",
-          },
+          data: { status: newRoomStatus },
         })
 
-        // Update cleaning status (may fail if migration not applied yet — non-blocking)
+        // Update cleaning status (non-blocking)
         try {
           await db.room.update({
             where: { id: existingBooking.roomId },
@@ -276,10 +301,10 @@ export async function PATCH(
             },
           })
         } catch (cleaningErr) {
-          console.warn("[checkout] Could not set cleaningStatus (migration may be missing):", (cleaningErr as Error).message)
+          console.warn("[checkout] Could not set cleaningStatus:", (cleaningErr as Error).message)
         }
 
-        // Auto-assign housekeeping task (await to capture warnings for the response)
+        // Auto-assign housekeeping task
         try {
           const assignResult = await autoAssignCleaning(existingBooking.roomId, session.user.guestHouseId)
           if (assignResult.unassigned && assignResult.warning) {
@@ -293,6 +318,38 @@ export async function PATCH(
       if (status === "cancelled") {
         updateData.cancelledAt = new Date()
         updateData.cancelledBy = session.user.id
+
+        // Recompute room status (free the room if no other active bookings)
+        const newRoomStatus = await recomputeRoomStatus(
+          existingBooking.roomId,
+          session.user.guestHouseId
+        )
+
+        await db.room.update({
+          where: { id: existingBooking.roomId },
+          data: { status: newRoomStatus },
+        })
+      }
+
+      if (status === "no_show") {
+        // Recompute room status (free the room if no other active bookings)
+        const newRoomStatus = await recomputeRoomStatus(
+          existingBooking.roomId,
+          session.user.guestHouseId
+        )
+
+        await db.room.update({
+          where: { id: existingBooking.roomId },
+          data: { status: newRoomStatus },
+        })
+      }
+
+      if (status === "confirmed") {
+        // When a pending booking is confirmed, set room to reserved
+        await db.room.update({
+          where: { id: existingBooking.roomId },
+          data: { status: "reserved" },
+        })
       }
     }
 
@@ -357,6 +414,17 @@ export async function DELETE(
     // Actually delete the booking
     await db.booking.delete({
       where: { id },
+    })
+
+    // Recompute room status after deletion (free the room if no other active bookings)
+    const newRoomStatus = await recomputeRoomStatus(
+      existingBooking.roomId,
+      session.user.guestHouseId
+    )
+
+    await db.room.update({
+      where: { id: existingBooking.roomId },
+      data: { status: newRoomStatus },
     })
 
     return NextResponse.json({ success: true })
