@@ -54,6 +54,7 @@ import {
   CheckCircle,
   Info,
   Database,
+  BookOpen,
 } from "lucide-react"
 
 // Types
@@ -409,12 +410,20 @@ export default function AdminGuestHousesPage() {
             <p className="text-sm text-gray-500">Gestion des maisons d'hôtes</p>
           </div>
         </div>
-        <Link href="/app/admin/backup">
-          <Button variant="outline" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">
-            <Database className="w-4 h-4 mr-2" />
-            Sauvegardes
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/app/admin/guide">
+            <Button variant="outline" className="text-violet-600 hover:bg-violet-50 hover:text-violet-700">
+              <BookOpen className="w-4 h-4 mr-2" />
+              Guide Admin
+            </Button>
+          </Link>
+          <Link href="/app/admin/backup">
+            <Button variant="outline" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">
+              <Database className="w-4 h-4 mr-2" />
+              Sauvegardes
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}

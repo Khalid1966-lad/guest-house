@@ -928,3 +928,55 @@ Stage Summary:
 - Checkout response includes a warning message explaining the reason
 - Housekeeping page now shows amber "Non assigné" indicator on unassigned task cards
 - 4 diagnostic messages cover all edge cases (no staff, no schedules, not today, not now)
+
+---
+Task ID: super-admin-guide
+Agent: Main
+Task: Create comprehensive Super Admin guide page
+
+Work Log:
+- Read existing guide page at src/app/(app)/app/guide/page.tsx to understand component structure
+- Replicated GuideSection/GuideContent interfaces, GuideSearch, ContentBlock, SectionCard components
+- Created 8 comprehensive guide sections covering all Super Admin functionality
+- Applied deep purple/violet theme throughout (step numbers, feature checkmarks, info blocks, search dropdown)
+- Added new "info" content block type (violet-themed informational callout)
+- Sections: Introduction, Panel Admin overview, Guesthouse management, Subscriptions, Backups, Pending registrations, Best practices, Glossary
+- Backups section documents all 21 tables, safety backup, dry-run validation, dynamic table discovery
+- All content in French, action-oriented with step-by-step instructions
+- Lint passes with zero errors
+
+Stage Summary:
+- Super Admin guide page created at /app/admin/guide/page.tsx
+- 8 collapsible sections with search functionality and navigation chips
+- Purple/violet theme consistent with Super Admin branding
+- Complete documentation of: Panel Admin, Guesthouses CRUD, Subscriptions (4 plans), Backups (full/guesthouse restore), Pending registrations
+- Links back to admin panel and general user guide in footer
+
+
+---
+Task ID: guide-rewrite-v2.7
+Agent: Main
+Task: Complete rewrite of user guide page for v2.7.0
+
+Work Log:
+- Read existing guide page at `src/app/(app)/app/guide/page.tsx` (1020 lines)
+- Completely rewrote the file with 15 comprehensive sections covering all app features
+- Added new "info" content type (blue-themed informational boxes) to ContentBlock renderer
+- Added "Tous développer" / "Tout réduire" toggle button with expandedAll state
+- Added version badge (v2.7.0) in header area
+- Updated all imports to match required spec (removed unused, added Info, ChevronUp, Sparkles, Clock)
+- Removed all references to "Super Administrateur" / "super_admin" (separate guide)
+- Updated roles section: removed super_admin, added Gouvernant and Gouvernante roles (7 total)
+- Added 3 new sections: Ménage (housekeeping), Notifications, Glossaire
+- Updated existing sections with v2.7.0 features: restaurant integration in invoices, pricing modes, payment methods, seasonal pricing, 30-second polling, etc.
+- Used semantic Tailwind classes (text-muted-foreground, bg-background, bg-muted) instead of hardcoded gray colors
+- All 15 sections with full documentation: Bienvenue, Tableau de bord, Chambres, Réservations, Clients, Facturation, Restaurant, Ménage, Dépenses, Statistiques, Notifications, Paramètres, Rôles et Permissions, L'interface, Glossaire
+- Lint check passed with zero errors
+
+Stage Summary:
+- User guide completely rewritten from ~1020 lines to comprehensive v2.7.0 documentation
+- 15 sections covering every app feature in clear, beginner-friendly French
+- New "info" content type added for informational callout boxes
+- Expand/collapse all functionality added
+- No super_admin references (moved to separate admin guide)
+- 7 roles documented: Propriétaire, Gestionnaire, Réceptionniste, Comptable, Femme de ménage, Gouvernant, Gouvernante
