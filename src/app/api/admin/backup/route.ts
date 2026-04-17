@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
+import { createId } from "@paralleldrive/cuid2"
 import { APP_VERSION } from "@/lib/version"
 
 // Force dynamic rendering (no caching)
@@ -48,32 +49,6 @@ const TABLES_ORDER = [
   "CleaningTaskItem",
   "Notification",
   "AuditLog",
-]
-
-// ============================================
-// Table delete order (reverse dependencies)
-// ============================================
-const TABLES_DELETE_ORDER = [
-  "Notification",
-  "AuditLog",
-  "CleaningTaskItem",
-  "CleaningTask",
-  "Expense",
-  "OrderItem",
-  "RestaurantOrder",
-  "Payment",
-  "InvoiceItem",
-  "Invoice",
-  "Booking",
-  "Guest",
-  "MenuItem",
-  "RoomPrice",
-  "Amenity",
-  "Room",
-  "Role",
-  "GuestHouseSetting",
-  "User",
-  "GuestHouse",
 ]
 
 // ============================================
@@ -134,7 +109,7 @@ async function exportAllData() {
 }
 
 // ============================================
-// GET - List all backups
+// GET - List all backups (RAW SQL - bypass Prisma model)
 // ============================================
 export async function GET() {
   const user = await requireSuperAdmin()
@@ -143,26 +118,32 @@ export async function GET() {
   }
 
   try {
-    const backups = await db.backup.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        label: true,
-        type: true,
-        sizeKo: true,
-        tableCount: true,
-        tableSummary: true,
-        guestHouseList: true,
-        createdBy: true,
-        createdAt: true,
-      },
-    })
+    const backups = await db.$queryRaw<Array<{
+      id: string
+      label: string | null
+      type: string
+      sizeKo: number
+      tableCount: number
+      tableSummary: string
+      guestHouseList: string
+      createdBy: string
+      createdAt: Date
+    }>>`
+      SELECT "id", "label", "type", "sizeKo", "tableCount", "tableSummary", "guestHouseList", "createdBy", "createdAt"
+      FROM "Backup"
+      ORDER BY "createdAt" DESC
+    `
 
-    // Parse JSON fields
     const parsedBackups = backups.map((b) => ({
-      ...b,
+      id: b.id,
+      label: b.label,
+      type: b.type,
+      sizeKo: b.sizeKo,
+      tableCount: b.tableCount,
       tableSummary: JSON.parse(b.tableSummary || "{}"),
       guestHouseList: JSON.parse(b.guestHouseList || "[]"),
+      createdBy: b.createdBy,
+      createdAt: b.createdAt.toISOString(),
     }))
 
     return NextResponse.json({ backups: parsedBackups }, {
@@ -170,12 +151,15 @@ export async function GET() {
     })
   } catch (error) {
     console.error("Erreur récupération backups:", error)
-    return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Erreur interne du serveur",
+      detail: error instanceof Error ? error.message : String(error),
+    }, { status: 500 })
   }
 }
 
 // ============================================
-// POST - Create a backup
+// POST - Create a backup (RAW SQL for Backup table)
 // ============================================
 export async function POST(request: NextRequest) {
   const user = await requireSuperAdmin()
@@ -210,48 +194,40 @@ export async function POST(request: NextRequest) {
     // Calculate size in Ko
     const sizeKo = Math.round(Buffer.byteLength(compressedBase64, "base64") / 1024)
 
-    // Save to DB
-    const backup = await db.backup.create({
-      data: {
-        label: label || null,
-        type,
-        compressedData: compressedBase64,
-        sizeKo,
-        tableCount: TABLES_ORDER.length,
-        tableSummary: JSON.stringify(tableSummary),
-        guestHouseList: JSON.stringify(guestHouseList),
-        createdBy: user.id,
-      },
-    })
+    // Generate ID
+    const id = createId()
+
+    // Insert using raw SQL
+    await db.$executeRaw`
+      INSERT INTO "Backup" ("id", "label", "type", "compressedData", "sizeKo", "tableCount", "tableSummary", "guestHouseList", "createdBy", "createdAt")
+      VALUES (${id}, ${label || null}, ${type}, ${compressedBase64}, ${sizeKo}, ${TABLES_ORDER.length}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${user.id}, NOW())
+    `
 
     // Auto cleanup: keep max 5 auto backups
     if (type === "auto") {
-      const autoBackups = await db.backup.findMany({
-        where: { type: "auto" },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      })
-
+      const autoBackups = await db.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Backup" WHERE "type" = 'auto' ORDER BY "createdAt" DESC
+      `
       if (autoBackups.length > 5) {
-        const toDelete = autoBackups.slice(5)
-        await db.backup.deleteMany({
-          where: { id: { in: toDelete.map((b) => b.id) } },
-        })
+        const toDeleteIds = autoBackups.slice(5)
+        for (const b of toDeleteIds) {
+          await db.$executeRaw`DELETE FROM "Backup" WHERE "id" = ${b.id}`
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
       backup: {
-        id: backup.id,
-        label: backup.label,
-        type: backup.type,
-        sizeKo: backup.sizeKo,
-        tableCount: backup.tableCount,
+        id,
+        label: label || null,
+        type,
+        sizeKo,
+        tableCount: TABLES_ORDER.length,
         tableSummary,
         guestHouseList,
-        createdBy: backup.createdBy,
-        createdAt: backup.createdAt,
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
       },
     })
   } catch (error) {
@@ -278,20 +254,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id requis" }, { status: 400 })
     }
 
-    const backup = await db.backup.findUnique({
-      where: { id },
-      select: { id: true, label: true, createdAt: true },
-    })
+    // Check existence with raw SQL
+    const existing = await db.$queryRaw<Array<{ id: string; label: string | null }>>`
+      SELECT "id", "label" FROM "Backup" WHERE "id" = ${id}
+    `
 
-    if (!backup) {
+    if (!existing || existing.length === 0) {
       return NextResponse.json({ error: "Backup non trouvé" }, { status: 404 })
     }
 
-    await db.backup.delete({ where: { id } })
+    await db.$executeRaw`DELETE FROM "Backup" WHERE "id" = ${id}`
 
     return NextResponse.json({
       success: true,
-      message: `Backup "${backup.label || backup.id}" supprimé avec succès`,
+      message: `Backup "${existing[0].label || existing[0].id}" supprimé avec succès`,
     })
   } catch (error) {
     console.error("Erreur suppression backup:", error)

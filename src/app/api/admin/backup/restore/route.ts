@@ -248,7 +248,7 @@ function filterByGuestHouse(
 }
 
 // ============================================
-// POST - Restore from backup
+// POST - Restore from backup (RAW SQL for Backup fetch)
 // ============================================
 export async function POST(request: NextRequest) {
   const user = await requireSuperAdmin()
@@ -264,14 +264,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const backup = await db.backup.findFirst({
-      where: { id },
-    })
+    // Fetch backup using raw SQL — bypasses Prisma model mapping
+    const results = await db.$queryRaw<Array<{
+      id: string
+      label: string | null
+      compressedData: string
+    }>>`
+      SELECT "id", "label", "compressedData"
+      FROM "Backup"
+      WHERE "id" = ${id}
+    `
 
-    if (!backup) {
+    if (!results || results.length === 0) {
       return NextResponse.json({ error: "Backup non trouvé" }, { status: 404 })
     }
 
+    const backup = results[0]
     const { tables, version, exportedAt } = parseBackupData(backup.compressedData)
 
     if (guestHouseId) {

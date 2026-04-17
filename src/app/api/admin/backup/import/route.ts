@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
+import { createId } from "@paralleldrive/cuid2"
 
 // ============================================
 // Super Admin guard
@@ -21,7 +22,7 @@ async function requireSuperAdmin() {
 }
 
 // ============================================
-// POST - Import a backup from uploaded .json.gz file
+// POST - Import a backup from uploaded .json.gz file (RAW SQL for Backup insert)
 // ============================================
 export async function POST(request: NextRequest) {
   const user = await requireSuperAdmin()
@@ -33,7 +34,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get("file") as File | null
     const label = formData.get("label") as string | null
-    const importMode = formData.get("mode") as string | null // "store" | "restore"
 
     if (!file) {
       return NextResponse.json({ error: "Fichier requis" }, { status: 400 })
@@ -113,39 +113,27 @@ export async function POST(request: NextRequest) {
     // Count non-empty tables
     const tableCount = Object.values(tableSummary).filter((c) => c > 0).length
 
-    if (importMode === "restore") {
-      // Direct restore mode - clear DB and restore immediately
-      // This is handled by returning the data and letting client call restore API
-      // Store temporarily and return backup ID
-    }
+    // Generate ID and insert using raw SQL
+    const id = createId()
 
-    // Store as new backup
-    const backup = await db.backup.create({
-      data: {
-        label: label || `Import: ${file.name}`,
-        type: "manual",
-        compressedData: compressedBase64,
-        sizeKo,
-        tableCount,
-        tableSummary: JSON.stringify(tableSummary),
-        guestHouseList: JSON.stringify(guestHouseList),
-        createdBy: user.id,
-      },
-    })
+    await db.$executeRaw`
+      INSERT INTO "Backup" ("id", "label", "type", "compressedData", "sizeKo", "tableCount", "tableSummary", "guestHouseList", "createdBy", "createdAt")
+      VALUES (${id}, ${label || `Import: ${file.name}`}, ${'manual'}, ${compressedBase64}, ${sizeKo}, ${tableCount}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${user.id}, NOW())
+    `
 
     return NextResponse.json({
       success: true,
       message: "Sauvegarde importée avec succès",
       backup: {
-        id: backup.id,
-        label: backup.label,
-        type: backup.type,
-        sizeKo: backup.sizeKo,
-        tableCount: backup.tableCount,
+        id,
+        label: label || `Import: ${file.name}`,
+        type: "manual",
+        sizeKo,
+        tableCount,
         tableSummary,
         guestHouseList,
-        createdBy: backup.createdBy,
-        createdAt: backup.createdAt,
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
       },
       meta: {
         originalFilename: file.name,

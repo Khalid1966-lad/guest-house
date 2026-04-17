@@ -58,7 +58,7 @@ server.log
 
 # Embedded repo
 guest-house/
-download/
+/download/
 .zscripts/
 worklog.md
 examples/

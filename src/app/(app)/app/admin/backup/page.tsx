@@ -146,16 +146,22 @@ export default function AdminBackupPage() {
   }, [session, sessionStatus, router])
 
   // Fetch backups
+  const [listError, setListError] = useState<string | null>(null)
+
   const fetchBackups = async () => {
     setIsLoading(true)
+    setListError(null)
     try {
       const res = await fetch("/api/admin/backup")
       const data = await res.json()
       if (res.ok) {
         setBackups(data.backups || [])
+      } else {
+        setListError(data.error || data.detail || `Erreur ${res.status}`)
       }
     } catch (err) {
       console.error("Erreur chargement backups:", err)
+      setListError("Erreur réseau")
     } finally {
       setIsLoading(false)
     }
@@ -482,6 +488,20 @@ export default function AdminBackupPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* List error banner */}
+      {listError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-700">Erreur de chargement</p>
+            <p className="text-xs text-red-600 mt-0.5">{listError}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={fetchBackups} className="shrink-0 text-red-700 hover:text-red-800 hover:bg-red-100">
+            Réessayer
+          </Button>
+        </div>
+      )}
 
       {/* Info banner */}
       <div className="p-4 bg-sky-50 border border-sky-200 rounded-lg flex items-start gap-3">
