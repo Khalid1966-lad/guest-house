@@ -389,7 +389,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Wrap in transaction for safety
+      // Wrap in transaction for safety (2 min timeout for large datasets)
       const result = await db.$transaction(async (tx) => {
         const existingGh = await tx.guestHouse.findUnique({
           where: { id: guestHouseId },
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
         }
 
         return insertAllTables(filteredTables, tx)
-      })
+      }, { timeout: 120_000 })
 
       const warnings = result.errors.length > 0 ? result.errors : undefined
 
@@ -418,12 +418,12 @@ export async function POST(request: NextRequest) {
         meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })
     } else {
-      // ─── Full restore (wrapped in transaction) ───────────────
+      // ─── Full restore (wrapped in transaction, 2 min timeout) ───────────────
       const result = await db.$transaction(async (tx) => {
         const deleteErrors = await clearAllTables(tx)
         const insertResult = await insertAllTables(tables, tx)
         return { deleteErrors, insertResult }
-      })
+      }, { timeout: 120_000 })
 
       const allErrors = [...result.deleteErrors, ...result.insertResult.errors]
       const warnings = allErrors.length > 0 ? allErrors : undefined
