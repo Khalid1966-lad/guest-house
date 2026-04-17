@@ -694,19 +694,19 @@ export default function BookingsPage() {
       <div className="flex justify-end">
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
           <Button
-            variant={viewMode === "calendar" ? "default" : "ghost"}
+            variant="ghost"
             size="sm"
             onClick={() => setViewMode("calendar")}
-            className={viewMode === "calendar" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-700 dark:text-gray-300"}
+            className={viewMode === "calendar" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}
           >
             <CalendarDays className="w-4 h-4 mr-2" />
             Calendrier
           </Button>
           <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
+            variant="ghost"
             size="sm"
             onClick={() => setViewMode("list")}
-            className={viewMode === "list" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-700 dark:text-gray-300"}
+            className={viewMode === "list" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}
           >
             <Search className="w-4 h-4 mr-2" />
             Liste

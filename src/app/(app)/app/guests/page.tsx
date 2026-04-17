@@ -399,14 +399,14 @@ export default function GuestsPage() {
               {filteredGuests.map((guest) => (
                 <div
                   key={guest.id}
-                  className="flex items-center justify-between py-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                  className="flex flex-col gap-2 py-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                 >
                   <div 
                     className="flex items-center gap-4 flex-1 cursor-pointer"
                     onClick={() => router.push(`/app/guests/${guest.id}`)}
                   >
                     {/* Avatar */}
-                    <div className="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center shrink-0">
                       <span className="text-lg font-semibold text-sky-600">
                         {guest.firstName.charAt(0)}{guest.lastName.charAt(0)}
                       </span>
@@ -441,46 +441,88 @@ export default function GuestsPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Stats — desktop */}
+                    <div className="hidden sm:flex items-center gap-6 mr-4">
+                      <div className="text-center">
+                        <p className="font-semibold">{guest._count?.bookings || 0}</p>
+                        <p className="text-xs text-gray-500">Séjours</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-semibold text-sky-600">
+                          {guest.totalSpent > 0 ? formatAmount(guest.totalSpent) : "-"}
+                        </p>
+                        <p className="text-xs text-gray-500">Total</p>
+                      </div>
+                    </div>
+
+                    {/* Actions — desktop */}
+                    <div className="hidden sm:flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => router.push(`/app/guests/${guest.id}`)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditGuest(guest)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-600"
+                        onClick={() => handleDeleteGuest(guest.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="hidden sm:flex items-center gap-6 mr-4">
-                    <div className="text-center">
-                      <p className="font-semibold">{guest._count?.bookings || 0}</p>
-                      <p className="text-xs text-gray-500">Séjours</p>
+                  {/* Mobile: stats + actions below */}
+                  <div className="flex sm:hidden items-center justify-between pl-16">
+                    <div className="flex items-center gap-4">
+                      <div className="text-center">
+                        <p className="font-semibold text-sm">{guest._count?.bookings || 0}</p>
+                        <p className="text-[11px] text-gray-500">Séjours</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-semibold text-sm text-sky-600">
+                          {guest.totalSpent > 0 ? formatAmount(guest.totalSpent) : "-"}
+                        </p>
+                        <p className="text-[11px] text-gray-500">Total</p>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <p className="font-semibold text-sky-600">
-                        {guest.totalSpent > 0 ? formatAmount(guest.totalSpent) : "-"}
-                      </p>
-                      <p className="text-xs text-gray-500">Total</p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => router.push(`/app/guests/${guest.id}`)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleEditGuest(guest)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600"
+                        onClick={() => handleDeleteGuest(guest.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => router.push(`/app/guests/${guest.id}`)}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditGuest(guest)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-600"
-                      onClick={() => handleDeleteGuest(guest.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
               ))}
