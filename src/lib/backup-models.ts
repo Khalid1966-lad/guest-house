@@ -65,6 +65,7 @@ export const DEPENDENCIES: Record<string, Set<string>> = {
   Amenity: new Set(["GuestHouse"]),
   Guest: new Set(["GuestHouse"]),
   Booking: new Set(["GuestHouse", "Guest", "Room", "User"]),
+  Occupant: new Set(["Booking"]),
   Invoice: new Set(["GuestHouse", "Guest", "User"]),
   InvoiceItem: new Set(["Invoice"]),
   Payment: new Set(["GuestHouse", "Invoice", "Booking", "User"]),

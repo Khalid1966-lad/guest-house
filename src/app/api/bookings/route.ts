@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
         status: true,
         source: true,
         guestNotes: true,
+        notes: true,
         extraBeds: true,
         extraBedPrice: true,
         babyBed: true,
@@ -104,6 +105,20 @@ export async function GET(request: NextRequest) {
         invoice: {
           select: {
             id: true,
+          },
+        },
+        occupants: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            dateOfBirth: true,
+            nationality: true,
+            idType: true,
+            idNumber: true,
+            isAdult: true,
+            isMainBooker: true,
+            relationship: true,
           },
         },
       },

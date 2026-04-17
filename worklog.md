@@ -980,3 +980,79 @@ Stage Summary:
 - Expand/collapse all functionality added
 - No super_admin references (moved to separate admin guide)
 - 7 roles documented: Propriétaire, Gestionnaire, Réceptionniste, Comptable, Femme de ménage, Gouvernant, Gouvernante
+
+---
+Task ID: 7-frontend-occupants
+Agent: Main
+Task: Update bookings page with occupants management frontend
+
+Work Log:
+- Added `Occupant` interface with fields: id, firstName, lastName, dateOfBirth, nationality, idType, idNumber, isAdult, isMainBooker, relationship
+- Updated `Booking` interface to include `notes: string | null` and `occupants: Occupant[]`
+- Added `notes: ""` to defaultFormData
+- Added new state variables: `occupants`, `nationalitySearch`, `showNationalitySelect`
+- Added imports: `getNationality`, `searchNationalities`, `nationalities` from `@/lib/nationalities`, `ScrollArea`, `Popover`/`PopoverContent`/`PopoverTrigger`, `Star`, `UserPlus` icons
+- Added occupant handler functions: `handleAddOccupant`, `handleRemoveOccupant`, `handleUpdateOccupant`, `buildOccupantsPayload`
+- Updated `handleNewBooking` to reset occupants to `[]`
+- Updated `handleEditBooking` to populate occupants from booking (excluding main booker) and populate notes field
+- Updated `handleSaveBooking` to save occupants + notes via PUT /api/bookings/[id]/occupants after booking create/update
+- Added Occupants section in Create/Edit dialog:
+  - Main booker auto-card (amber themed, non-removable)
+  - Each additional occupant: compact card with first/last name, DOB, adult/child toggle, nationality (searchable popover with flags), ID type (CIN/Passeport/Carte séjour), ID number, relationship dropdown, delete button
+  - "Ajouter un occupant" button with dashed border
+- Added "Notes réservation" textarea in Create/Edit dialog (separate from guest notes)
+- Added Occupants section in Booking Detail dialog: compact cards showing name, nationality flag+name, ID info, adult/child badge, relationship badge, main booker star badge
+- Added booking-level notes display in detail dialog (amber themed)
+- Updated DayBookingRow to show occupant count with UserPlus icon
+- All lint checks pass, dev server compiles without errors
+
+Stage Summary:
+- Full occupants management UI added to bookings page
+- Occupants saved via PUT /api/bookings/[id]/occupants after booking create/update
+- Nationality searchable dropdown using Popover + ScrollArea with flag+name display
+- Main booker auto-created from form firstName/lastName, shown as non-removable amber card
+- Booking-level notes field added (separate from guest notes)
+- Occupant count shown in day view booking rows
+- Occupant details visible in booking detail dialog with nationality flags
+
+---
+Task ID: occupants-system
+Agent: Main
+Task: Implement occupants management system for reservations
+
+Work Log:
+- Added Occupant model to all 3 Prisma schemas (schema.prisma, schema.sqlite.prisma, schema.postgresql.prisma)
+  - Fields: id, bookingId, guestHouseId, firstName, lastName, dateOfBirth, nationality, idType, idNumber, isAdult, isMainBooker, relationship
+  - Relation: Booking has many Occupants (onDelete: Cascade)
+- Added notes field to Booking model (global reservation notes)
+- Updated backup-models.ts DEPENDENCIES with Occupant
+- Pushed SQLite schema to local database successfully
+- Created exhaustive nationality list at src/lib/nationalities.ts (170+ countries with ISO codes, French names, emoji flags)
+- Created API endpoints:
+  - GET /api/bookings/[id]/occupants - list occupants for a booking
+  - POST /api/bookings/[id]/occupants - add single occupant
+  - PUT /api/bookings/[id]/occupants - bulk replace occupants + update booking notes
+  - PATCH /api/occupants/[id] - update individual occupant
+  - DELETE /api/occupants/[id] - delete occupant (prevents deleting main booker)
+- Updated GET /api/bookings to include occupants and notes in response
+- Updated GET /api/bookings/[id] to include occupants in response
+- Updated bookings page frontend:
+  - Added Occupant interface and updated Booking interface with occupants + notes
+  - Added occupants state management and handlers
+  - Added searchable nationality selector with Popover (flags + search)
+  - Main booker auto-created from form data, shown as non-removable amber card
+  - Additional occupants: expandable cards with name, DOB, adult/child toggle, nationality, ID type+number, relationship, delete
+  - Booking notes textarea in create/edit dialog
+  - Occupants saved via PUT /api/bookings/[id]/occupants after booking creation/update
+  - Occupants shown in booking detail dialog with flags, badges
+  - Occupant count shown in DayBookingRow with UserPlus icon
+- All lint checks pass clean, dev server compiles successfully
+
+Stage Summary:
+- Full occupants management system implemented for each reservation
+- Main booker (réservant) is auto-created from client form data, non-removable
+- Additional occupants can be added with complete information: name, DOB, nationality (searchable with flags), ID type/number, adult/child, relationship
+- Nationality list covers 170+ countries with exhaustive search
+- Booking-level notes field added (separate from guest notes)
+- Occupants displayed in booking details with visual badges
+- Occupant count shown in day view booking rows

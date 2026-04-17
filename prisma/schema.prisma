@@ -411,8 +411,35 @@ model Booking {
   cancelledBy   String?
   cancelReason  String?
   
+  // Notes globales sur la réservation
+  notes         String?
+  
   invoice       Invoice?
   payments      Payment[]
+  occupants     Occupant[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// OCCUPANTS (personnes hébergées)
+// ============================================
+model Occupant {
+  id            String   @id @default(cuid())
+  bookingId     String
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  guestHouseId  String
+  
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime?
+  nationality   String?   // Code ISO 3166-1 alpha-2 (ex: MA, FR, DZ...)
+  idType        String?   // CIN, PASSEPORT, CARTE_SEJOUR
+  idNumber      String?
+  isAdult       Boolean  @default(true)
+  isMainBooker  Boolean  @default(false) // Le réservataire (client principal)
+  relationship  String?  // Lien avec le réservataire (conjoint, enfant, ami, collegue, autre)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

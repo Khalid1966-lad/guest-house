@@ -65,7 +65,12 @@ import {
   Eye,
   Filter,
   XCircle,
+  Star,
+  UserPlus,
 } from "lucide-react"
+import { getNationality, searchNationalities, nationalities } from "@/lib/nationalities"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addDays, subDays, isToday, parseISO, startOfDay } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -94,6 +99,19 @@ interface Room {
   babyBedPrice: number
 }
 
+interface Occupant {
+  id?: string
+  firstName: string
+  lastName: string
+  dateOfBirth: string | null
+  nationality: string | null
+  idType: string | null
+  idNumber: string | null
+  isAdult: boolean
+  isMainBooker: boolean
+  relationship: string | null
+}
+
 interface Booking {
   id: string
   checkIn: string
@@ -105,12 +123,14 @@ interface Booking {
   status: string
   source: string
   guestNotes: string | null
+  notes: string | null
   extraBeds: number
   extraBedPrice: number
   babyBed: boolean
   babyBedPrice: number
   guest: Guest
   room: Room
+  occupants: Occupant[]
 }
 
 // Status colors and labels
@@ -157,6 +177,7 @@ const defaultFormData = {
   nightlyRate: "",
   source: "direct",
   guestNotes: "",
+  notes: "",
   extraBeds: "0",
   babyBed: false,
 }
@@ -207,6 +228,12 @@ function DayBookingRow({
               <Users className="w-3 h-3" />
               {booking.adults}{booking.children > 0 ? ` + ${booking.children} enf.` : ""}
             </span>
+            {booking.occupants && booking.occupants.length > 0 && (
+              <span className="flex items-center gap-1">
+                <UserPlus className="w-3 h-3" />
+                {booking.occupants.length}
+              </span>
+            )}
           </div>
         </div>
         <Badge className={cn("shrink-0 hidden sm:flex", statusInfo.bg, statusInfo.color, "border-0")}>
@@ -281,6 +308,9 @@ export default function BookingsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [occupants, setOccupants] = useState<Occupant[]>([])
+  const [nationalitySearch, setNationalitySearch] = useState("")
+  const [showNationalitySelect, setShowNationalitySelect] = useState<string | null>(null)
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -371,10 +401,57 @@ export default function BookingsPage() {
   const goToNextDay = () => setCurrentDate(addDays(currentDate, 1))
   const goToToday = () => setCurrentDate(new Date())
 
+  // ─── Occupant handlers ─────────────────────────────────────
+  const handleAddOccupant = () => {
+    setOccupants((prev) => [
+      ...prev,
+      {
+        firstName: "",
+        lastName: "",
+        dateOfBirth: null,
+        nationality: null,
+        idType: null,
+        idNumber: null,
+        isAdult: true,
+        isMainBooker: false,
+        relationship: null,
+      },
+    ])
+  }
+
+  const handleRemoveOccupant = (index: number) => {
+    setOccupants((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleUpdateOccupant = (index: number, field: keyof Occupant, value: string | boolean | null) => {
+    setOccupants((prev) =>
+      prev.map((o, i) => (i === index ? { ...o, [field]: value } : o))
+    )
+  }
+
+  // Build occupants with main booker auto-included
+  const buildOccupantsPayload = () => {
+    const mainBooker: Occupant = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      dateOfBirth: null,
+      nationality: null,
+      idType: null,
+      idNumber: null,
+      isAdult: true,
+      isMainBooker: true,
+      relationship: null,
+    }
+    return [mainBooker, ...occupants]
+  }
+
+  // ─── End occupant handlers ───────────────────────────────────
+
   // Open new booking dialog
   const handleNewBooking = () => {
     setEditingBooking(null)
     setFormData(defaultFormData)
+    setOccupants([])
     setFormError("")
     setIsDialogOpen(true)
   }
@@ -396,7 +473,11 @@ export default function BookingsPage() {
       nightlyRate: booking.nightlyRate.toString(),
       source: booking.source,
       guestNotes: booking.guestNotes || "",
+      notes: booking.notes || "",
     })
+    // Populate occupants (exclude main booker - it's auto-created)
+    const otherOccupants = (booking.occupants || []).filter((o) => !o.isMainBooker)
+    setOccupants(otherOccupants)
     setFormError("")
     setIsDetailOpen(false)
     setIsDialogOpen(true)
@@ -508,6 +589,25 @@ export default function BookingsPage() {
         setFormError(errorData.error || "Erreur lors de la sauvegarde")
         setIsSaving(false)
         return
+      }
+
+      const bookingData = await response.json()
+      const bookingId = bookingData.booking?.id || bookingData.id
+
+      // Save occupants + notes
+      if (bookingId) {
+        try {
+          await fetch(`/api/bookings/${bookingId}/occupants`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              occupants: buildOccupantsPayload(),
+              notes: formData.notes || null,
+            }),
+          })
+        } catch (err) {
+          console.error("Erreur sauvegarde occupants:", err)
+        }
       }
 
       setIsDialogOpen(false)
@@ -1306,8 +1406,51 @@ export default function BookingsPage() {
               {/* Notes */}
               {selectedBooking.guestNotes && (
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Notes</p>
+                  <p className="text-sm text-gray-500 mb-1">Notes client</p>
                   <p className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">{selectedBooking.guestNotes}</p>
+                </div>
+              )}
+
+              {/* Booking Notes */}
+              {selectedBooking.notes && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Notes réservation</p>
+                  <p className="text-sm bg-amber-50 dark:bg-amber-950 p-3 rounded-lg">{selectedBooking.notes}</p>
+                </div>
+              )}
+
+              {/* Occupants */}
+              {selectedBooking.occupants && selectedBooking.occupants.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2 flex items-center gap-2">
+                    <UserPlus className="w-3 h-3" />
+                    Occupants ({selectedBooking.occupants.length})
+                  </p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {selectedBooking.occupants.map((occ, idx) => {
+                      const nat = occ.nationality ? getNationality(occ.nationality) : null
+                      return (
+                        <div key={occ.id || idx} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm">
+                          {occ.isMainBooker && (
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 shrink-0 gap-1">
+                              <Star className="w-3 h-3" />
+                              Réservant
+                            </Badge>
+                          )}
+                          <span className="font-medium">{occ.firstName} {occ.lastName}</span>
+                          {nat && (
+                            <span className="text-gray-500">{nat.flag} {nat.name}</span>
+                          )}
+                          {!occ.isAdult && (
+                            <Badge variant="secondary" className="text-xs">Enfant</Badge>
+                          )}
+                          {occ.relationship && (
+                            <Badge variant="outline" className="text-xs">{occ.relationship}</Badge>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -1698,6 +1841,217 @@ export default function BookingsPage() {
                 placeholder="Demandes spéciales..."
                 rows={2}
               />
+            </div>
+
+            {/* Booking Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes réservation</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleFormChange("notes", e.target.value)}
+                placeholder="Notes internes pour cette réservation..."
+                rows={2}
+              />
+            </div>
+
+            {/* Occupants Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Occupants
+                  <Badge variant="secondary">{occupants.length + 1}</Badge>
+                </h3>
+              </div>
+
+              {/* Main booker card (auto, non-removable) */}
+              <div className="p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="w-4 h-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-700">Réservant principal</span>
+                </div>
+                <p className="text-sm font-medium">
+                  {formData.firstName || "Prénom"} {formData.lastName || "Nom"}
+                </p>
+              </div>
+
+              {/* Additional occupants */}
+              {occupants.length > 0 && (
+                <div className="space-y-3">
+                  {occupants.map((occ, index) => (
+                    <div key={index} className="p-3 border rounded-lg space-y-3 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Occupant {index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRemoveOccupant(index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Prénom *</Label>
+                          <Input
+                            value={occ.firstName}
+                            onChange={(e) => handleUpdateOccupant(index, "firstName", e.target.value)}
+                            placeholder="Prénom"
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Nom *</Label>
+                          <Input
+                            value={occ.lastName}
+                            onChange={(e) => handleUpdateOccupant(index, "lastName", e.target.value)}
+                            placeholder="Nom"
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Date de naissance</Label>
+                          <Input
+                            type="date"
+                            value={occ.dateOfBirth || ""}
+                            onChange={(e) => handleUpdateOccupant(index, "dateOfBirth", e.target.value || null)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Adulte / Enfant</Label>
+                          <div className="flex items-center gap-2 h-9">
+                            <Switch
+                              checked={occ.isAdult}
+                              onCheckedChange={(checked) => handleUpdateOccupant(index, "isAdult", checked)}
+                            />
+                            <span className="text-sm">{occ.isAdult ? "Adulte" : "Enfant"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nationalité</Label>
+                        <Popover
+                          open={showNationalitySelect === `occ-${index}`}
+                          onOpenChange={(open) => {
+                            setShowNationalitySelect(open ? `occ-${index}` : null)
+                            if (open) setNationalitySearch("")
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full h-9 justify-start text-sm font-normal"
+                            >
+                              {occ.nationality ? (() => {
+                                const nat = getNationality(occ.nationality)
+                                return nat ? `${nat.flag} ${nat.name}` : occ.nationality
+                              })() : (
+                                <span className="text-gray-400">Sélectionner...</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 p-0" align="start">
+                            <div className="p-2 border-b">
+                              <Input
+                                placeholder="Rechercher..."
+                                value={nationalitySearch}
+                                onChange={(e) => setNationalitySearch(e.target.value)}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <ScrollArea className="max-h-48">
+                              <div className="p-1">
+                                {searchNationalities(nationalitySearch).slice(0, 30).map((nat) => (
+                                  <button
+                                    key={nat.code}
+                                    type="button"
+                                    className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                                    onClick={() => {
+                                      handleUpdateOccupant(index, "nationality", nat.code)
+                                      setShowNationalitySelect(null)
+                                    }}
+                                  >
+                                    <span>{nat.flag}</span>
+                                    <span>{nat.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Type pièce d'identité</Label>
+                          <Select
+                            value={occ.idType || ""}
+                            onValueChange={(v) => handleUpdateOccupant(index, "idType", v || null)}
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder="Type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CIN">CIN</SelectItem>
+                              <SelectItem value="Passeport">Passeport</SelectItem>
+                              <SelectItem value="Carte de séjour">Carte de séjour</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">N° pièce d'identité</Label>
+                          <Input
+                            value={occ.idNumber || ""}
+                            onChange={(e) => handleUpdateOccupant(index, "idNumber", e.target.value || null)}
+                            placeholder="Numéro..."
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Relation avec le réservant</Label>
+                        <Select
+                          value={occ.relationship || ""}
+                          onValueChange={(v) => handleUpdateOccupant(index, "relationship", v || null)}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Relation..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="conjoint">Conjoint(e)</SelectItem>
+                            <SelectItem value="enfant">Enfant</SelectItem>
+                            <SelectItem value="ami">Ami(e)</SelectItem>
+                            <SelectItem value="collègue">Collègue</SelectItem>
+                            <SelectItem value="autre">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full border-dashed"
+                onClick={handleAddOccupant}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter un occupant
+              </Button>
             </div>
           </div>
 

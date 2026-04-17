@@ -26,6 +26,9 @@ export async function GET(
       include: {
         guest: true,
         room: true,
+        occupants: {
+          orderBy: [{ isMainBooker: "desc" }, { createdAt: "asc" }],
+        },
       },
     })
 
