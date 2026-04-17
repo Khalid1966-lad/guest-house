@@ -1674,13 +1674,17 @@ export default function BookingsPage() {
                 Chambre
               </h3>
               <Select value={formData.roomId} onValueChange={handleRoomSelect}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 text-base">
                   <SelectValue placeholder="Sélectionner une chambre" />
                 </SelectTrigger>
                 <SelectContent>
                   {rooms.map((room) => (
-                    <SelectItem key={room.id} value={room.id}>
-                      Chambre {room.number} - {roomTypes[room.type] || room.type} ({room.capacity} pers.) - {formatAmount(room.basePrice)}/nuit
+                    <SelectItem key={room.id} value={room.id} className="py-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium">Chambre {room.number}{room.name ? ` — ${room.name}` : ""}</span>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">{roomTypes[room.type] || room.type} · {room.capacity} pers.</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{formatAmount(room.basePrice)}/nuit</div>
                     </SelectItem>
                   ))}
                 </SelectContent>
