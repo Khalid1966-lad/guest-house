@@ -728,3 +728,92 @@ Stage Summary:
 - `src/lib/db.ts` — imports and calls ensureSubscriptionTable
 - `src/app/api/admin/subscriptions/route.ts` — resilient try/catch with fallback query
 - All guesthouses will now appear in the subscriptions admin panel
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix login page - keep email autofill, clear password after logout
+
+Work Log:
+- Read login page at src/app/(auth)/login/page.tsx
+- Found that password clearing useEffect was already partially implemented (from previous session)
+- Changed email field autoComplete from "off" to "email" to allow email autofill on shared computers
+- Password field already had autoComplete="new-password" (browser-respected directive to not autofill)
+- useEffect already runs 3 passes (100ms, 500ms, 1000ms) to clear password after browser autofills it
+- Removed email clearing from the useEffect (was already removed in previous session)
+
+Stage Summary:
+- Login form now: email can be autofilled by browser, password is ALWAYS cleared on page load
+- Uses triple-pass setTimeout (100ms/500ms/1000ms) to catch all browser autofill timing variations
+- File modified: src/app/(auth)/login/page.tsx
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Logo/favicon for shared links - Open Graph meta tags
+
+Work Log:
+- Checked existing logo assets in /public folder (icon.png 32x32, android-chrome-512x512.png, etc.)
+- Generated professional OG image (1344x768) using z-ai image generation CLI
+- Saved to /public/og-image.png
+- Added comprehensive Open Graph meta tags to root layout (src/app/layout.tsx):
+  - og:title, og:description, og:url, og:site_name, og:image, og:locale, og:type
+  - twitter:card (summary_large_image), twitter:title, twitter:description, twitter:image
+  - application-name
+- Verified lint passes clean
+
+Stage Summary:
+- Social sharing now displays app logo, title, and description
+- Works with WhatsApp, Facebook, LinkedIn, Twitter/X, Slack, etc.
+- File modified: src/app/layout.tsx
+- File created: /public/og-image.png (1344x768 AI-generated branded image)
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Analyze housekeeping auto-assignment system (analysis only, no code)
+
+Work Log:
+- Reviewed current checkout flow in src/app/api/bookings/[id]/route.ts
+- Reviewed housekeeping task creation in src/app/api/housekeeping/tasks/route.ts
+- Reviewed housekeeping task management in src/app/api/housekeeping/tasks/[id]/route.ts
+- Reviewed housekeeping page UI in src/app/(app)/app/housekeeping/page.tsx
+- Reviewed Prisma schema for CleaningTask, CleaningTaskItem, Room, User models
+- Reviewed GuestHouseSetting model for potential configuration
+
+Stage Summary:
+ANALYSIS - Current System:
+- When a booking is checked out (status → "checked_out"), the room gets:
+  - status → "available"
+  - cleaningStatus → "departure"
+  - cleaningUpdatedAt → now()
+- NO CleaningTask is auto-created at checkout
+- The housekeeping page shows rooms in "départ" status
+- User must manually click "Démarrer le ménage" to create a CleaningTask
+- Manual task creation allows selecting assigned staff, priority, and notes
+- CleaningTask model supports: assignedToId, status (pending/in_progress/completed/verified/needs_repair), priority (low/normal/high)
+
+PROPOSED AUTO-ASSIGNMENT SYSTEM:
+1. Trigger Point: After checkout (PATCH /api/bookings/[id] when status="checked_out")
+2. Auto-create CleaningTask with:
+   - priority: "normal" (default)
+   - status: "pending" (NOT auto-started)
+   - assignedToId: auto-assigned from housekeeping staff
+   - Auto-generated checklist items (same template as manual creation)
+3. Auto-assignment logic (round-robin or least-busy):
+   - Query all active users with role "femmeDeMenage" in the same guestHouseId
+   - Find the one with the fewest active tasks (status in [pending, in_progress])
+   - Assign to that person
+   - If no housekeeping staff exist, create task unassigned
+4. Configuration (in GuestHouseSetting):
+   - autoAssignHousekeeping: Boolean @default(true)
+   - defaultHousekeeperId: String? (optional override)
+5. Room status flow:
+   - "departure" (checkout) → "departure" (task created, pending) 
+   - When staff clicks "Démarrer" → task status "in_progress", room status "cleaning"
+6. Manual override: Full-access roles can always reassign or create tasks manually
+
+FILES TO MODIFY (when coding):
+- prisma/schema.postgresql.prisma: Add autoAssignHousekeeping + defaultHousekeeperId to GuestHouseSetting
+- src/app/api/bookings/[id]/route.ts: Add auto-assignment logic after checkout
+- src/app/(app)/app/housekeeping/page.tsx: Show "Assigné automatiquement" badge
+- src/app/api/settings/route.ts: Add auto-assignment settings endpoints

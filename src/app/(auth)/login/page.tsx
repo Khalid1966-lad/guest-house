@@ -25,19 +25,23 @@ function LoginForm() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
 
-  // Clear autofilled fields on mount (after browser fills them)
+  // Clear ONLY password field after browser autofills it.
+  // Email autofill is kept for convenience on shared computers.
+  // We run multiple passes because some browsers fill asynchronously.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (emailRef.current && emailRef.current.value) {
-        emailRef.current.value = ""
-        setEmail("")
-      }
+    const clearPassword = () => {
       if (passwordRef.current && passwordRef.current.value) {
         passwordRef.current.value = ""
         setPassword("")
       }
-    }, 100)
-    return () => clearTimeout(timer)
+    }
+    // Pass 1: 100ms — catches most autofills
+    const t1 = setTimeout(clearPassword, 100)
+    // Pass 2: 500ms — catches late autofills (Chrome, Edge)
+    const t2 = setTimeout(clearPassword, 500)
+    // Pass 3: 1000ms — catches very late autofills
+    const t3 = setTimeout(clearPassword, 1000)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [])
   const [error, setError] = useState(message === "account_created" ? "" : "")
   const [success, setSuccess] = useState(message === "account_created" ? "Compte créé avec succès ! Connectez-vous pour continuer." : "")
@@ -109,7 +113,7 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit} autoComplete="off">
+          <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -136,7 +140,7 @@ function LoginForm() {
                   required
                   disabled={isLoading}
                   className="h-11"
-                  autoComplete="off"
+                  autoComplete="email"
                 />
               </div>
               
