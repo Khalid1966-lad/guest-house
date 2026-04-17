@@ -67,7 +67,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, startOfDay } from "date-fns"
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addDays, subDays, isToday, parseISO, startOfDay } from "date-fns"
 import { fr } from "date-fns/locale"
 
 // Types
@@ -161,6 +161,102 @@ const defaultFormData = {
   babyBed: false,
 }
 
+// ─── Day View Booking Row ─────────────────────────────────────────
+function DayBookingRow({
+  booking,
+  formatAmount,
+  onView,
+  onEdit,
+  onUpdateStatus,
+  onDelete,
+  getStatusActions,
+}: {
+  booking: Booking
+  formatAmount: (n: number) => string
+  onView: (b: Booking) => void
+  onEdit: (b: Booking) => void
+  onUpdateStatus: (id: string, status: string) => void
+  onDelete: (b: Booking) => void
+  getStatusActions: (b: Booking) => { status: string; label: string; icon: React.ReactNode; className?: string }[]
+}) {
+  const statusInfo = bookingStatuses[booking.status] || bookingStatuses.pending
+  const actions = getStatusActions(booking)
+  const totalNights = Math.max(1, Math.ceil((parseISO(booking.checkOut).getTime() - parseISO(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)))
+
+  return (
+    <div
+      className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-white dark:bg-gray-900 border hover:shadow-sm transition-all"
+    >
+      <div
+        className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+        onClick={() => onView(booking)}
+      >
+        <div className={cn("w-3 h-3 rounded-full shrink-0", statusInfo.bg)} />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium truncate">
+            {booking.guest.firstName} {booking.guest.lastName}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <BedDouble className="w-3 h-3" />
+              {booking.room.number}
+            </span>
+            <span>{formatAmount(booking.totalPrice)}</span>
+            <span>{totalNights} nuit{totalNights > 1 ? "s" : ""}</span>
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {booking.adults}{booking.children > 0 ? ` + ${booking.children} enf.` : ""}
+            </span>
+          </div>
+        </div>
+        <Badge className={cn("shrink-0 hidden sm:flex", statusInfo.bg, statusInfo.color, "border-0")}>
+          {statusInfo.label}
+        </Badge>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 pl-6 sm:pl-0" onClick={(e) => e.stopPropagation()}>
+        {actions.map((action) => (
+          <Button
+            key={action.status}
+            size="sm"
+            variant="outline"
+            className={cn("h-8 text-xs", action.className)}
+            onClick={() => onUpdateStatus(booking.id, action.status)}
+          >
+            {action.icon}
+            {action.label}
+          </Button>
+        ))}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 shrink-0"
+          onClick={() => onView(booking)}
+        >
+          <Eye className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 shrink-0"
+          onClick={() => onEdit(booking)}
+        >
+          <Edit className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 shrink-0 text-red-600"
+          onClick={() => onDelete(booking)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function BookingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -171,7 +267,7 @@ export default function BookingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar")
+  const [viewMode, setViewMode] = useState<"calendar" | "list" | "day">("day")
   const [statusFilter, setStatusFilter] = useState("all")
   const [roomFilter, setRoomFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -271,6 +367,8 @@ export default function BookingsPage() {
   // Navigate months
   const goToPreviousMonth = () => setCurrentDate(subMonths(currentDate, 1))
   const goToNextMonth = () => setCurrentDate(addMonths(currentDate, 1))
+  const goToPreviousDay = () => setCurrentDate(subDays(currentDate, 1))
+  const goToNextDay = () => setCurrentDate(addDays(currentDate, 1))
   const goToToday = () => setCurrentDate(new Date())
 
   // Open new booking dialog
@@ -711,11 +809,195 @@ export default function BookingsPage() {
             <Search className="w-4 h-4 mr-2" />
             Liste
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setViewMode("day")}
+            className={viewMode === "day" ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}
+          >
+            <CalendarIcon className="w-4 h-4 mr-2" />
+            Jour
+          </Button>
         </div>
       </div>
 
-      {/* Calendar View */}
-      {viewMode === "calendar" ? (
+      {/* Day View */}
+      {viewMode === "day" ? (
+        <div className="space-y-6">
+          {/* Day Navigation */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="text-center">
+                  <h2 className={cn(
+                    "text-xl font-semibold capitalize",
+                    isToday(currentDate) && "text-sky-600"
+                  )}>
+                    {format(currentDate, "EEEE d MMMM yyyy", { locale: fr })}
+                  </h2>
+                  {isToday(currentDate) && (
+                    <Badge className="bg-sky-100 text-sky-700 border-sky-200 mt-1">Aujourd&apos;hui</Badge>
+                  )}
+                </div>
+                <Button variant="outline" size="icon" onClick={goToNextDay}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+              {!isToday(currentDate) && (
+                <div className="flex justify-center mt-2">
+                  <Button variant="ghost" size="sm" onClick={goToToday}>
+                    Retour à aujourd&apos;hui
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Day Summary Stats */}
+          {(() => {
+            const dayStr = format(currentDate, "yyyy-MM-dd")
+            const arrivals = filteredBookings.filter(b => format(parseISO(b.checkIn), "yyyy-MM-dd") === dayStr && !["cancelled", "no_show", "checked_out"].includes(b.status))
+            const departures = filteredBookings.filter(b => format(parseISO(b.checkOut), "yyyy-MM-dd") === dayStr && !["cancelled", "no_show"].includes(b.status))
+            const present = filteredBookings.filter(b => {
+              if (["cancelled", "no_show"].includes(b.status)) return false
+              const ci = startOfDay(parseISO(b.checkIn))
+              const co = startOfDay(parseISO(b.checkOut))
+              const today = startOfDay(currentDate)
+              return today >= ci && today < co
+            })
+
+            return (
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/30">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-green-600">{arrivals.length}</p>
+                    <p className="text-sm text-gray-500 mt-1">Arrivées</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/30">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-red-600">{departures.length}</p>
+                    <p className="text-sm text-gray-500 mt-1">Départs</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-sky-200 bg-sky-50/50 dark:border-sky-900 dark:bg-sky-950/30">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-sky-600">{present.length}</p>
+                    <p className="text-sm text-gray-500 mt-1">Présents</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })()}
+
+          {/* Arrivées Section */}
+          {(() => {
+            const dayStr = format(currentDate, "yyyy-MM-dd")
+            const arrivals = filteredBookings.filter(b => format(parseISO(b.checkIn), "yyyy-MM-dd") === dayStr && !["cancelled", "no_show", "checked_out"].includes(b.status))
+            return arrivals.length > 0 ? (
+              <Card className="border-green-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2 text-green-700">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                      <LogIn className="w-4 h-4 text-green-600" />
+                    </div>
+                    Arrivées
+                    <Badge className="bg-green-100 text-green-700 border-green-300">{arrivals.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {arrivals.map((booking) => (
+                      <DayBookingRow key={booking.id} booking={booking} formatAmount={formatAmount} onView={handleViewBooking} onEdit={handleEditBooking} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteClick} getStatusActions={getStatusActions} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-green-100">
+                <CardContent className="p-6 text-center text-gray-400">
+                  <LogIn className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Aucune arrivée ce jour</p>
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          {/* Départs Section */}
+          {(() => {
+            const dayStr = format(currentDate, "yyyy-MM-dd")
+            const departures = filteredBookings.filter(b => format(parseISO(b.checkOut), "yyyy-MM-dd") === dayStr && !["cancelled", "no_show"].includes(b.status))
+            return departures.length > 0 ? (
+              <Card className="border-red-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2 text-red-700">
+                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                      <LogOut className="w-4 h-4 text-red-600" />
+                    </div>
+                    Départs
+                    <Badge className="bg-red-100 text-red-700 border-red-300">{departures.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {departures.map((booking) => (
+                      <DayBookingRow key={booking.id} booking={booking} formatAmount={formatAmount} onView={handleViewBooking} onEdit={handleEditBooking} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteClick} getStatusActions={getStatusActions} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-red-100">
+                <CardContent className="p-6 text-center text-gray-400">
+                  <LogOut className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Aucun départ ce jour</p>
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          {/* Présents Section */}
+          {(() => {
+            const present = filteredBookings.filter(b => {
+              if (["cancelled", "no_show"].includes(b.status)) return false
+              const ci = startOfDay(parseISO(b.checkIn))
+              const co = startOfDay(parseISO(b.checkOut))
+              const today = startOfDay(currentDate)
+              return today >= ci && today < co
+            })
+            return present.length > 0 ? (
+              <Card className="border-sky-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2 text-sky-700">
+                    <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center">
+                      <BedDouble className="w-4 h-4 text-sky-600" />
+                    </div>
+                    En séjour
+                    <Badge className="bg-sky-100 text-sky-700 border-sky-300">{present.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {present.map((booking) => (
+                      <DayBookingRow key={booking.id} booking={booking} formatAmount={formatAmount} onView={handleViewBooking} onEdit={handleEditBooking} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteClick} getStatusActions={getStatusActions} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-sky-100">
+                <CardContent className="p-6 text-center text-gray-400">
+                  <BedDouble className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Aucun client en séjour ce jour</p>
+                </CardContent>
+              </Card>
+            )
+          })()}
+        </div>
+      ) : viewMode === "calendar" ? (
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
