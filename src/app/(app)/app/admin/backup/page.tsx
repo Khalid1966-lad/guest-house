@@ -640,59 +640,60 @@ export default function AdminBackupPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8 text-sky-600 hover:bg-sky-50"
-                          onClick={() => handleDownload(backup)}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Télécharger (.json.gz)</TooltipContent>
-                    </Tooltip>
+                  {/* Expand toggle */}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0">
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </div>
 
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => {
-                            setRestoreDialogId(backup.id)
-                            setRestoreMode("full")
-                            setSelectedGuestHouseId("")
-                            setRestoreResult(null)
-                          }}
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Restaurer</TooltipContent>
-                    </Tooltip>
+                {/* Actions — centered at bottom */}
+                <div className="flex items-center justify-center gap-2 px-4 py-3 border-t bg-gray-50/50" onClick={(e) => e.stopPropagation()}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-8 w-8 text-sky-600 hover:bg-sky-50"
+                        onClick={() => handleDownload(backup)}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Télécharger (.json.gz)</TooltipContent>
+                  </Tooltip>
 
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50"
-                          onClick={() => setDeleteDialogId(backup.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Supprimer</TooltipContent>
-                    </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                        onClick={() => {
+                          setRestoreDialogId(backup.id)
+                          setRestoreMode("full")
+                          setSelectedGuestHouseId("")
+                          setRestoreResult(null)
+                        }}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Restaurer</TooltipContent>
+                  </Tooltip>
 
-                    <Button size="icon" variant="ghost" className="h-8 w-8">
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </Button>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-8 w-8 text-red-600 hover:bg-red-50"
+                        onClick={() => setDeleteDialogId(backup.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Supprimer</TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {/* Expanded details */}

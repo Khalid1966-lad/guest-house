@@ -617,8 +617,14 @@ export default function AdminGuestHousesPage() {
                     <p className="text-xs text-gray-400">~{gh.counts.estimatedSizeKo} Ko</p>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {/* Expand toggle */}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0">
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </div>
+
+                {/* Actions — centered at bottom */}
+                <div className="flex items-center justify-center gap-2 px-4 py-3 border-t bg-gray-50/50" onClick={(e) => e.stopPropagation()}>
                     {gh.status === "pending" && (
                       <Button
                         size="sm"
@@ -688,10 +694,6 @@ export default function AdminGuestHousesPage() {
                         <KeyRound className="w-3 h-3" />
                       </Button>
                     )}
-                    <Button size="icon" variant="ghost" className="h-8 w-8">
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </Button>
-                  </div>
                 </div>
 
                 {/* Détail expansible */}
