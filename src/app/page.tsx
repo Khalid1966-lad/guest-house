@@ -217,42 +217,7 @@ const faqs = [
   },
 ]
 
-const plans = [
-  {
-    name: "Gratuit",
-    price: "0",
-    unit: "/mois",
-    description: "Idéal pour démarrer et découvrir l'application",
-    features: [
-      "1 maison d'hôtes",
-      "Jusqu'à 5 chambres",
-      "Gestion des réservations",
-      "Gestion des clients",
-      "Facturation basique",
-      "Support par email",
-    ],
-    cta: "Commencer gratuitement",
-    popular: false,
-  },
-  {
-    name: "Premium",
-    price: "29",
-    unit: "/mois",
-    description: "Pour les professionnels qui veulent tout automatiser",
-    features: [
-      "Établissements illimités",
-      "Chambres illimitées",
-      "Ménage intelligent & auto-attribution",
-      "Module restaurant complet",
-      "Statistiques & rapports PDF",
-      "Multi-devises",
-      "Gestion d'équipe & permissions",
-      "Support prioritaire",
-    ],
-    cta: "Essai gratuit 14 jours",
-    popular: true,
-  },
-]
+
 
 /* ───────────────────────────────────────────
    COMPONENT
@@ -285,12 +250,6 @@ export default function LandingPage() {
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
             >
               Comment ça marche
-            </a>
-            <a
-              href="#pricing"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Tarifs
             </a>
             <a
               href="#testimonials"
@@ -620,82 +579,6 @@ export default function LandingPage() {
                     <p className="font-semibold text-sm">{t.name}</p>
                     <p className="text-xs text-gray-400">{t.role}</p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── PRICING ─── */}
-      <section id="pricing" className="py-20 md:py-28 px-4 bg-gray-50/70">
-        <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-14">
-            <Badge
-              variant="secondary"
-              className="mb-4 bg-sky-50 text-sky-700 border-sky-200"
-            >
-              Tarifs
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
-              Un prix simple et transparent
-            </h2>
-            <p className="text-gray-500 max-w-xl mx-auto text-lg">
-              Commencez gratuitement, passez à Premium quand vous êtes prêt. Pas
-              de frais cachés.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 items-stretch">
-            {plans.map((p, i) => (
-              <Card
-                key={i}
-                className={`relative overflow-hidden transition-shadow duration-300 ${
-                  p.popular
-                    ? "border-sky-300 shadow-xl shadow-sky-100 scale-[1.02]"
-                    : "border-gray-200 hover:shadow-lg"
-                }`}
-              >
-                {p.popular && (
-                  <div className="absolute top-0 right-0">
-                    <div className="bg-sky-600 text-white text-xs font-semibold px-4 py-1 rounded-bl-xl">
-                      Le plus populaire
-                    </div>
-                  </div>
-                )}
-                <CardHeader className="pb-2 pt-6 px-6">
-                  <CardTitle className="text-xl">{p.name}</CardTitle>
-                  <p className="text-sm text-gray-500">{p.description}</p>
-                </CardHeader>
-                <CardContent className="px-6 pb-6">
-                  <div className="mb-6">
-                    <span className="text-4xl font-extrabold">{p.price} €</span>
-                    <span className="text-gray-400 ml-1">{p.unit}</span>
-                  </div>
-                  <ul className="space-y-3 mb-8">
-                    {p.features.map((f, j) => (
-                      <li key={j} className="flex items-start gap-2.5">
-                        <CheckCircle2
-                          className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                            p.popular ? "text-sky-600" : "text-gray-400"
-                          }`}
-                        />
-                        <span className="text-sm text-gray-600">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/register" className="block">
-                    <Button
-                      className={`w-full h-11 font-semibold ${
-                        p.popular
-                          ? `${brandBg} ${brandBgHover} shadow-lg shadow-sky-200`
-                          : "bg-gray-900 hover:bg-gray-800"
-                      }`}
-                    >
-                      {p.cta}
-                      <ArrowRight className="w-4 h-4 ml-1.5" />
-                    </Button>
-                  </Link>
                 </CardContent>
               </Card>
             ))}
