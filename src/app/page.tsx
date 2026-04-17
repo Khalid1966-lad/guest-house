@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,6 +10,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import {
   CalendarDays,
@@ -40,6 +47,7 @@ import {
   Phone,
   MapPin,
   ExternalLink,
+  Menu,
 } from "lucide-react"
 import { LandingFooter } from "@/components/layout/footer"
 
@@ -48,6 +56,14 @@ const brand = "text-sky-600"
 const brandBg = "bg-sky-600"
 const brandBgLight = "bg-sky-50"
 const brandBgHover = "hover:bg-sky-700"
+
+const navLinks = [
+  { label: "Fonctionnalités", href: "#features" },
+  { label: "Comment ça marche", href: "#how-it-works" },
+  { label: "Témoignages", href: "#testimonials" },
+  { label: "Devis", href: "#quote" },
+  { label: "FAQ", href: "#faq" },
+]
 
 /* ───────────────────────────────────────────
    DATA
@@ -221,6 +237,9 @@ const faqs = [
    ─────────────────────────────────────────── */
 
 export default function LandingPage() {
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const closeMobile = () => setMobileOpen(false)
+
   return (
     <div className="min-h-screen bg-white">
       {/* ─── HEADER ─── */}
@@ -235,44 +254,82 @@ export default function LandingPage() {
             </span>
           </Link>
 
+          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Fonctionnalités
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Comment ça marche
-            </a>
-            <a
-              href="#testimonials"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Témoignages
-            </a>
-            <a
-              href="#faq"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              FAQ
-            </a>
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link href="/login">
-              <Button variant="ghost" size="sm" className="hidden sm:flex">
+            <Link href="/login" className="hidden sm:block">
+              <Button variant="ghost" size="sm">
                 Se connecter
               </Button>
             </Link>
-            <Link href="/register">
+            <Link href="/register" className="hidden sm:block">
               <Button className={`${brandBg} ${brandBgHover}`} size="sm">
                 Essai gratuit
               </Button>
             </Link>
+
+            {/* Mobile hamburger */}
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden w-10 h-10"
+                  aria-label="Menu"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 p-0">
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <div className="flex items-center gap-2.5 px-5 h-16 border-b">
+                  <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center">
+                    <Hotel className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="font-bold">PMS Guest House</span>
+                </div>
+                <nav className="flex flex-col px-3 py-4 gap-1">
+                  {navLinks.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      onClick={closeMobile}
+                      className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                  <div className="border-t my-3" />
+                  <Link href="/login" onClick={closeMobile}>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start px-3 font-medium"
+                    >
+                      Se connecter
+                    </Button>
+                  </Link>
+                  <Link href="/register" onClick={closeMobile}>
+                    <Button
+                      className={`w-full ${brandBg} ${brandBgHover} font-semibold mt-1`}
+                    >
+                      Essai gratuit
+                      <ArrowRight className="w-4 h-4 ml-1.5" />
+                    </Button>
+                  </Link>
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
