@@ -626,6 +626,69 @@ export function Sidebar() {
 
 // ─── Header ────────────────────────────────────────────────────────────────
 
+function HeaderUserMenu() {
+  const { data: session } = useSession()
+  const { theme, setTheme } = useTheme()
+
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: "/login" })
+  }
+
+  const initials = session?.user?.name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase() || "U"
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+          <Avatar className="h-8 w-8 ring-2 ring-sky-200 dark:ring-sky-800">
+            {session?.user?.avatar && <AvatarImage src={session.user.avatar} alt={session.user.name || ""} />}
+            <AvatarFallback className="bg-sky-100 text-sky-700 text-xs font-semibold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>
+          <p className="text-sm font-medium truncate">{session?.user?.name}</p>
+          <p className="text-xs text-muted-foreground capitalize">
+            {session?.user?.role === "super_admin" ? "Super Admin" : session?.user?.role}
+          </p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/app/settings/profile" className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            Paramètres
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+          {theme === "dark" ? (
+            <>
+              <Sun className="mr-2 h-4 w-4" />
+              Mode clair
+            </>
+          ) : (
+            <>
+              <Moon className="mr-2 h-4 w-4" />
+              Mode sombre
+            </>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+          <LogOut className="mr-2 h-4 w-4" />
+          Déconnexion
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function Header() {
   return (
     <header className="h-16 border-b bg-white dark:bg-gray-900 flex items-center justify-between px-4 lg:px-6">
@@ -633,6 +696,10 @@ export function Header() {
       <div className="flex-1" />
       <div className="flex items-center gap-2">
         <NotificationBell />
+        {/* Mobile-only user menu for quick disconnect */}
+        <div className="lg:hidden">
+          <HeaderUserMenu />
+        </div>
       </div>
     </header>
   )
