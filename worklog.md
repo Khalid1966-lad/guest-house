@@ -708,3 +708,23 @@ Stage Summary:
 - Les abonnements sont automatiquement sauvegardés/restaurés avec le système de backup
 - Le super admin a un panel complet pour gérer les abonnements avec prolongation rapide (+30j, +90j, +1an)
 - Les propriétaires voient leur date d'expiration dans le footer et un bandeau d'alerte en cas de problème
+
+---
+Task ID: 1
+Agent: main
+Task: Fix subscriptions page - all guesthouses should be visible
+
+Work Log:
+- Identified root cause: Subscription table was never created on PostgreSQL (Vercel)
+- The Prisma schema had the model but `prisma db push` was never run against production
+- The LEFT JOIN query in GET /api/admin/subscriptions failed silently because the table didn't exist
+- Created `src/lib/ensure-subscription-table.ts` (same pattern as ensure-backup-table.ts)
+- Updated `src/lib/db.ts` to call ensureSubscriptionTable on cold start
+- Added fallback query in GET handler: if Subscription table doesn't exist, returns all GHs with NULL subscription fields
+- Pushed to GitHub, Vercel will auto-deploy
+
+Stage Summary:
+- `src/lib/ensure-subscription-table.ts` — new file, creates Subscription table via pg raw SQL
+- `src/lib/db.ts` — imports and calls ensureSubscriptionTable
+- `src/app/api/admin/subscriptions/route.ts` — resilient try/catch with fallback query
+- All guesthouses will now appear in the subscriptions admin panel
