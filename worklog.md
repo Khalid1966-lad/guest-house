@@ -1173,3 +1173,19 @@ Stage Summary:
 - Only available rooms (no conflicting bookings) are shown in the dropdown
 - Dynamic placeholders and status messages guide the user through the flow
 - Edit mode correctly shows the current room as available via excludeBookingId param
+
+---
+Task ID: push-vercel-postgresql
+Agent: Main
+Task: Push 3 pending commits to origin/main for Vercel deployment
+
+Work Log:
+- Verified schema.prisma uses provider = "postgresql"
+- Verified DATABASE_URL points to Neon PostgreSQL
+- Verified package.json scripts (build, postinstall, db:push, db:generate) use default schema.prisma (no sqlite references)
+- Pushed 3 commits to origin/main: e7a2d3f, e3b58e3, e7c213e
+- Vercel will auto-deploy from origin/main
+
+Stage Summary:
+- All changes pushed successfully
+- Vercel deployment will use PostgreSQL (Neon) — confirmed
