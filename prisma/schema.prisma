@@ -9,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -58,6 +58,8 @@ model GuestHouse {
   notifications  Notification[]
   cleaningTasks  CleaningTask[]
   subscription   Subscription?
+  housekeepingZones HousekeepingZone[]
+  staffSchedules    StaffSchedule[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -89,6 +91,12 @@ model GuestHouseSetting {
   touristTaxPerAdult Float   @default(0.60)  // Tax per adult per night
   touristTaxPerChild Float   @default(0.30)  // Tax per child per night
   touristTaxFreeAge  Int     @default(18)    // Free for children under this age
+  
+  // Housekeeping auto-assignment settings
+  autoAssignHousekeeping  Boolean @default(false)
+  autoAssignMode          String  @default("zone")
+  autoStartCleaning       Boolean @default(false)
+  defaultCleaningPriority String  @default("normal")
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,6 +141,8 @@ model User {
   cleaningTasksAssigned    CleaningTask[] @relation("CleaningAssignedTo")
   cleaningTasksVerified    CleaningTask[] @relation("CleaningVerifiedBy")
   cleaningTaskItemsChecked CleaningTaskItem[] @relation("CleaningCheckedBy")
+  housekeepingZone         HousekeepingZone?
+  staffSchedule            StaffSchedule[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -744,6 +754,47 @@ model Subscription {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// ZONES DE MÉNAGE (assignation agent ↔ étage/chambre)
+// ============================================
+model HousekeepingZone {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+
+  userId        String @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  zoneType      String  @default("floor")   // "floor" | "room" | "custom"
+  floorNumber   Int?                        // if zoneType = "floor"
+  roomIds       String  @default("[]")      // JSON array of roomId — if zoneType = "room"
+  zoneName      String?                     // "Étage 1", "Aile Nord", "Pavillon Bleu"...
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// EMPLOI DU TEMPS DES AGENTS DE MÉNAGE
+// ============================================
+model StaffSchedule {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dayOfWeek     Int                           // 0=Dim, 1=Lun ... 6=Sam
+  startTime     String  @default("07:00")
+  endTime       String  @default("15:00")
+  isAvailable   Boolean @default(true)        // false = congé/absence exceptionnelle
+
+  @@unique([userId, dayOfWeek])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================
