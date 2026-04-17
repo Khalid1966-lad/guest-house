@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
+import { createId } from "@paralleldrive/cuid2"
 
 // Force dynamic rendering (no caching)
 export const dynamic = "force-dynamic"
@@ -107,7 +108,6 @@ function validateBackupStructure(tables: Record<string, unknown[]>) {
       issues.push(`${tableName}: ${rows.length} lignes mais aucune colonne détectée`)
     }
 
-    // Check critical fields
     if (rows.length > 0) {
       if (tableName === "GuestHouse" && !sampleColumns.includes("id")) {
         issues.push("GuestHouse: colonne 'id' manquante")
@@ -121,7 +121,6 @@ function validateBackupStructure(tables: Record<string, unknown[]>) {
     }
   }
 
-  // Check total record count
   const totalRecords = Object.values(stats).reduce((sum, s) => sum + s.rows, 0)
   if (totalRecords === 0) {
     issues.push("La sauvegarde est vide — aucune donnée à restaurer")
@@ -131,30 +130,95 @@ function validateBackupStructure(tables: Record<string, unknown[]>) {
 }
 
 // ============================================
-// Delete all data (full clear)
+// Export current DB state as safety backup (RAW SQL)
 // ============================================
-async function clearAllTables(tx: typeof db) {
+async function createSafetyBackup(userId: string): Promise<string> {
+  const queries: Record<string, () => Promise<unknown[]>> = {
+    GuestHouse: () => db.guestHouse.findMany(),
+    GuestHouseSetting: () => db.guestHouseSetting.findMany(),
+    User: () => db.user.findMany(),
+    Role: () => db.role.findMany(),
+    Room: () => db.room.findMany(),
+    RoomPrice: () => db.roomPrice.findMany(),
+    Amenity: () => db.amenity.findMany(),
+    Guest: () => db.guest.findMany(),
+    Booking: () => db.booking.findMany(),
+    Invoice: () => db.invoice.findMany(),
+    InvoiceItem: () => db.invoiceItem.findMany(),
+    Payment: () => db.payment.findMany(),
+    MenuItem: () => db.menuItem.findMany(),
+    RestaurantOrder: () => db.restaurantOrder.findMany(),
+    OrderItem: () => db.orderItem.findMany(),
+    Expense: () => db.expense.findMany(),
+    CleaningTask: () => db.cleaningTask.findMany(),
+    CleaningTaskItem: () => db.cleaningTaskItem.findMany(),
+    Notification: () => db.notification.findMany(),
+    AuditLog: () => db.auditLog.findMany(),
+  }
+
+  const tables: Record<string, unknown[]> = {}
+  const tableSummary: Record<string, number> = {}
+  let guestHouseList: { id: string; name: string; slug: string }[] = []
+
+  for (const table of TABLES_INSERT_ORDER) {
+    try {
+      const rows = await queries[table]()
+      tables[table] = rows
+      tableSummary[table] = rows.length
+      if (table === "GuestHouse") {
+        guestHouseList = (rows as any[]).map(r => ({ id: r.id, name: r.name, slug: r.slug }))
+      }
+    } catch {
+      tables[table] = []
+      tableSummary[table] = 0
+    }
+  }
+
+  const payload = JSON.stringify({
+    version: "safety",
+    exportedAt: new Date().toISOString(),
+    safetyOf: "pre-restore",
+    tables,
+  })
+
+  const compressed = zlib.gzipSync(Buffer.from(payload))
+  const compressedBase64 = compressed.toString("base64")
+  const sizeKo = Math.round(Buffer.byteLength(compressedBase64, "base64") / 1024)
+  const id = createId()
+
+  await db.$executeRaw`
+    INSERT INTO "Backup" ("id", "label", "type", "compressedData", "sizeKo", "tableCount", "tableSummary", "guestHouseList", "createdBy", "createdAt")
+    VALUES (${id}, ${'[SAFETY] Avant restauration'}, ${'auto'}, ${compressedBase64}, ${sizeKo}, ${TABLES_INSERT_ORDER.length}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${userId}, NOW())
+  `
+
+  return id
+}
+
+// ============================================
+// Delete all data (no transaction — sequential)
+// ============================================
+async function clearAllTables() {
   const deleteOps: Record<string, () => Promise<unknown>> = {
-    Notification: () => tx.notification.deleteMany(),
-    AuditLog: () => tx.auditLog.deleteMany(),
-    CleaningTaskItem: () => tx.cleaningTaskItem.deleteMany(),
-    CleaningTask: () => tx.cleaningTask.deleteMany(),
-    Expense: () => tx.expense.deleteMany(),
-    OrderItem: () => tx.orderItem.deleteMany(),
-    RestaurantOrder: () => tx.restaurantOrder.deleteMany(),
-    Payment: () => tx.payment.deleteMany(),
-    InvoiceItem: () => tx.invoiceItem.deleteMany(),
-    Invoice: () => tx.invoice.deleteMany(),
-    Booking: () => tx.booking.deleteMany(),
-    Guest: () => tx.guest.deleteMany(),
-    MenuItem: () => tx.menuItem.deleteMany(),
-    RoomPrice: () => tx.roomPrice.deleteMany(),
-    Amenity: () => tx.amenity.deleteMany(),
-    Room: () => tx.room.deleteMany(),
-    Role: () => tx.role.deleteMany(),
-    GuestHouseSetting: () => tx.guestHouseSetting.deleteMany(),
-    User: () => tx.user.deleteMany(),
-    GuestHouse: () => tx.guestHouse.deleteMany(),
+    Notification: () => db.notification.deleteMany(),
+    AuditLog: () => db.auditLog.deleteMany(),
+    CleaningTaskItem: () => db.cleaningTaskItem.deleteMany(),
+    CleaningTask: () => db.cleaningTask.deleteMany(),
+    Expense: () => db.expense.deleteMany(),
+    OrderItem: () => db.orderItem.deleteMany(),
+    RestaurantOrder: () => db.restaurantOrder.deleteMany(),
+    Payment: () => db.payment.deleteMany(),
+    InvoiceItem: () => db.invoiceItem.deleteMany(),
+    Invoice: () => db.invoice.deleteMany(),
+    Booking: () => db.booking.deleteMany(),
+    Guest: () => db.guest.deleteMany(),
+    MenuItem: () => db.menuItem.deleteMany(),
+    RoomPrice: () => db.roomPrice.deleteMany(),
+    Amenity: () => db.amenity.deleteMany(),
+    Room: () => db.room.deleteMany(),
+    Role: () => db.role.deleteMany(),
+    GuestHouseSetting: () => db.guestHouseSetting.deleteMany(),
+    User: () => db.user.deleteMany(),
+    GuestHouse: () => db.guestHouse.deleteMany(),
   }
 
   const errors: string[] = []
@@ -176,30 +240,30 @@ async function clearAllTables(tx: typeof db) {
 }
 
 // ============================================
-// Insert all data with skipDuplicates (safe insert)
+// Insert all data (no transaction — sequential, with skipDuplicates)
 // ============================================
-async function insertAllTables(tables: Record<string, unknown[]>, tx: typeof db) {
+async function insertAllTables(tables: Record<string, unknown[]>) {
   const insertOps: Record<string, (rows: unknown[]) => Promise<unknown>> = {
-    GuestHouse: (rows) => tx.guestHouse.createMany({ data: rows as any[], skipDuplicates: true }),
-    GuestHouseSetting: (rows) => tx.guestHouseSetting.createMany({ data: rows as any[], skipDuplicates: true }),
-    User: (rows) => tx.user.createMany({ data: rows as any[], skipDuplicates: true }),
-    Role: (rows) => tx.role.createMany({ data: rows as any[], skipDuplicates: true }),
-    Room: (rows) => tx.room.createMany({ data: rows as any[], skipDuplicates: true }),
-    RoomPrice: (rows) => tx.roomPrice.createMany({ data: rows as any[], skipDuplicates: true }),
-    Amenity: (rows) => tx.amenity.createMany({ data: rows as any[], skipDuplicates: true }),
-    Guest: (rows) => tx.guest.createMany({ data: rows as any[], skipDuplicates: true }),
-    Booking: (rows) => tx.booking.createMany({ data: rows as any[], skipDuplicates: true }),
-    Invoice: (rows) => tx.invoice.createMany({ data: rows as any[], skipDuplicates: true }),
-    InvoiceItem: (rows) => tx.invoiceItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    Payment: (rows) => tx.payment.createMany({ data: rows as any[], skipDuplicates: true }),
-    MenuItem: (rows) => tx.menuItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    RestaurantOrder: (rows) => tx.restaurantOrder.createMany({ data: rows as any[], skipDuplicates: true }),
-    OrderItem: (rows) => tx.orderItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    Expense: (rows) => tx.expense.createMany({ data: rows as any[], skipDuplicates: true }),
-    CleaningTask: (rows) => tx.cleaningTask.createMany({ data: rows as any[], skipDuplicates: true }),
-    CleaningTaskItem: (rows) => tx.cleaningTaskItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    Notification: (rows) => tx.notification.createMany({ data: rows as any[], skipDuplicates: true }),
-    AuditLog: (rows) => tx.auditLog.createMany({ data: rows as any[], skipDuplicates: true }),
+    GuestHouse: (rows) => db.guestHouse.createMany({ data: rows as any[], skipDuplicates: true }),
+    GuestHouseSetting: (rows) => db.guestHouseSetting.createMany({ data: rows as any[], skipDuplicates: true }),
+    User: (rows) => db.user.createMany({ data: rows as any[], skipDuplicates: true }),
+    Role: (rows) => db.role.createMany({ data: rows as any[], skipDuplicates: true }),
+    Room: (rows) => db.room.createMany({ data: rows as any[], skipDuplicates: true }),
+    RoomPrice: (rows) => db.roomPrice.createMany({ data: rows as any[], skipDuplicates: true }),
+    Amenity: (rows) => db.amenity.createMany({ data: rows as any[], skipDuplicates: true }),
+    Guest: (rows) => db.guest.createMany({ data: rows as any[], skipDuplicates: true }),
+    Booking: (rows) => db.booking.createMany({ data: rows as any[], skipDuplicates: true }),
+    Invoice: (rows) => db.invoice.createMany({ data: rows as any[], skipDuplicates: true }),
+    InvoiceItem: (rows) => db.invoiceItem.createMany({ data: rows as any[], skipDuplicates: true }),
+    Payment: (rows) => db.payment.createMany({ data: rows as any[], skipDuplicates: true }),
+    MenuItem: (rows) => db.menuItem.createMany({ data: rows as any[], skipDuplicates: true }),
+    RestaurantOrder: (rows) => db.restaurantOrder.createMany({ data: rows as any[], skipDuplicates: true }),
+    OrderItem: (rows) => db.orderItem.createMany({ data: rows as any[], skipDuplicates: true }),
+    Expense: (rows) => db.expense.createMany({ data: rows as any[], skipDuplicates: true }),
+    CleaningTask: (rows) => db.cleaningTask.createMany({ data: rows as any[], skipDuplicates: true }),
+    CleaningTaskItem: (rows) => db.cleaningTaskItem.createMany({ data: rows as any[], skipDuplicates: true }),
+    Notification: (rows) => db.notification.createMany({ data: rows as any[], skipDuplicates: true }),
+    AuditLog: (rows) => db.auditLog.createMany({ data: rows as any[], skipDuplicates: true }),
   }
 
   let totalInserted = 0
@@ -218,7 +282,7 @@ async function insertAllTables(tables: Record<string, unknown[]>, tx: typeof db)
     }
 
     try {
-      const BATCH_SIZE = 50 // Smaller batches for safety
+      const BATCH_SIZE = 50
       let inserted = 0
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = rows.slice(i, i + BATCH_SIZE)
@@ -260,10 +324,7 @@ function filterByGuestHouse(
 
   filtered.GuestHouse = (tables.GuestHouse || []).filter((r: any) => r.id === guestHouseId)
   filtered.GuestHouseSetting = (tables.GuestHouseSetting || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.User = (tables.User || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) return true
-    return false
-  })
+  filtered.User = (tables.User || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.Role = (tables.Role || []).filter((r: any) => r.guestHouseId === guestHouseId)
   filtered.Room = (tables.Room || []).filter((r: any) => {
     if (r.guestHouseId === guestHouseId) { roomIds.add(r.id); return true }
@@ -304,7 +365,7 @@ function filterByGuestHouse(
 }
 
 // ============================================
-// POST - Restore from backup (RAW SQL for Backup fetch)
+// POST - Restore from backup
 // ============================================
 export async function POST(request: NextRequest) {
   const user = await requireSuperAdmin()
@@ -321,7 +382,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Fetch backup using raw SQL — bypasses Prisma model mapping
+    // Fetch backup using raw SQL
     const results = await db.$queryRaw<Array<{
       id: string
       label: string | null
@@ -339,11 +400,10 @@ export async function POST(request: NextRequest) {
     const backup = results[0]
     const { tables, version, exportedAt } = parseBackupData(backup.compressedData)
 
-    // ─── DRY RUN MODE: validate without modifying DB ──────────
+    // ─── DRY RUN MODE ──────────────────────────────────────────
     if (dryRun) {
       const validation = validateBackupStructure(tables)
 
-      // If guesthouse mode, also validate the filter
       if (guestHouseId) {
         const filtered = filterByGuestHouse(tables, guestHouseId)
         if (filtered.GuestHouse.length === 0) {
@@ -379,7 +439,7 @@ export async function POST(request: NextRequest) {
     // ─── ACTUAL RESTORE ──────────────────────────────────────
 
     if (guestHouseId) {
-      // ─── Individual guesthouse restore ───────────────────────
+      // ─── Guesthouse restore (small — safe with transaction) ─
       const filteredTables = filterByGuestHouse(tables, guestHouseId)
 
       if (filteredTables.GuestHouse.length === 0) {
@@ -389,7 +449,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Wrap in transaction for safety (2 min timeout for large datasets)
       const result = await db.$transaction(async (tx) => {
         const existingGh = await tx.guestHouse.findUnique({
           where: { id: guestHouseId },
@@ -400,8 +459,54 @@ export async function POST(request: NextRequest) {
           await tx.guestHouse.delete({ where: { id: guestHouseId } })
         }
 
-        return insertAllTables(filteredTables, tx)
-      }, { timeout: 120_000 })
+        // Use non-tx db for insertAllTables (same pattern, pass tx)
+        const insertOps: Record<string, (rows: unknown[]) => Promise<unknown>> = {
+          GuestHouse: (rows) => tx.guestHouse.createMany({ data: rows as any[], skipDuplicates: true }),
+          GuestHouseSetting: (rows) => tx.guestHouseSetting.createMany({ data: rows as any[], skipDuplicates: true }),
+          User: (rows) => tx.user.createMany({ data: rows as any[], skipDuplicates: true }),
+          Role: (rows) => tx.role.createMany({ data: rows as any[], skipDuplicates: true }),
+          Room: (rows) => tx.room.createMany({ data: rows as any[], skipDuplicates: true }),
+          RoomPrice: (rows) => tx.roomPrice.createMany({ data: rows as any[], skipDuplicates: true }),
+          Amenity: (rows) => tx.amenity.createMany({ data: rows as any[], skipDuplicates: true }),
+          Guest: (rows) => tx.guest.createMany({ data: rows as any[], skipDuplicates: true }),
+          Booking: (rows) => tx.booking.createMany({ data: rows as any[], skipDuplicates: true }),
+          Invoice: (rows) => tx.invoice.createMany({ data: rows as any[], skipDuplicates: true }),
+          InvoiceItem: (rows) => tx.invoiceItem.createMany({ data: rows as any[], skipDuplicates: true }),
+          Payment: (rows) => tx.payment.createMany({ data: rows as any[], skipDuplicates: true }),
+          MenuItem: (rows) => tx.menuItem.createMany({ data: rows as any[], skipDuplicates: true }),
+          RestaurantOrder: (rows) => tx.restaurantOrder.createMany({ data: rows as any[], skipDuplicates: true }),
+          OrderItem: (rows) => tx.orderItem.createMany({ data: rows as any[], skipDuplicates: true }),
+          Expense: (rows) => tx.expense.createMany({ data: rows as any[], skipDuplicates: true }),
+          CleaningTask: (rows) => tx.cleaningTask.createMany({ data: rows as any[], skipDuplicates: true }),
+          CleaningTaskItem: (rows) => tx.cleaningTaskItem.createMany({ data: rows as any[], skipDuplicates: true }),
+          Notification: (rows) => tx.notification.createMany({ data: rows as any[], skipDuplicates: true }),
+          AuditLog: (rows) => tx.auditLog.createMany({ data: rows as any[], skipDuplicates: true }),
+        }
+
+        let totalInserted = 0
+        let totalExpected = 0
+        const details: Record<string, number> = {}
+        const errors: string[] = []
+
+        for (const table of TABLES_INSERT_ORDER) {
+          const op = insertOps[table]
+          const rows = filteredTables[table] || []
+          totalExpected += rows.length
+          if (!op || rows.length === 0) { details[table] = 0; continue }
+          try {
+            const result = await op(rows)
+            const count = (result as { count: number })?.count ?? rows.length
+            details[table] = count
+            totalInserted += count
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            errors.push(`${table}: ${msg}`)
+            details[table] = 0
+          }
+        }
+
+        return { totalInserted, totalExpected, details, errors }
+      }, { timeout: 60_000 })
 
       const warnings = result.errors.length > 0 ? result.errors : undefined
 
@@ -409,35 +514,47 @@ export async function POST(request: NextRequest) {
         success: true,
         message: `Maison d'hôtes "${(filteredTables.GuestHouse[0] as any)?.name || guestHouseId}" restaurée`,
         mode: "guesthouse",
-        stats: {
-          totalInserted: result.totalInserted,
-          totalExpected: result.totalExpected,
-          details: result.details,
-        },
+        stats: { totalInserted: result.totalInserted, totalExpected: result.totalExpected, details: result.details },
         warnings,
         meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })
     } else {
-      // ─── Full restore (wrapped in transaction, 2 min timeout) ───────────────
-      const result = await db.$transaction(async (tx) => {
-        const deleteErrors = await clearAllTables(tx)
-        const insertResult = await insertAllTables(tables, tx)
-        return { deleteErrors, insertResult }
-      }, { timeout: 120_000 })
+      // ─── Full restore (NO transaction — sequential, unlimited time) ─
+      // Step 1: Create safety backup of current state
+      let safetyBackupId: string | null = null
+      try {
+        safetyBackupId = await createSafetyBackup(user.id)
+        console.log(`[restore] Safety backup created: ${safetyBackupId}`)
+      } catch (err) {
+        console.error("[restore] Failed to create safety backup:", err)
+      }
 
-      const allErrors = [...result.deleteErrors, ...result.insertResult.errors]
-      const warnings = allErrors.length > 0 ? allErrors : undefined
+      // Step 2: Clear all tables (sequential, no timeout)
+      const deleteErrors = await clearAllTables()
+
+      // Step 3: Insert all data (sequential, no timeout)
+      const insertResult = await insertAllTables(tables)
+
+      const allErrors = [...deleteErrors, ...insertResult.errors]
+      const hasErrors = allErrors.length > 0
+      const isPartial = insertResult.totalInserted < insertResult.totalExpected
 
       return NextResponse.json({
         success: true,
-        message: "Restauration complète terminée",
+        message: isPartial
+          ? `Restauration partielle — ${insertResult.totalInserted}/${insertResult.totalExpected} enregistrements insérés`
+          : "Restauration complète terminée",
         mode: "full",
         stats: {
-          totalInserted: result.insertResult.totalInserted,
-          totalExpected: result.insertResult.totalExpected,
-          details: result.insertResult.details,
+          totalInserted: insertResult.totalInserted,
+          totalExpected: insertResult.totalExpected,
+          details: insertResult.details,
         },
-        warnings,
+        warnings: hasErrors ? allErrors : undefined,
+        safetyBackupId,
+        safetyNote: safetyBackupId
+          ? `Sauvegarde de sécurité créée avant la restauration. En cas de problème, restaurez cette sauvegarde pour revenir en arrière.`
+          : "Impossible de créer la sauvegarde de sécurité.",
         meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })
     }

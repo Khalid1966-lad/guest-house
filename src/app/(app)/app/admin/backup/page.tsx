@@ -131,6 +131,9 @@ export default function AdminBackupPage() {
   const [restoreResult, setRestoreResult] = useState<string | null>(null)
   const [isValidating, setIsValidating] = useState(false)
   const [validationResult, setValidationResult] = useState<{ ok: boolean; message: string; recordCount: number; tableCount: number; issues: string[] } | null>(null)
+  const [restoreSafetyNote, setRestoreSafetyNote] = useState<string | null>(null)
+  const [restoreWarnings, setRestoreWarnings] = useState<string[] | null>(null)
+  const [restoreStats, setRestoreStats] = useState<{ totalInserted: number; totalExpected: number; details: Record<string, number> } | null>(null)
 
   // Import backup
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -285,18 +288,21 @@ export default function AdminBackupPage() {
       const data = await res.json()
 
       if (res.ok) {
-        const warningsMsg = data.warnings && data.warnings.length > 0
-          ? ` (${data.warnings.length} avertissement(s))`
-          : ""
-        setRestoreResult(`${data.message}${warningsMsg}`)
+        setRestoreResult(data.message)
+        setRestoreSafetyNote(data.safetyNote || null)
+        setRestoreWarnings(data.warnings || null)
+        setRestoreStats(data.stats || null)
         setTimeout(() => {
           setRestoreDialogId(null)
           setRestoreResult(null)
           setRestoreMode("full")
           setSelectedGuestHouseId("")
           setValidationResult(null)
+          setRestoreSafetyNote(null)
+          setRestoreWarnings(null)
+          setRestoreStats(null)
           fetchBackups()
-        }, 3000)
+        }, 6000)
       } else {
         setRestoreResult(`Erreur: ${data.error}`)
       }
@@ -1040,6 +1046,36 @@ export default function AdminBackupPage() {
               <p className={`text-sm font-medium ${restoreResult.startsWith("Erreur") ? "text-red-700" : "text-green-700"}`}>
                 {restoreResult}
               </p>
+
+              {/* Stats */}
+              {restoreStats && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {restoreStats.totalInserted}/{restoreStats.totalExpected} enregistrements restaurés
+                </p>
+              )}
+
+              {/* Safety backup note */}
+              {restoreSafetyNote && !restoreResult.startsWith("Erreur") && (
+                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 text-left">
+                  <p className="font-medium flex items-center gap-1">
+                    <Shield className="w-3.5 h-3.5" />
+                    Sauvegarde de sécurité automatique
+                  </p>
+                  <p className="mt-1 text-amber-600">{restoreSafetyNote}</p>
+                </div>
+              )}
+
+              {/* Warnings */}
+              {restoreWarnings && restoreWarnings.length > 0 && (
+                <div className="mt-2 text-left">
+                  <p className="text-xs font-medium text-amber-600 mb-1">Avertissements :</p>
+                  <ul className="space-y-0.5 max-h-24 overflow-y-auto">
+                    {restoreWarnings.map((w, i) => (
+                      <li key={i} className="text-xs text-amber-600">• {w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
