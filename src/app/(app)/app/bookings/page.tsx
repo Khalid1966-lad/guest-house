@@ -494,9 +494,25 @@ export default function BookingsPage() {
     setIsDetailOpen(true)
   }
 
-  // Handle form change
+  // Handle form change — if user edits name/phone after selecting an existing guest, clear guestId so a new guest is created
   const handleFormChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value }
+      // If user changes name or phone after selecting a guest, unlink the guest
+      // so the API will create a new guest record instead of reusing the existing one
+      if (prev.guestId && (field === "firstName" || field === "lastName" || field === "phone")) {
+        const originalGuest = guests.find((g) => g.id === prev.guestId)
+        if (originalGuest) {
+          const nameChanged = (field === "firstName" && value !== originalGuest.firstName) ||
+                               (field === "lastName" && value !== originalGuest.lastName)
+          const phoneChanged = field === "phone" && value !== (originalGuest.phone || "")
+          if (nameChanged || phoneChanged) {
+            next.guestId = ""
+          }
+        }
+      }
+      return next
+    })
   }
 
   // Select room and set default price
@@ -1582,21 +1598,31 @@ export default function BookingsPage() {
                 Client
               </h3>
 
-              {formData.guestId ? (
-                <div className="flex items-center justify-between p-3 bg-sky-50 dark:bg-sky-950 rounded-lg">
-                  <div>
-                    <p className="font-medium">{formData.firstName} {formData.lastName}</p>
-                    <p className="text-sm text-gray-500">{formData.email || formData.phone}</p>
+              {formData.guestId ? (() => {
+                const linkedGuest = guests.find((g) => g.id === formData.guestId)
+                const nameMatches = linkedGuest && formData.firstName === linkedGuest.firstName && formData.lastName === linkedGuest.lastName
+                return (
+                  <div className={cn("flex items-center justify-between p-3 rounded-lg border", nameMatches ? "bg-sky-50 dark:bg-sky-950 border-sky-200" : "bg-amber-50 dark:bg-amber-950 border-amber-300")}>
+                    <div>
+                      <p className="font-medium">{formData.firstName} {formData.lastName}</p>
+                      <p className="text-sm text-gray-500">{formData.email || formData.phone}</p>
+                      {!nameMatches && linkedGuest && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          ⚠️ Client existant : {linkedGuest.firstName} {linkedGuest.lastName} — un nouveau client sera créé
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFormData((prev) => ({ ...prev, guestId: "" }))}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFormData((prev) => ({ ...prev, guestId: "" }))}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
+                )
+              })()
+              : (
                 <div className="space-y-3">
                   {guests.length > 0 && (
                     <div className="flex gap-2">
