@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
 import { createId } from "@paralleldrive/cuid2"
+import { getBackupConfig, toModelName, DEPENDENCIES } from "@/lib/backup-models"
 
 // Force dynamic rendering (no caching)
 export const dynamic = "force-dynamic"
@@ -25,55 +26,6 @@ async function requireSuperAdmin() {
 }
 
 // ============================================
-// Table insert order (dependency-safe)
-// ============================================
-const TABLES_INSERT_ORDER = [
-  "GuestHouse",
-  "GuestHouseSetting",
-  "User",
-  "Role",
-  "Room",
-  "RoomPrice",
-  "Amenity",
-  "Guest",
-  "Booking",
-  "Invoice",
-  "InvoiceItem",
-  "Payment",
-  "MenuItem",
-  "RestaurantOrder",
-  "OrderItem",
-  "Expense",
-  "CleaningTask",
-  "CleaningTaskItem",
-  "Notification",
-  "AuditLog",
-]
-
-const TABLES_DELETE_ORDER = [
-  "Notification",
-  "AuditLog",
-  "CleaningTaskItem",
-  "CleaningTask",
-  "Expense",
-  "OrderItem",
-  "RestaurantOrder",
-  "Payment",
-  "InvoiceItem",
-  "Invoice",
-  "Booking",
-  "Guest",
-  "MenuItem",
-  "RoomPrice",
-  "Amenity",
-  "Room",
-  "Role",
-  "GuestHouseSetting",
-  "User",
-  "GuestHouse",
-]
-
-// ============================================
 // Parse backup data from compressed base64
 // ============================================
 function parseBackupData(compressedBase64: string) {
@@ -91,34 +43,33 @@ function parseBackupData(compressedBase64: string) {
 // Validate backup structure (dry-run)
 // ============================================
 function validateBackupStructure(tables: Record<string, unknown[]>) {
+  const config = getBackupConfig(db)
   const issues: string[] = []
-  const stats: Record<string, { rows: number; columns: number; sampleColumns: string[] }> = {}
+  const stats: Record<string, { rows: number; columns: number }> = {}
 
-  for (const tableName of TABLES_INSERT_ORDER) {
-    const rows = tables[tableName] || []
-    const sampleColumns = rows.length > 0 ? Object.keys(rows[0] as object) : []
+  for (const modelName of config.insertOrder) {
+    const rows = tables[modelName] || []
+    const columns = rows.length > 0 ? Object.keys(rows[0] as object).length : 0
 
-    stats[tableName] = {
-      rows: rows.length,
-      columns: sampleColumns.length,
-      sampleColumns: sampleColumns.slice(0, 5),
+    stats[modelName] = { rows: rows.length, columns }
+
+    if (rows.length > 0 && columns === 0) {
+      issues.push(`${modelName}: ${rows.length} lignes mais aucune colonne détectée`)
     }
+  }
 
-    if (rows.length > 0 && sampleColumns.length === 0) {
-      issues.push(`${tableName}: ${rows.length} lignes mais aucune colonne détectée`)
-    }
+  // Check for tables in backup that don't exist in current schema (new since backup)
+  const backupTables = Object.keys(tables).filter(k => tables[k]?.length > 0)
+  const currentTables = new Set(config.insertOrder)
+  const newTables = backupTables.filter(t => !currentTables.has(t))
+  if (newTables.length > 0) {
+    issues.push(`Tables dans la sauvegarde mais pas dans le schéma actuel: ${newTables.join(", ")} (elles seront ignorées à la restauration)`)
+  }
 
-    if (rows.length > 0) {
-      if (tableName === "GuestHouse" && !sampleColumns.includes("id")) {
-        issues.push("GuestHouse: colonne 'id' manquante")
-      }
-      if (tableName === "User" && !sampleColumns.includes("email")) {
-        issues.push("User: colonne 'email' manquante")
-      }
-      if (tableName === "GuestHouse" && !sampleColumns.includes("slug")) {
-        issues.push("GuestHouse: colonne 'slug' manquante")
-      }
-    }
+  // Check for tables in current schema that aren't in backup
+  const missingTables = config.insertOrder.filter(t => !backupTables.includes(t) && (tables[t]?.length ?? 0) === 0)
+  if (missingTables.length > 0) {
+    issues.push(`Tables manquantes dans la sauvegarde: ${missingTables.join(", ")} (elles resteront vides)`)
   }
 
   const totalRecords = Object.values(stats).reduce((sum, s) => sum + s.rows, 0)
@@ -130,47 +81,29 @@ function validateBackupStructure(tables: Record<string, unknown[]>) {
 }
 
 // ============================================
-// Export current DB state as safety backup (RAW SQL)
+// Export current DB state as safety backup (dynamic)
 // ============================================
 async function createSafetyBackup(userId: string): Promise<string> {
-  const queries: Record<string, () => Promise<unknown[]>> = {
-    GuestHouse: () => db.guestHouse.findMany(),
-    GuestHouseSetting: () => db.guestHouseSetting.findMany(),
-    User: () => db.user.findMany(),
-    Role: () => db.role.findMany(),
-    Room: () => db.room.findMany(),
-    RoomPrice: () => db.roomPrice.findMany(),
-    Amenity: () => db.amenity.findMany(),
-    Guest: () => db.guest.findMany(),
-    Booking: () => db.booking.findMany(),
-    Invoice: () => db.invoice.findMany(),
-    InvoiceItem: () => db.invoiceItem.findMany(),
-    Payment: () => db.payment.findMany(),
-    MenuItem: () => db.menuItem.findMany(),
-    RestaurantOrder: () => db.restaurantOrder.findMany(),
-    OrderItem: () => db.orderItem.findMany(),
-    Expense: () => db.expense.findMany(),
-    CleaningTask: () => db.cleaningTask.findMany(),
-    CleaningTaskItem: () => db.cleaningTaskItem.findMany(),
-    Notification: () => db.notification.findMany(),
-    AuditLog: () => db.auditLog.findMany(),
-  }
-
+  const config = getBackupConfig(db)
   const tables: Record<string, unknown[]> = {}
   const tableSummary: Record<string, number> = {}
   let guestHouseList: { id: string; name: string; slug: string }[] = []
 
-  for (const table of TABLES_INSERT_ORDER) {
+  for (const modelName of config.insertOrder) {
+    const dbKey = toModelName(modelName) as keyof typeof db
+    const modelClient = db[dbKey]
+    if (!modelClient || typeof modelClient.findMany !== "function") continue
+
     try {
-      const rows = await queries[table]()
-      tables[table] = rows
-      tableSummary[table] = rows.length
-      if (table === "GuestHouse") {
+      const rows = await modelClient.findMany()
+      tables[modelName] = rows
+      tableSummary[modelName] = rows.length
+      if (modelName === "GuestHouse") {
         guestHouseList = (rows as any[]).map(r => ({ id: r.id, name: r.name, slug: r.slug }))
       }
     } catch {
-      tables[table] = []
-      tableSummary[table] = 0
+      tables[modelName] = []
+      tableSummary[modelName] = 0
     }
   }
 
@@ -188,51 +121,30 @@ async function createSafetyBackup(userId: string): Promise<string> {
 
   await db.$executeRaw`
     INSERT INTO "Backup" ("id", "label", "type", "compressedData", "sizeKo", "tableCount", "tableSummary", "guestHouseList", "createdBy", "createdAt")
-    VALUES (${id}, ${'[SAFETY] Avant restauration'}, ${'auto'}, ${compressedBase64}, ${sizeKo}, ${TABLES_INSERT_ORDER.length}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${userId}, NOW())
+    VALUES (${id}, ${'[SAFETY] Avant restauration'}, ${'auto'}, ${compressedBase64}, ${sizeKo}, ${config.insertOrder.length}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${userId}, NOW())
   `
 
   return id
 }
 
 // ============================================
-// Delete all data (no transaction — sequential)
+// Delete all data (sequential, no transaction)
 // ============================================
 async function clearAllTables() {
-  const deleteOps: Record<string, () => Promise<unknown>> = {
-    Notification: () => db.notification.deleteMany(),
-    AuditLog: () => db.auditLog.deleteMany(),
-    CleaningTaskItem: () => db.cleaningTaskItem.deleteMany(),
-    CleaningTask: () => db.cleaningTask.deleteMany(),
-    Expense: () => db.expense.deleteMany(),
-    OrderItem: () => db.orderItem.deleteMany(),
-    RestaurantOrder: () => db.restaurantOrder.deleteMany(),
-    Payment: () => db.payment.deleteMany(),
-    InvoiceItem: () => db.invoiceItem.deleteMany(),
-    Invoice: () => db.invoice.deleteMany(),
-    Booking: () => db.booking.deleteMany(),
-    Guest: () => db.guest.deleteMany(),
-    MenuItem: () => db.menuItem.deleteMany(),
-    RoomPrice: () => db.roomPrice.deleteMany(),
-    Amenity: () => db.amenity.deleteMany(),
-    Room: () => db.room.deleteMany(),
-    Role: () => db.role.deleteMany(),
-    GuestHouseSetting: () => db.guestHouseSetting.deleteMany(),
-    User: () => db.user.deleteMany(),
-    GuestHouse: () => db.guestHouse.deleteMany(),
-  }
-
+  const config = getBackupConfig(db)
   const errors: string[] = []
 
-  for (const table of TABLES_DELETE_ORDER) {
-    const op = deleteOps[table]
-    if (op) {
-      try {
-        await op()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        errors.push(`${table}: ${msg}`)
-        console.error(`[restore] Erreur suppression table ${table}:`, err)
-      }
+  for (const modelName of config.deleteOrder) {
+    const dbKey = toModelName(modelName) as keyof typeof db
+    const modelClient = db[dbKey]
+    if (!modelClient || typeof modelClient.deleteMany !== "function") continue
+
+    try {
+      await modelClient.deleteMany()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push(`${modelName}: ${msg}`)
+      console.error(`[restore] Erreur suppression table ${modelName}:`, err)
     }
   }
 
@@ -240,44 +152,28 @@ async function clearAllTables() {
 }
 
 // ============================================
-// Insert all data (no transaction — sequential, with skipDuplicates)
+// Insert all data (sequential, skipDuplicates, dynamic)
 // ============================================
 async function insertAllTables(tables: Record<string, unknown[]>) {
-  const insertOps: Record<string, (rows: unknown[]) => Promise<unknown>> = {
-    GuestHouse: (rows) => db.guestHouse.createMany({ data: rows as any[], skipDuplicates: true }),
-    GuestHouseSetting: (rows) => db.guestHouseSetting.createMany({ data: rows as any[], skipDuplicates: true }),
-    User: (rows) => db.user.createMany({ data: rows as any[], skipDuplicates: true }),
-    Role: (rows) => db.role.createMany({ data: rows as any[], skipDuplicates: true }),
-    Room: (rows) => db.room.createMany({ data: rows as any[], skipDuplicates: true }),
-    RoomPrice: (rows) => db.roomPrice.createMany({ data: rows as any[], skipDuplicates: true }),
-    Amenity: (rows) => db.amenity.createMany({ data: rows as any[], skipDuplicates: true }),
-    Guest: (rows) => db.guest.createMany({ data: rows as any[], skipDuplicates: true }),
-    Booking: (rows) => db.booking.createMany({ data: rows as any[], skipDuplicates: true }),
-    Invoice: (rows) => db.invoice.createMany({ data: rows as any[], skipDuplicates: true }),
-    InvoiceItem: (rows) => db.invoiceItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    Payment: (rows) => db.payment.createMany({ data: rows as any[], skipDuplicates: true }),
-    MenuItem: (rows) => db.menuItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    RestaurantOrder: (rows) => db.restaurantOrder.createMany({ data: rows as any[], skipDuplicates: true }),
-    OrderItem: (rows) => db.orderItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    Expense: (rows) => db.expense.createMany({ data: rows as any[], skipDuplicates: true }),
-    CleaningTask: (rows) => db.cleaningTask.createMany({ data: rows as any[], skipDuplicates: true }),
-    CleaningTaskItem: (rows) => db.cleaningTaskItem.createMany({ data: rows as any[], skipDuplicates: true }),
-    Notification: (rows) => db.notification.createMany({ data: rows as any[], skipDuplicates: true }),
-    AuditLog: (rows) => db.auditLog.createMany({ data: rows as any[], skipDuplicates: true }),
-  }
-
+  const config = getBackupConfig(db)
   let totalInserted = 0
   let totalExpected = 0
   const details: Record<string, number> = {}
   const errors: string[] = []
 
-  for (const table of TABLES_INSERT_ORDER) {
-    const op = insertOps[table]
-    const rows = tables[table] || []
+  for (const modelName of config.insertOrder) {
+    const rows = tables[modelName] || []
     totalExpected += rows.length
 
-    if (!op || rows.length === 0) {
-      details[table] = 0
+    if (rows.length === 0) {
+      details[modelName] = 0
+      continue
+    }
+
+    const dbKey = toModelName(modelName) as keyof typeof db
+    const modelClient = db[dbKey]
+    if (!modelClient || typeof modelClient.createMany !== "function") {
+      details[modelName] = 0
       continue
     }
 
@@ -286,20 +182,16 @@ async function insertAllTables(tables: Record<string, unknown[]>) {
       let inserted = 0
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = rows.slice(i, i + BATCH_SIZE)
-        const result = await op(batch)
-        if (result && typeof result === "object" && "count" in result) {
-          inserted += (result as { count: number }).count
-        } else {
-          inserted += batch.length
-        }
+        const result = await modelClient.createMany({ data: batch as any[], skipDuplicates: true })
+        inserted += result.count
       }
-      details[table] = inserted
+      details[modelName] = inserted
       totalInserted += inserted
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      errors.push(`${table}: ${msg}`)
-      console.error(`[restore] Erreur insertion table ${table}:`, err)
-      details[table] = 0
+      errors.push(`${modelName}: ${msg}`)
+      console.error(`[restore] Erreur insertion table ${modelName}:`, err)
+      details[modelName] = 0
     }
   }
 
@@ -307,7 +199,7 @@ async function insertAllTables(tables: Record<string, unknown[]>) {
 }
 
 // ============================================
-// Filter tables by guestHouseId
+// Filter tables by guestHouseId (dynamic with DEPENDENCIES)
 // ============================================
 function filterByGuestHouse(
   tables: Record<string, unknown[]>,
@@ -315,6 +207,13 @@ function filterByGuestHouse(
 ): Record<string, unknown[]> {
   const filtered: Record<string, unknown[]> = {}
 
+  // First pass: collect all top-level IDs with guestHouseId
+  const guestHouseRow = (tables.GuestHouse || []).find((r: any) => r.id === guestHouseId)
+  if (!guestHouseRow) return filtered
+
+  filtered.GuestHouse = [guestHouseRow]
+
+  // Collect referenced IDs for cascading
   const roomIds = new Set<string>()
   const guestIds = new Set<string>()
   const invoiceIds = new Set<string>()
@@ -322,44 +221,69 @@ function filterByGuestHouse(
   const taskIds = new Set<string>()
   const menuItemIds = new Set<string>()
 
-  filtered.GuestHouse = (tables.GuestHouse || []).filter((r: any) => r.id === guestHouseId)
-  filtered.GuestHouseSetting = (tables.GuestHouseSetting || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.User = (tables.User || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.Role = (tables.Role || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.Room = (tables.Room || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) { roomIds.add(r.id); return true }
-    return false
-  })
-  filtered.RoomPrice = (tables.RoomPrice || []).filter((r: any) => roomIds.has(r.roomId))
-  filtered.Amenity = (tables.Amenity || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.Guest = (tables.Guest || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) { guestIds.add(r.id); return true }
-    return false
-  })
-  filtered.Booking = (tables.Booking || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.Invoice = (tables.Invoice || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) { invoiceIds.add(r.id); return true }
-    return false
-  })
-  filtered.InvoiceItem = (tables.InvoiceItem || []).filter((r: any) => invoiceIds.has(r.invoiceId))
-  filtered.Payment = (tables.Payment || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.MenuItem = (tables.MenuItem || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) { menuItemIds.add(r.id); return true }
-    return false
-  })
-  filtered.RestaurantOrder = (tables.RestaurantOrder || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) { orderIds.add(r.id); return true }
-    return false
-  })
-  filtered.OrderItem = (tables.OrderItem || []).filter((r: any) => orderIds.has(r.orderId))
-  filtered.Expense = (tables.Expense || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.CleaningTask = (tables.CleaningTask || []).filter((r: any) => {
-    if (r.guestHouseId === guestHouseId) { taskIds.add(r.id); return true }
-    return false
-  })
-  filtered.CleaningTaskItem = (tables.CleaningTaskItem || []).filter((r: any) => taskIds.has(r.taskId))
-  filtered.Notification = (tables.Notification || []).filter((r: any) => r.guestHouseId === guestHouseId)
-  filtered.AuditLog = (tables.AuditLog || []).filter((r: any) => r.guestHouseId === guestHouseId)
+  // Dynamic filter: check if table has guestHouseId or cascading FK
+  const collect = (modelName: string, rows: any[]) => {
+    const deps = DEPENDENCIES[modelName]
+    if (!deps) return rows
+
+    for (const row of rows) {
+      // Keep rows that belong to this guesthouse
+      if (row.guestHouseId === guestHouseId) {
+        if (modelName === "Room") roomIds.add(row.id)
+        if (modelName === "Guest") guestIds.add(row.id)
+        if (modelName === "Invoice") invoiceIds.add(row.id)
+        if (modelName === "RestaurantOrder") orderIds.add(row.id)
+        if (modelName === "CleaningTask") taskIds.add(row.id)
+        if (modelName === "MenuItem") menuItemIds.add(row.id)
+        return true
+      }
+      // Keep rows that reference a collected FK
+      if (roomIds.has(row.roomId)) return true
+      if (guestIds.has(row.guestId)) return true
+      if (invoiceIds.has(row.invoiceId)) return true
+      if (orderIds.has(row.orderId)) return true
+      if (taskIds.has(row.taskId)) return true
+      if (menuItemIds.has(row.menuItemId)) return true
+      if (deps.has("GuestHouse") && row.guestHouseId === guestHouseId) return true
+    }
+
+    return rows.filter(() => false) // no match
+  }
+
+  const config = getBackupConfig(db)
+  for (const modelName of config.insertOrder) {
+    if (modelName === "GuestHouse") continue // already handled
+    const rows = tables[modelName] || []
+    const deps = DEPENDENCIES[modelName]
+
+    if (!deps || !deps.has("GuestHouse")) {
+      // Table without guestHouseId FK — skip for guesthouse restore
+      filtered[modelName] = []
+      continue
+    }
+
+    const matched: any[] = []
+    for (const row of rows) {
+      if (row.guestHouseId === guestHouseId) {
+        if (modelName === "Room") roomIds.add(row.id)
+        if (modelName === "Guest") guestIds.add(row.id)
+        if (modelName === "Invoice") invoiceIds.add(row.id)
+        if (modelName === "RestaurantOrder") orderIds.add(row.id)
+        if (modelName === "CleaningTask") taskIds.add(row.id)
+        if (modelName === "MenuItem") menuItemIds.add(row.id)
+        matched.push(row)
+        continue
+      }
+
+      // Check cascading FKs
+      if (modelName === "RoomPrice" && roomIds.has(row.roomId)) { matched.push(row); continue }
+      if (modelName === "InvoiceItem" && invoiceIds.has(row.invoiceId)) { matched.push(row); continue }
+      if (modelName === "OrderItem" && orderIds.has(row.orderId)) { matched.push(row); continue }
+      if (modelName === "CleaningTaskItem" && taskIds.has(row.taskId)) { matched.push(row); continue }
+    }
+
+    filtered[modelName] = matched
+  }
 
   return filtered
 }
@@ -406,7 +330,7 @@ export async function POST(request: NextRequest) {
 
       if (guestHouseId) {
         const filtered = filterByGuestHouse(tables, guestHouseId)
-        if (filtered.GuestHouse.length === 0) {
+        if (filtered.GuestHouse?.length !== 1) {
           return NextResponse.json({
             success: false,
             dryRun: true,
@@ -439,10 +363,10 @@ export async function POST(request: NextRequest) {
     // ─── ACTUAL RESTORE ──────────────────────────────────────
 
     if (guestHouseId) {
-      // ─── Guesthouse restore (small — safe with transaction) ─
+      // ─── Guesthouse restore (small — transaction OK) ─
       const filteredTables = filterByGuestHouse(tables, guestHouseId)
 
-      if (filteredTables.GuestHouse.length === 0) {
+      if (filteredTables.GuestHouse?.length !== 1) {
         return NextResponse.json(
           { error: "Cette maison d'hôtes n'existe pas dans cette sauvegarde" },
           { status: 404 }
@@ -450,77 +374,56 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await db.$transaction(async (tx) => {
-        const existingGh = await tx.guestHouse.findUnique({
-          where: { id: guestHouseId },
-          select: { id: true },
-        })
-
-        if (existingGh) {
+        // Delete existing guesthouse and cascade
+        try {
           await tx.guestHouse.delete({ where: { id: guestHouseId } })
+        } catch {
+          // Might not exist — that's OK
         }
 
-        // Use non-tx db for insertAllTables (same pattern, pass tx)
-        const insertOps: Record<string, (rows: unknown[]) => Promise<unknown>> = {
-          GuestHouse: (rows) => tx.guestHouse.createMany({ data: rows as any[], skipDuplicates: true }),
-          GuestHouseSetting: (rows) => tx.guestHouseSetting.createMany({ data: rows as any[], skipDuplicates: true }),
-          User: (rows) => tx.user.createMany({ data: rows as any[], skipDuplicates: true }),
-          Role: (rows) => tx.role.createMany({ data: rows as any[], skipDuplicates: true }),
-          Room: (rows) => tx.room.createMany({ data: rows as any[], skipDuplicates: true }),
-          RoomPrice: (rows) => tx.roomPrice.createMany({ data: rows as any[], skipDuplicates: true }),
-          Amenity: (rows) => tx.amenity.createMany({ data: rows as any[], skipDuplicates: true }),
-          Guest: (rows) => tx.guest.createMany({ data: rows as any[], skipDuplicates: true }),
-          Booking: (rows) => tx.booking.createMany({ data: rows as any[], skipDuplicates: true }),
-          Invoice: (rows) => tx.invoice.createMany({ data: rows as any[], skipDuplicates: true }),
-          InvoiceItem: (rows) => tx.invoiceItem.createMany({ data: rows as any[], skipDuplicates: true }),
-          Payment: (rows) => tx.payment.createMany({ data: rows as any[], skipDuplicates: true }),
-          MenuItem: (rows) => tx.menuItem.createMany({ data: rows as any[], skipDuplicates: true }),
-          RestaurantOrder: (rows) => tx.restaurantOrder.createMany({ data: rows as any[], skipDuplicates: true }),
-          OrderItem: (rows) => tx.orderItem.createMany({ data: rows as any[], skipDuplicates: true }),
-          Expense: (rows) => tx.expense.createMany({ data: rows as any[], skipDuplicates: true }),
-          CleaningTask: (rows) => tx.cleaningTask.createMany({ data: rows as any[], skipDuplicates: true }),
-          CleaningTaskItem: (rows) => tx.cleaningTaskItem.createMany({ data: rows as any[], skipDuplicates: true }),
-          Notification: (rows) => tx.notification.createMany({ data: rows as any[], skipDuplicates: true }),
-          AuditLog: (rows) => tx.auditLog.createMany({ data: rows as any[], skipDuplicates: true }),
-        }
-
+        // Insert filtered data using transaction client
+        const config = getBackupConfig(tx)
         let totalInserted = 0
         let totalExpected = 0
         const details: Record<string, number> = {}
         const errors: string[] = []
 
-        for (const table of TABLES_INSERT_ORDER) {
-          const op = insertOps[table]
-          const rows = filteredTables[table] || []
+        for (const modelName of config.insertOrder) {
+          const rows = filteredTables[modelName] || []
           totalExpected += rows.length
-          if (!op || rows.length === 0) { details[table] = 0; continue }
+          if (rows.length === 0) { details[modelName] = 0; continue }
+
+          const dbKey = toModelName(modelName) as keyof typeof tx
+          const modelClient = tx[dbKey]
+          if (!modelClient || typeof modelClient.createMany !== "function") {
+            details[modelName] = 0; continue
+          }
+
           try {
-            const result = await op(rows)
-            const count = (result as { count: number })?.count ?? rows.length
-            details[table] = count
-            totalInserted += count
+            const res = await modelClient.createMany({ data: rows as any[], skipDuplicates: true })
+            details[modelName] = res.count
+            totalInserted += res.count
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
-            errors.push(`${table}: ${msg}`)
-            details[table] = 0
+            errors.push(`${modelName}: ${msg}`)
+            details[modelName] = 0
           }
         }
 
         return { totalInserted, totalExpected, details, errors }
       }, { timeout: 60_000 })
 
-      const warnings = result.errors.length > 0 ? result.errors : undefined
-
       return NextResponse.json({
         success: true,
         message: `Maison d'hôtes "${(filteredTables.GuestHouse[0] as any)?.name || guestHouseId}" restaurée`,
         mode: "guesthouse",
         stats: { totalInserted: result.totalInserted, totalExpected: result.totalExpected, details: result.details },
-        warnings,
+        warnings: result.errors.length > 0 ? result.errors : undefined,
         meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })
     } else {
-      // ─── Full restore (NO transaction — sequential, unlimited time) ─
-      // Step 1: Create safety backup of current state
+      // ─── Full restore (NO transaction — sequential) ─
+      // Step 1: Safety backup
       let safetyBackupId: string | null = null
       try {
         safetyBackupId = await createSafetyBackup(user.id)
@@ -529,14 +432,13 @@ export async function POST(request: NextRequest) {
         console.error("[restore] Failed to create safety backup:", err)
       }
 
-      // Step 2: Clear all tables (sequential, no timeout)
+      // Step 2: Clear all tables
       const deleteErrors = await clearAllTables()
 
-      // Step 3: Insert all data (sequential, no timeout)
+      // Step 3: Insert all data
       const insertResult = await insertAllTables(tables)
 
       const allErrors = [...deleteErrors, ...insertResult.errors]
-      const hasErrors = allErrors.length > 0
       const isPartial = insertResult.totalInserted < insertResult.totalExpected
 
       return NextResponse.json({
@@ -545,15 +447,11 @@ export async function POST(request: NextRequest) {
           ? `Restauration partielle — ${insertResult.totalInserted}/${insertResult.totalExpected} enregistrements insérés`
           : "Restauration complète terminée",
         mode: "full",
-        stats: {
-          totalInserted: insertResult.totalInserted,
-          totalExpected: insertResult.totalExpected,
-          details: insertResult.details,
-        },
-        warnings: hasErrors ? allErrors : undefined,
+        stats: { totalInserted: insertResult.totalInserted, totalExpected: insertResult.totalExpected, details: insertResult.details },
+        warnings: allErrors.length > 0 ? allErrors : undefined,
         safetyBackupId,
         safetyNote: safetyBackupId
-          ? `Sauvegarde de sécurité créée avant la restauration. En cas de problème, restaurez cette sauvegarde pour revenir en arrière.`
+          ? "Sauvegarde de sécurité créée avant la restauration. En cas de problème, restaurez cette sauvegarde pour revenir en arrière."
           : "Impossible de créer la sauvegarde de sécurité.",
         meta: { backupLabel: backup.label, backupDate: exportedAt, backupVersion: version },
       })

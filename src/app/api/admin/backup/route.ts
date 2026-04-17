@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
 import { createId } from "@paralleldrive/cuid2"
+import { getBackupConfig, toModelName } from "@/lib/backup-models"
 import { APP_VERSION } from "@/lib/version"
 
 // Force dynamic rendering (no caching)
@@ -26,90 +27,44 @@ async function requireSuperAdmin() {
 }
 
 // ============================================
-// Table export order (dependency-safe for insert)
-// ============================================
-const TABLES_ORDER = [
-  "GuestHouse",
-  "GuestHouseSetting",
-  "User",
-  "Role",
-  "Room",
-  "RoomPrice",
-  "Amenity",
-  "Guest",
-  "Booking",
-  "Invoice",
-  "InvoiceItem",
-  "Payment",
-  "MenuItem",
-  "RestaurantOrder",
-  "OrderItem",
-  "Expense",
-  "CleaningTask",
-  "CleaningTaskItem",
-  "Notification",
-  "AuditLog",
-]
-
-// ============================================
-// Export all data using Prisma queries (portable)
+// Export all data using dynamic Prisma queries
 // ============================================
 async function exportAllData() {
+  const config = getBackupConfig(db)
   const tables: Record<string, unknown[]> = {}
   const tableSummary: Record<string, number> = {}
   let guestHouseList: { id: string; name: string; slug: string }[] = []
 
-  // Use Prisma model queries — portable across SQLite and PostgreSQL
-  const queries: Record<string, () => Promise<unknown[]>> = {
-    GuestHouse: () => db.guestHouse.findMany(),
-    GuestHouseSetting: () => db.guestHouseSetting.findMany(),
-    User: () => db.user.findMany(),
-    Role: () => db.role.findMany(),
-    Room: () => db.room.findMany(),
-    RoomPrice: () => db.roomPrice.findMany(),
-    Amenity: () => db.amenity.findMany(),
-    Guest: () => db.guest.findMany(),
-    Booking: () => db.booking.findMany(),
-    Invoice: () => db.invoice.findMany(),
-    InvoiceItem: () => db.invoiceItem.findMany(),
-    Payment: () => db.payment.findMany(),
-    MenuItem: () => db.menuItem.findMany(),
-    RestaurantOrder: () => db.restaurantOrder.findMany(),
-    OrderItem: () => db.orderItem.findMany(),
-    Expense: () => db.expense.findMany(),
-    CleaningTask: () => db.cleaningTask.findMany(),
-    CleaningTaskItem: () => db.cleaningTaskItem.findMany(),
-    Notification: () => db.notification.findMany(),
-    AuditLog: () => db.auditLog.findMany(),
-  }
+  for (const modelName of config.insertOrder) {
+    const dbKey = toModelName(modelName) as keyof typeof db
+    const modelClient = db[dbKey]
 
-  for (const table of TABLES_ORDER) {
-    const query = queries[table]
-    if (!query) continue
+    if (!modelClient || typeof modelClient.findMany !== "function") continue
+
     try {
-      const rows = await query()
-      tables[table] = rows as unknown[]
-      tableSummary[table] = rows.length
+      const rows = await modelClient.findMany()
+      tables[modelName] = rows as unknown[]
+      tableSummary[modelName] = rows.length
 
-      if (table === "GuestHouse") {
-        guestHouseList = (rows as Record<string, unknown>[]).map((r) => ({
-          id: r.id as string,
-          name: r.name as string,
-          slug: r.slug as string,
+      if (modelName === "GuestHouse") {
+        guestHouseList = (rows as any[]).map((r) => ({
+          id: r.id,
+          name: r.name,
+          slug: r.slug,
         }))
       }
     } catch (err) {
-      console.error(`Erreur export table ${table}:`, err)
-      tables[table] = []
-      tableSummary[table] = 0
+      console.error(`Erreur export table ${modelName}:`, err)
+      tables[modelName] = []
+      tableSummary[modelName] = 0
     }
   }
 
-  return { tables, tableSummary, guestHouseList }
+  return { tables, tableSummary, guestHouseList, tableCount: config.insertOrder.length }
 }
 
 // ============================================
-// GET - List all backups (RAW SQL - bypass Prisma model)
+// GET - List all backups (RAW SQL)
 // ============================================
 export async function GET() {
   const user = await requireSuperAdmin()
@@ -151,7 +106,7 @@ export async function GET() {
     })
   } catch (error) {
     console.error("Erreur récupération backups:", error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: "Erreur interne du serveur",
       detail: error instanceof Error ? error.message : String(error),
     }, { status: 500 })
@@ -172,26 +127,21 @@ export async function POST(request: NextRequest) {
     const label: string | undefined = body.label
     const type: "manual" | "auto" = body.type || "manual"
 
-    // Export all data
-    const { tables, tableSummary, guestHouseList } = await exportAllData()
+    // Export all data (dynamic — picks up new tables automatically)
+    const { tables, tableSummary, guestHouseList, tableCount } = await exportAllData()
 
     // Build backup payload
     const payload = {
       version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       tables,
-      meta: {
-        tableSummary,
-        guestHouseList,
-      },
+      meta: { tableSummary, guestHouseList },
     }
 
     // Compress with gzip → base64
     const jsonString = JSON.stringify(payload)
     const compressed = zlib.gzipSync(Buffer.from(jsonString))
     const compressedBase64 = compressed.toString("base64")
-
-    // Calculate size in Ko
     const sizeKo = Math.round(Buffer.byteLength(compressedBase64, "base64") / 1024)
 
     // Generate ID
@@ -200,16 +150,16 @@ export async function POST(request: NextRequest) {
     // Insert using raw SQL
     await db.$executeRaw`
       INSERT INTO "Backup" ("id", "label", "type", "compressedData", "sizeKo", "tableCount", "tableSummary", "guestHouseList", "createdBy", "createdAt")
-      VALUES (${id}, ${label || null}, ${type}, ${compressedBase64}, ${sizeKo}, ${TABLES_ORDER.length}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${user.id}, NOW())
+      VALUES (${id}, ${label || null}, ${type}, ${compressedBase64}, ${sizeKo}, ${tableCount}, ${JSON.stringify(tableSummary)}, ${JSON.stringify(guestHouseList)}, ${user.id}, NOW())
     `
 
-    // Auto cleanup: keep max 5 auto backups
+    // Auto cleanup: keep max 7 auto backups
     if (type === "auto") {
       const autoBackups = await db.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "Backup" WHERE "type" = 'auto' ORDER BY "createdAt" DESC
       `
-      if (autoBackups.length > 5) {
-        const toDeleteIds = autoBackups.slice(5)
+      if (autoBackups.length > 7) {
+        const toDeleteIds = autoBackups.slice(7)
         for (const b of toDeleteIds) {
           await db.$executeRaw`DELETE FROM "Backup" WHERE "id" = ${b.id}`
         }
@@ -223,7 +173,7 @@ export async function POST(request: NextRequest) {
         label: label || null,
         type,
         sizeKo,
-        tableCount: TABLES_ORDER.length,
+        tableCount,
         tableSummary,
         guestHouseList,
         createdBy: user.id,
@@ -254,7 +204,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id requis" }, { status: 400 })
     }
 
-    // Check existence with raw SQL
     const existing = await db.$queryRaw<Array<{ id: string; label: string | null }>>`
       SELECT "id", "label" FROM "Backup" WHERE "id" = ${id}
     `
