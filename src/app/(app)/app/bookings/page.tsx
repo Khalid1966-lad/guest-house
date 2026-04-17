@@ -534,8 +534,8 @@ export default function BookingsPage() {
 
     // When dates change, re-fetch available rooms
     if (field === "checkIn" || field === "checkOut") {
-      const newCheckIn = field === "checkIn" ? value : formData.checkOut
-      const newCheckOut = field === "checkOut" ? value : formData.checkIn
+      const newCheckIn = field === "checkIn" ? value : formData.checkIn
+      const newCheckOut = field === "checkOut" ? value : formData.checkOut
       if (newCheckIn && newCheckOut && newCheckOut > newCheckIn) {
         fetchAvailableRooms(newCheckIn, newCheckOut, editingBooking?.id)
         // Check if current room is still available
