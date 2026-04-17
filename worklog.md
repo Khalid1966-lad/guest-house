@@ -1056,3 +1056,30 @@ Stage Summary:
 - Booking-level notes field added (separate from guest notes)
 - Occupants displayed in booking details with visual badges
 - Occupant count shown in day view booking rows
+
+---
+Task ID: migrate-to-neon-postgresql
+Agent: Main
+Task: Migrate database from local SQLite to Neon PostgreSQL
+
+Work Log:
+- Diagnosed issue: schema.prisma was configured with provider=sqlite but user needs Neon PostgreSQL
+- Found that schema.postgresql.prisma already existed with correct PostgreSQL provider and all latest models (Occupant, Subscription, Backup, HousekeepingZone, StaffSchedule)
+- Copied schema.postgresql.prisma to schema.prisma (replacing SQLite version)
+- Updated .env: DATABASE_URL changed from file:/home/z/my-project/db/custom.db to postgresql://neondb_owner:***@ep-wandering-smoke-agsq7mdb-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require
+- Removed channel_binding=require from URL (not supported by Prisma/pg)
+- Fixed package.json scripts: build and postinstall no longer reference separate schema files
+- Removed obsolete scripts: db:push:pg, db:generate:pg (no longer needed with unified schema)
+- Ran prisma db push --accept-data-loss to sync all tables to Neon PostgreSQL (success)
+- Ran prisma generate to regenerate Prisma Client for PostgreSQL
+- Verified ensure-backup-table.ts, ensure-subscription-table.ts, ensure-housekeeping-tables.ts all check for postgresql:// prefix (compatible)
+- Verified no SQLite references remain in src/ code
+- Lint passes clean
+
+Stage Summary:
+- Database fully migrated from SQLite to Neon PostgreSQL
+- schema.prisma now uses provider=postgresql (unified, no more separate sqlite/postgresql files)
+- All 24 tables synced to Neon: GuestHouse, User, Role, Session, Account, VerificationToken, Room, Amenity, RoomPrice, Guest, Booking, Occupant, Invoice, InvoiceItem, Payment, MenuItem, RestaurantOrder, OrderItem, Expense, Notification, CleaningTask, CleaningTaskItem, AuditLog, Subscription, HousekeepingZone, StaffSchedule, Backup
+- package.json scripts cleaned up: build, postinstall, db:push, db:generate all use default schema.prisma
+- User.menuAccess field properly uses Json? type (PostgreSQL native JSON, not String? like SQLite)
+- Ready for Vercel deployment — just need to set DATABASE_URL env var in Vercel dashboard

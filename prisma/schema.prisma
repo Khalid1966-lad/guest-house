@@ -9,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -59,7 +59,7 @@ model GuestHouse {
   cleaningTasks  CleaningTask[]
   subscription   Subscription?
   housekeepingZones HousekeepingZone[]
-  staffSchedules    StaffSchedule[]
+  staffSchedules  StaffSchedule[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -93,10 +93,10 @@ model GuestHouseSetting {
   touristTaxFreeAge  Int     @default(18)    // Free for children under this age
   
   // Housekeeping auto-assignment settings
-  autoAssignHousekeeping  Boolean @default(false)
-  autoAssignMode          String  @default("zone")
-  autoStartCleaning       Boolean @default(false)
-  defaultCleaningPriority String  @default("normal")
+  autoAssignHousekeeping  Boolean @default(false)  // Enable/disable auto-assignment on checkout
+  autoAssignMode          String  @default("zone")      // "zone" | "round_robin" | "manual_only"
+  autoStartCleaning       Boolean @default(false)  // true = task auto-started (in_progress), false = pending
+  defaultCleaningPriority String  @default("normal") // low | normal | high
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -127,7 +127,7 @@ model User {
   timezone      String?
   
   // Per-user menu access permissions (JSON: { dashboard: true, rooms: false, ... })
-  menuAccess    String?   // JSON string for SQLite compatibility
+  menuAccess    Json?
   
   sessions      Session[]
   accounts      Account[]
@@ -434,12 +434,12 @@ model Occupant {
   firstName     String
   lastName      String
   dateOfBirth   DateTime?
-  nationality   String?   // Code ISO 3166-1 alpha-2 (ex: MA, FR, DZ...)
-  idType        String?   // CIN, PASSEPORT, CARTE_SEJOUR
+  nationality   String?
+  idType        String?
   idNumber      String?
   isAdult       Boolean  @default(true)
-  isMainBooker  Boolean  @default(false) // Le réservataire (client principal)
-  relationship  String?  // Lien avec le réservataire (conjoint, enfant, ami, collegue, autre)
+  isMainBooker  Boolean  @default(false)
+  relationship  String?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -483,7 +483,7 @@ model Invoice {
   
   items         InvoiceItem[]
   payments      Payment[]
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -661,14 +661,14 @@ model Notification {
   userId        String?
   user          User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  type          String   // new_booking, check_in, check_out, cancelled, new_invoice, payment_received, etc.
+  type          String
   title         String
   message       String
   
-  entityType    String?  // booking, invoice, guest, room, etc.
+  entityType    String?
   entityId      String?
   
-  isRead        Boolean  @default(false)
+  isRead        Boolean @default(false)
   
   createdAt     DateTime @default(now())
   
@@ -825,7 +825,7 @@ model StaffSchedule {
 }
 
 // ============================================
-// BACKUPS (Super Admin)
+// SAUVEGARDES (BACKUPS)
 // ============================================
 model Backup {
   id            String   @id @default(cuid())
@@ -842,5 +842,3 @@ model Backup {
   createdBy     String
   createdAt     DateTime @default(now())
 }
-
-
