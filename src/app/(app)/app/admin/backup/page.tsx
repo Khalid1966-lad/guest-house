@@ -251,8 +251,28 @@ export default function AdminBackupPage() {
     }
   }
 
-  const handleDownload = (backup: BackupItem) => {
-    window.open(`/api/admin/backup/${backup.id}/download`, "_blank")
+  const handleDownload = async (backup: BackupItem) => {
+    try {
+      const res = await fetch(`/api/admin/backup/${backup.id}/download`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        alert(data?.error || `Erreur ${res.status}: Impossible de télécharger`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const timestamp = new Date(backup.createdAt).toISOString().replace(/[:.]/g, "-")
+      const label = (backup.label || "sauvegarde").replace(/[^a-zA-Z0-9-_]/g, "_")
+      a.download = `pms-backup-${label}-${timestamp}.json.gz`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert("Erreur réseau lors du téléchargement")
+    }
   }
 
   const handleImportClick = () => {
