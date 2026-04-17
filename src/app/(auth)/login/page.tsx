@@ -19,6 +19,8 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") || "/app/dashboard"
   const message = searchParams.get("message")
   
+  // Use a formKey to force remount after logout (clears autofill)
+  const [formKey, setFormKey] = useState(Date.now())
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -92,7 +94,7 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} key={formKey}>
             <CardContent className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -117,6 +119,7 @@ function LoginForm() {
                   required
                   disabled={isLoading}
                   className="h-11"
+                  autoComplete="off"
                 />
               </div>
               
@@ -140,6 +143,7 @@ function LoginForm() {
                     required
                     disabled={isLoading}
                     className="h-11 pr-10"
+                    autoComplete="off"
                   />
                   <button
                     type="button"
