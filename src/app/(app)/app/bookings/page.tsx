@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useCurrency } from "@/hooks/use-currency"
+import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -288,6 +289,7 @@ export default function BookingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { formatAmount } = useCurrency()
+  const { toast } = useToast()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
@@ -364,6 +366,9 @@ export default function BookingsPage() {
       if (bookingsRes.ok) {
         const data = await bookingsRes.json()
         setBookings(data.bookings || [])
+      } else {
+        console.error("Bookings API error:", bookingsRes.status, await bookingsRes.text().catch(() => ""))
+        setError("Impossible de charger les réservations. Réessayez.")
       }
 
       if (roomsRes.ok) {
@@ -585,8 +590,14 @@ export default function BookingsPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        setFormError(errorData.error || "Erreur lors de la sauvegarde")
+        const errorData = await response.json().catch(() => ({ error: "Erreur serveur" }))
+        const errorMsg = errorData.error || "Erreur lors de la sauvegarde"
+        setFormError(errorMsg)
+        toast({
+          title: "Erreur",
+          description: errorMsg,
+          variant: "destructive",
+        })
         setIsSaving(false)
         return
       }
@@ -597,7 +608,7 @@ export default function BookingsPage() {
       // Save occupants + notes
       if (bookingId) {
         try {
-          await fetch(`/api/bookings/${bookingId}/occupants`, {
+          const occRes = await fetch(`/api/bookings/${bookingId}/occupants`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -605,16 +616,32 @@ export default function BookingsPage() {
               notes: formData.notes || null,
             }),
           })
+          if (!occRes.ok) {
+            console.warn("Occupants save returned status:", occRes.status)
+          }
         } catch (err) {
           console.error("Erreur sauvegarde occupants:", err)
         }
       }
 
+      const guestName = `${formData.firstName} ${formData.lastName}`
+      const roomLabel = room ? `Ch. ${room.number}` : ""
+      toast({
+        title: editingBooking ? "Réservation modifiée" : "Réservation créée",
+        description: `${guestName} — ${roomLabel} (${format(parseISO(formData.checkIn), "dd/MM")} → ${format(parseISO(formData.checkOut), "dd/MM")})`,
+      })
+
       setIsDialogOpen(false)
       setIsSaving(false)
-      fetchData()
+      await fetchData()
     } catch (err) {
-      setFormError("Une erreur inattendue s'est produite")
+      const msg = "Une erreur inattendue s'est produite. Veuillez réessayer."
+      setFormError(msg)
+      toast({
+        title: "Erreur",
+        description: msg,
+        variant: "destructive",
+      })
       setIsSaving(false)
     }
   }
@@ -631,18 +658,30 @@ export default function BookingsPage() {
       if (response.ok) {
         const data = await response.json()
 
+        const statusLabels: Record<string, string> = {
+          checked_in: "Check-in effectué",
+          checked_out: "Check-out effectué",
+          cancelled: "Réservation annulée",
+          confirmed: "Réservation confirmée",
+          no_show: "Marqué comme no-show",
+        }
+        toast({ title: statusLabels[newStatus] || "Statut mis à jour" })
+
         // Show housekeeping warning if any (e.g., no agent available)
         if (data.housekeepingWarning) {
           setTimeout(() => {
-            alert(data.housekeepingWarning)
+            toast({ title: "Ménage", description: data.housekeepingWarning })
           }, 500)
         }
 
         setIsDetailOpen(false)
-        fetchData()
+        await fetchData()
+      } else {
+        toast({ title: "Erreur", description: "Impossible de mettre à jour le statut", variant: "destructive" })
       }
     } catch (err) {
       console.error("Erreur mise à jour:", err)
+      toast({ title: "Erreur", description: "Erreur lors de la mise à jour", variant: "destructive" })
     }
   }
 
@@ -665,12 +704,16 @@ export default function BookingsPage() {
       })
 
       if (response.ok) {
+        toast({ title: "Réservation supprimée" })
         setIsDeleteDialogOpen(false)
         setBookingToDelete(null)
-        fetchData()
+        await fetchData()
+      } else {
+        toast({ title: "Erreur", description: "Impossible de supprimer la réservation", variant: "destructive" })
       }
     } catch (err) {
       console.error("Erreur suppression:", err)
+      toast({ title: "Erreur", description: "Erreur lors de la suppression", variant: "destructive" })
     } finally {
       setIsDeleting(false)
     }
