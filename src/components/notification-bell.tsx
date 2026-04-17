@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react"
 import { Bell, Check, CheckCheck, Trash2, CalendarDays, LogIn, LogOut, XCircle, Receipt, CreditCard, UtensilsCrossed, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
@@ -176,7 +175,7 @@ export function NotificationBell() {
             <p className="text-xs mt-1">Les nouvelles notifications apparaîtront ici</p>
           </div>
         ) : (
-          <ScrollArea className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="divide-y">
               {notifications.map((notification) => (
                 <div
@@ -251,7 +250,7 @@ export function NotificationBell() {
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {/* Footer */}
