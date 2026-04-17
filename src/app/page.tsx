@@ -751,7 +751,7 @@ export default function LandingPage() {
                       </a>
                       <a href="tel:+212662425890">
                         <Button
-                          className="w-full bg-white/10 text-gray-900 hover:bg-white hover:text-white font-semibold h-11 border border-white/20 transition-all"
+                          className="w-full bg-white/10 text-gray-900 hover:bg-white/20 font-semibold h-11 border border-white/20 transition-all"
                         >
                           <Phone className="w-4 h-4 mr-2" />
                           Appeler maintenant

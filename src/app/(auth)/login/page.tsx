@@ -113,7 +113,7 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} autoComplete="off">
             <CardContent className="space-y-4">
               {error && (
                 <Alert variant="destructive">
