@@ -321,6 +321,10 @@ export default function BookingsPage() {
   const [transferReason, setTransferReason] = useState("")
   const [isTransferring, setIsTransferring] = useState(false)
   const [transferError, setTransferError] = useState("")
+  // Available rooms for date range
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([])
+  const [isLoadingAvailableRooms, setIsLoadingAvailableRooms] = useState(false)
+  const [datesComplete, setDatesComplete] = useState(false)
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -465,6 +469,8 @@ export default function BookingsPage() {
     setEditingBooking(null)
     setFormData(defaultFormData)
     setOccupants([])
+    setAvailableRooms([])
+    setDatesComplete(false)
     setFormError("")
     setIsDialogOpen(true)
   }
@@ -472,6 +478,8 @@ export default function BookingsPage() {
   // Open edit booking dialog
   const handleEditBooking = (booking: Booking) => {
     setEditingBooking(booking)
+    const checkIn = format(parseISO(booking.checkIn), "yyyy-MM-dd")
+    const checkOut = format(parseISO(booking.checkOut), "yyyy-MM-dd")
     setFormData({
       guestId: booking.guest.id,
       firstName: booking.guest.firstName,
@@ -479,8 +487,8 @@ export default function BookingsPage() {
       email: booking.guest.email || "",
       phone: booking.guest.phone || "",
       roomId: booking.room.id,
-      checkIn: format(parseISO(booking.checkIn), "yyyy-MM-dd"),
-      checkOut: format(parseISO(booking.checkOut), "yyyy-MM-dd"),
+      checkIn,
+      checkOut,
       adults: booking.adults.toString(),
       children: booking.children.toString(),
       nightlyRate: booking.nightlyRate.toString(),
@@ -494,6 +502,8 @@ export default function BookingsPage() {
     setFormError("")
     setIsDetailOpen(false)
     setIsDialogOpen(true)
+    // Fetch available rooms for the booking's dates (exclude current booking from conflict check)
+    fetchAvailableRooms(checkIn, checkOut, booking.id)
   }
 
   // View booking details
@@ -521,11 +531,57 @@ export default function BookingsPage() {
       }
       return next
     })
+
+    // When dates change, re-fetch available rooms
+    if (field === "checkIn" || field === "checkOut") {
+      const newCheckIn = field === "checkIn" ? value : formData.checkOut
+      const newCheckOut = field === "checkOut" ? value : formData.checkIn
+      if (newCheckIn && newCheckOut && newCheckOut > newCheckIn) {
+        fetchAvailableRooms(newCheckIn, newCheckOut, editingBooking?.id)
+        // Check if current room is still available
+        if (formData.roomId && availableRooms.length > 0) {
+          const isStillAvailable = availableRooms.some((r) => r.id === formData.roomId)
+          if (!isStillAvailable) {
+            setFormData((prev) => ({ ...prev, roomId: "", nightlyRate: "" }))
+          }
+        }
+      } else {
+        setAvailableRooms([])
+        setDatesComplete(false)
+        setFormData((prev) => ({ ...prev, roomId: "", nightlyRate: "" }))
+      }
+    }
+  }
+
+  // Fetch available rooms based on selected dates
+  const fetchAvailableRooms = async (checkIn: string, checkOut: string, excludeBookingId?: string) => {
+    if (!checkIn || !checkOut) {
+      setAvailableRooms([])
+      setDatesComplete(false)
+      return
+    }
+    setDatesComplete(true)
+    setIsLoadingAvailableRooms(true)
+    try {
+      let url = `/api/rooms/available?checkIn=${checkIn}&checkOut=${checkOut}`
+      if (excludeBookingId) url += `&excludeBookingId=${excludeBookingId}`
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableRooms(data.rooms || [])
+      }
+    } catch {
+      // Silently fail - user can still submit and get server error
+    } finally {
+      setIsLoadingAvailableRooms(false)
+    }
   }
 
   // Select room and set default price
   const handleRoomSelect = (roomId: string) => {
-    const room = rooms.find((r) => r.id === roomId)
+    const room = availableRooms.length > 0
+      ? availableRooms.find((r) => r.id === roomId)
+      : rooms.find((r) => r.id === roomId)
     setFormData((prev) => ({
       ...prev,
       roomId,
@@ -1773,31 +1829,7 @@ export default function BookingsPage() {
               )}
             </div>
 
-            {/* Room Selection */}
-            <div className="space-y-4">
-              <h3 className="font-medium flex items-center gap-2">
-                <BedDouble className="w-4 h-4" />
-                Chambre
-              </h3>
-              <Select value={formData.roomId} onValueChange={handleRoomSelect}>
-                <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Sélectionner une chambre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {rooms.map((room) => (
-                    <SelectItem key={room.id} value={room.id} className="py-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="font-medium">Chambre {room.number}{room.name ? ` — ${room.name}` : ""}</span>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">{roomTypes[room.type] || room.type} · {room.capacity} pers.</span>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{formatAmount(room.basePrice)}/nuit</div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Dates */}
+            {/* Dates — BEFORE room selection */}
             <div className="space-y-4">
               <h3 className="font-medium flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4" />
@@ -1826,6 +1858,57 @@ export default function BookingsPage() {
               {formData.checkIn && formData.checkOut && (
                 <p className="text-sm text-gray-500">
                   Durée: {calculateNights()} nuit{calculateNights() > 1 ? "s" : ""}
+                </p>
+              )}
+              {!datesComplete && (
+                <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+                  ⚠️ Sélectionnez les dates d'arrivée et de départ pour voir les chambres disponibles.
+                </p>
+              )}
+            </div>
+
+            {/* Room Selection — filtered by date availability */}
+            <div className="space-y-4">
+              <h3 className="font-medium flex items-center gap-2">
+                <BedDouble className="w-4 h-4" />
+                Chambre
+              </h3>
+              <Select
+                value={formData.roomId}
+                onValueChange={handleRoomSelect}
+                disabled={!datesComplete || isLoadingAvailableRooms}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder={
+                    !datesComplete
+                      ? "Saisissez les dates d'abord"
+                      : isLoadingAvailableRooms
+                        ? "Chargement des chambres..."
+                        : availableRooms.length === 0
+                          ? "Aucune chambre disponible"
+                          : "Sélectionner une chambre"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRooms.map((room) => (
+                    <SelectItem key={room.id} value={room.id} className="py-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium">Chambre {room.number}{room.name ? ` — ${room.name}` : ""}</span>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">{roomTypes[room.type] || room.type} · {room.capacity} pers.</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{formatAmount(room.basePrice)}/nuit</div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {datesComplete && !isLoadingAvailableRooms && availableRooms.length === 0 && (
+                <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md px-3 py-2">
+                  Aucune chambre disponible pour ces dates.
+                </p>
+              )}
+              {datesComplete && !isLoadingAvailableRooms && availableRooms.length > 0 && (
+                <p className="text-xs text-green-600">
+                  ✓ {availableRooms.length} chambre{availableRooms.length > 1 ? "s" : ""} disponible{availableRooms.length > 1 ? "s" : ""}
                 </p>
               )}
             </div>

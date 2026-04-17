@@ -1147,3 +1147,29 @@ Work Log:
 Stage Summary:
 - Transfer dialog no longer crashes when rendered
 - Both "Reserved" room status and "Transfer" features are fully functional
+
+---
+Task ID: date-first-room-availability
+Agent: Main
+Task: Force date selection before room, filter rooms by availability
+
+Work Log:
+- Created GET /api/rooms/available endpoint: accepts checkIn + checkOut query params, excludes rooms with conflicting bookings (confirmed/checked_in/pending), supports excludeBookingId for edit mode
+- Reordered booking form: Dates section now appears BEFORE Room selection (was Guest → Room → Dates, now Guest → Dates → Room)
+- Room dropdown is disabled until both dates are selected (datesComplete flag)
+- When dates change, available rooms are fetched from the new API endpoint
+- Placeholder text changes dynamically: "Saisissez les dates d'abord" → "Chargement..." → "Aucune chambre disponible" → "Sélectionner une chambre"
+- Amber warning message shown when dates are not yet selected
+- Green confirmation shows count of available rooms
+- Red error shown when no rooms are available for the selected dates
+- When dates change and current room becomes unavailable, roomId is auto-cleared
+- On edit mode (handleEditBooking), available rooms are pre-fetched for the booking's dates with excludeBookingId to include the current room
+- On new booking (handleNewBooking), available rooms and datesComplete are reset
+- handleRoomSelect now looks in availableRooms first, falls back to rooms array
+- Lint passes clean
+
+Stage Summary:
+- Booking form now enforces date-first workflow: user must select dates before choosing a room
+- Only available rooms (no conflicting bookings) are shown in the dropdown
+- Dynamic placeholders and status messages guide the user through the flow
+- Edit mode correctly shows the current room as available via excludeBookingId param
