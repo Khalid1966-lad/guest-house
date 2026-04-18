@@ -6,8 +6,8 @@ import zlib from "zlib"
 import { APP_VERSION } from "@/lib/version"
 
 export const dynamic = "force-dynamic"
-// Vercel: allow up to 300s for large DB backup exports
-export const maxDuration = 300
+// Vercel: max allowed on Hobby=10s, Pro=60s
+export const maxDuration = 60
 
 export async function POST(request: Request) {
   // Auth via shared secret
