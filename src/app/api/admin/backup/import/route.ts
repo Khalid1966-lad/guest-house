@@ -7,8 +7,6 @@ import { createId } from "@paralleldrive/cuid2"
 
 // Force dynamic rendering (no caching)
 export const dynamic = "force-dynamic"
-// Vercel: max allowed on Hobby=10s, Pro=60s
-export const maxDuration = 60
 
 // ============================================
 // Super Admin guard
