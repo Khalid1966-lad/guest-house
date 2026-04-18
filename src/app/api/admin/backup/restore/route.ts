@@ -8,6 +8,8 @@ import { getBackupConfig, toModelName, DEPENDENCIES } from "@/lib/backup-models"
 
 // Force dynamic rendering (no caching)
 export const dynamic = "force-dynamic"
+// Vercel: allow up to 300s for restore operations
+export const maxDuration = 300
 
 // ============================================
 // Super Admin guard
