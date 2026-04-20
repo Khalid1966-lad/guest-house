@@ -97,7 +97,7 @@ const guideSections: GuideSection[] = [
       },
       {
         type: "info",
-        text: "Version 2.8.1 — Export de la liste des clients par intervalle de dates (Excel, PDF, impression). La taxe de séjour est maintenant configurable par occupant (adulte/enfant) et par nuitée depuis les paramètres. Nouvelles catégories de services : Hammam (bain marocain) et Cooking classe.",
+        text: "Version 2.8.2 — La taxe de séjour est maintenant obligatoire dans les factures lorsqu'elle est activée dans les paramètres. Les tarifs adulte/enfant par nuitée sont auto-remplis depuis les paramètres et modifiables si besoin.",
       },
       {
         type: "tip",
