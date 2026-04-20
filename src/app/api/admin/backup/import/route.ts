@@ -5,6 +5,9 @@ import { authOptions } from "@/lib/auth"
 import zlib from "zlib"
 import { createId } from "@paralleldrive/cuid2"
 
+// Force dynamic rendering (no caching)
+export const dynamic = "force-dynamic"
+
 // ============================================
 // Super Admin guard
 // ============================================

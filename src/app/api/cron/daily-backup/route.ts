@@ -3,13 +3,14 @@ import { db } from "@/lib/db"
 import { toModelName, getBackupConfig } from "@/lib/backup-models"
 import { createId } from "@paralleldrive/cuid2"
 import zlib from "zlib"
+import { APP_VERSION } from "@/lib/version"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   // Auth via shared secret
   // 1. BACKUP_CRON_SECRET: our custom secret (for manual/testing calls)
-  // 2. CRON_SECRET: Vercel Cron's built-in secret (set in Vercel env)
+  // 2. CRON_SECRET: Vercel Cron's built-in secret (MUST be set in Vercel env vars)
   const authHeader = request.headers.get("authorization")
   const backupSecret = process.env.BACKUP_CRON_SECRET
   const vercelCronSecret = process.env.CRON_SECRET
@@ -19,8 +20,11 @@ export async function POST(request: Request) {
     (vercelCronSecret && authHeader === `Bearer ${vercelCronSecret}`)
 
   if (!isValid) {
+    console.warn("[cron-backup] Auth failed — CRON_SECRET or BACKUP_CRON_SECRET not configured or mismatch")
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
+
+  const startTime = Date.now()
 
   try {
     const config = getBackupConfig(db)
@@ -48,9 +52,10 @@ export async function POST(request: Request) {
     }
 
     const payload = JSON.stringify({
-      version: "auto-daily",
+      version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       tables,
+      meta: { tableSummary, guestHouseList },
     })
 
     const compressed = zlib.gzipSync(Buffer.from(payload))
@@ -75,17 +80,21 @@ export async function POST(request: Request) {
       }
     }
 
-    console.log(`[cron-backup] Auto backup created: ${id} (${sizeKo} Ko, ${config.insertOrder.length} tables)`)
+    const duration = Date.now() - startTime
+    const totalRecords = Object.values(tableSummary).reduce((a, b) => a + b, 0)
+    console.log(`[cron-backup] ✅ Auto backup created in ${duration}ms: ${id} (${sizeKo} Ko, ${config.insertOrder.length} tables, ${totalRecords} records)`)
 
     return NextResponse.json({
       success: true,
       id,
       sizeKo,
       tableCount: config.insertOrder.length,
-      totalRecords: Object.values(tableSummary).reduce((a, b) => a + b, 0),
+      totalRecords,
+      durationMs: duration,
     })
   } catch (error) {
-    console.error("[cron-backup] Error:", error)
+    const duration = Date.now() - startTime
+    console.error(`[cron-backup] ❌ Error after ${duration}ms:`, error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
