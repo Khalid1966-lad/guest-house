@@ -386,6 +386,7 @@ model Booking {
   // Tourist tax
   touristTaxApplied  Boolean @default(false)
   touristTaxPerNight Float   @default(0)
+  touristTaxNights   Int     @default(0)
   touristTaxAmount   Float   @default(0)
   
   nightlyRate   Float
