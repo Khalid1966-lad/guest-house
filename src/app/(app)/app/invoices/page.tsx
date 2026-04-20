@@ -1756,34 +1756,7 @@ export default function InvoicesPage() {
                 })}
               </div>
 
-              {/* Totals */}
-              <div className="bg-sky-50 dark:bg-sky-950 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Sous-total</span>
-                  <span>{formatAmount(subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>TVA</span>
-                  <span>{formatAmount(taxes)}</span>
-                </div>
-                {touristTaxSettings.enabled && touristTaxAmount > 0 && (
-                  <div className="flex justify-between text-sm text-amber-700 dark:text-amber-400">
-                    <span>
-                      Taxe de séjour ({formData.touristTaxAdults} adulte{parseInt(formData.touristTaxAdults) > 1 ? "s" : ""}
-                      {parseInt(formData.touristTaxChildren) > 0 ? ` + ${formData.touristTaxChildren} enfant${parseInt(formData.touristTaxChildren) > 1 ? "s" : ""}` : ""}
-                      × {formData.touristTaxNights} nuit{parseInt(formData.touristTaxNights) > 1 ? "s" : ""})
-                    </span>
-                    <span>{formatAmount(touristTaxAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-semibold text-lg border-t pt-2">
-                  <span>Total</span>
-                  <span className="text-sky-600">{formatAmount(total)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Due Date */}
+              {/* Due Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Date d'échéance</Label>
@@ -1866,6 +1839,27 @@ export default function InvoicesPage() {
               )}
             </div>
             )}
+
+            {/* Totals */}
+            <div className="bg-sky-50 dark:bg-sky-950 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Taxe de séjour</span>
+                  <span className="text-amber-700 dark:text-amber-400">{touristTaxSettings.enabled ? formatAmount(touristTaxAmount) : "—"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Sous-total</span>
+                  <span>{formatAmount(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>TVA</span>
+                  <span>{formatAmount(taxes)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                  <span>Total</span>
+                  <span className="text-sky-600">{formatAmount(total)}</span>
+                </div>
+              </div>
+            </div>
 
             {/* Payment Method + Notes */}
             <div className="grid grid-cols-2 gap-4">
