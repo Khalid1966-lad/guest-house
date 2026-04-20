@@ -1311,3 +1311,23 @@ Stage Summary:
 - All version references updated to v2.9.0
 - Lint passed clean
 - Dev server compiles without errors
+---
+Task ID: 4
+Agent: Main
+Task: Add guest list export by date interval (Excel, PDF, Print)
+
+Work Log:
+- Added touristTax fields to bookings API select (touristTaxApplied, touristTaxPerNight, touristTaxNights, touristTaxAmount) and nationality to guest select
+- Added collapsible export section to guests page with Download icon
+- Added date range inputs (Du / Au) that trigger auto-fetch of bookings via /api/bookings?startDate=&endDate=&status=all
+- Added BookingForExport interface with guest, room, occupants, tourist tax fields
+- Implemented Excel export (XLSX) with 12 columns: #, Nom, Prénom, Nationalité, Chambre, Arrivée, Départ, Nuitées, Adultes, Enfants, Total séjour, Taxe de séjour + totals row
+- Implemented Print/PDF export via browser print dialog with A4 landscape layout, styled table, stats bar, totals row
+- Added preview table in the export section showing filtered results with live totals
+- Version bumped to v2.9.1 (patch digit incremented per user convention)
+
+Stage Summary:
+- Export section is collapsible (click to expand) on the guests page
+- 3 export modes: Excel (.xlsx), PDF (via print dialog), Print
+- Data columns: Name, first name, nationality, room, check-in, check-out, nights, adults, children, total stay, tourist tax
+- Lint clean, dev server compiles without errors

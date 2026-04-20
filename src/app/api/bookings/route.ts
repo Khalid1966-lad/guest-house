@@ -78,6 +78,10 @@ export async function GET(request: NextRequest) {
         extraBedPrice: true,
         babyBed: true,
         babyBedPrice: true,
+        touristTaxApplied: true,
+        touristTaxPerNight: true,
+        touristTaxNights: true,
+        touristTaxAmount: true,
         guest: {
           select: {
             id: true,
@@ -85,6 +89,7 @@ export async function GET(request: NextRequest) {
             lastName: true,
             email: true,
             phone: true,
+            nationality: true,
           },
         },
         room: {

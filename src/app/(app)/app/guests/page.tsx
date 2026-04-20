@@ -38,10 +38,17 @@ import {
   Edit,
   Trash2,
   AlertCircle,
+  FileSpreadsheet,
+  FileText,
+  Printer,
+  Download,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { fr } from "date-fns/locale"
+import * as XLSX from "xlsx"
 
 // Types
 interface Guest {
@@ -88,6 +95,24 @@ const defaultFormData = {
   vipLevel: "",
 }
 
+// Booking type for export
+interface BookingForExport {
+  id: string
+  checkIn: string
+  checkOut: string
+  adults: number
+  children: number
+  status: string
+  totalPrice: number
+  touristTaxApplied: boolean
+  touristTaxPerNight: number
+  touristTaxNights: number
+  touristTaxAmount: number
+  guest: { firstName: string; lastName: string; email?: string | null; phone?: string | null; nationality?: string | null }
+  room: { number: string; name?: string | null }
+  occupants: { firstName: string; lastName: string; isAdult: boolean; dateOfBirth?: string | null }[]
+}
+
 export default function GuestsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -102,6 +127,13 @@ export default function GuestsPage() {
   const [formData, setFormData] = useState(defaultFormData)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState("")
+
+  // Export state
+  const [exportDateFrom, setExportDateFrom] = useState("")
+  const [exportDateTo, setExportDateTo] = useState("")
+  const [exportBookings, setExportBookings] = useState<BookingForExport[]>([])
+  const [isExportLoading, setIsExportLoading] = useState(false)
+  const [showExportSection, setShowExportSection] = useState(false)
 
   // Fetch guests
   const fetchGuests = async () => {
@@ -238,6 +270,194 @@ export default function GuestsPage() {
     }
   }
 
+  // ─── Export: Fetch bookings by date range ──────────────────────────────────
+  const fetchExportData = async () => {
+    if (!exportDateFrom || !exportDateTo) return
+    setIsExportLoading(true)
+    try {
+      const params = new URLSearchParams()
+      params.append("startDate", exportDateFrom)
+      params.append("endDate", exportDateTo)
+      params.append("status", "all")
+
+      const response = await fetch(`/api/bookings?${params.toString()}`)
+      if (response.ok) {
+        const data = await response.json()
+        setExportBookings(data.bookings || [])
+      } else {
+        setExportBookings([])
+      }
+    } catch (err) {
+      console.error("Erreur chargement données export:", err)
+      setExportBookings([])
+    } finally {
+      setIsExportLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (exportDateFrom && exportDateTo) {
+      fetchExportData()
+    } else {
+      setExportBookings([])
+    }
+  }, [exportDateFrom, exportDateTo])
+
+  const exportTotalNights = exportBookings.reduce((sum, b) => {
+    const ci = new Date(b.checkIn)
+    const co = new Date(b.checkOut)
+    return sum + Math.max(1, Math.ceil((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24)))
+  }, 0)
+  const exportTotalTaxe = exportBookings.reduce((sum, b) => sum + (b.touristTaxAmount || 0), 0)
+
+  // ─── Export: Excel ────────────────────────────────────────────────────────
+  const handleExportExcel = () => {
+    if (exportBookings.length === 0) return
+    const rows = exportBookings.map((b, i) => {
+      const ci = new Date(b.checkIn)
+      const co = new Date(b.checkOut)
+      const nights = Math.max(1, Math.ceil((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24)))
+      return {
+        "#": i + 1,
+        "Nom": b.guest.lastName,
+        "Prénom": b.guest.firstName,
+        "Nationalité": b.guest.nationality || "",
+        "Chambre": b.room.number,
+        "Arrivée": format(ci, "dd/MM/yyyy", { locale: fr }),
+        "Départ": format(co, "dd/MM/yyyy", { locale: fr }),
+        "Nuitées": nights,
+        "Adultes": b.adults,
+        "Enfants": b.children,
+        "Total séjour": b.totalPrice,
+        "Taxe de séjour": b.touristTaxApplied ? b.touristTaxAmount : 0,
+      }
+    })
+
+    rows.push({
+      "#": "",
+      "Nom": "",
+      "Prénom": "",
+      "Nationalité": "",
+      "Chambre": "TOTAL",
+      "Arrivée": "",
+      "Départ": "",
+      "Nuitées": exportTotalNights,
+      "Adultes": "",
+      "Enfants": "",
+      "Total séjour": exportBookings.reduce((s, b) => s + b.totalPrice, 0),
+      "Taxe de séjour": exportTotalTaxe,
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws["!cols"] = [
+      { wch: 4 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 10 },
+      { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+      { wch: 14 }, { wch: 16 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Liste clients")
+    const dateLabel = `_${exportDateFrom}_${exportDateTo}`
+    XLSX.writeFile(wb, `liste_clients${dateLabel}.xlsx`)
+  }
+
+  // ─── Export: Print / PDF (via browser print dialog) ────────────────────────
+  const handleExportPrint = () => {
+    if (exportBookings.length === 0) return
+    const dateRangeLabel = `Du ${format(parseISO(exportDateFrom), "dd/MM/yyyy", { locale: fr })} au ${format(parseISO(exportDateTo), "dd/MM/yyyy", { locale: fr })}`
+
+    const rows = exportBookings.map((b, i) => {
+      const ci = new Date(b.checkIn)
+      const co = new Date(b.checkOut)
+      const nights = Math.max(1, Math.ceil((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24)))
+      const occupantList = b.occupants && b.occupants.length > 0
+        ? b.occupants.map(o => `${o.firstName} ${o.lastName}${o.isAdult ? "" : " (enf.)"}`).join(", ")
+        : ""
+      return `<tr>
+        <td class="text-center">${i + 1}</td>
+        <td>${b.guest.lastName}</td>
+        <td>${b.guest.firstName}</td>
+        <td>${b.guest.nationality || ""}</td>
+        <td class="text-center"><strong>${b.room.number}</strong></td>
+        <td class="text-center">${format(ci, "dd/MM/yyyy", { locale: fr })}</td>
+        <td class="text-center">${format(co, "dd/MM/yyyy", { locale: fr })}</td>
+        <td class="text-center">${nights}</td>
+        <td class="text-center">${b.adults}</td>
+        <td class="text-center">${b.children}</td>
+        <td class="text-right">${b.totalPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</td>
+        <td class="text-right">${b.touristTaxApplied ? b.touristTaxAmount.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) : "—"}</td>
+      </tr>`
+    }).join("")
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Liste des clients — ${dateRangeLabel}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 9pt; color: #000; padding: 1cm; }
+    @page { size: A4 landscape; margin: 0; }
+    @media print { body { padding: 1cm; } }
+    h1 { font-size: 14pt; margin-bottom: 0.15rem; }
+    .subtitle { color: #555; font-size: 9pt; margin-bottom: 0.8rem; }
+    .stats { display: flex; gap: 1.5rem; margin-bottom: 0.8rem; font-size: 9pt; }
+    .stats span { background: #f0f9ff; padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 5px 6px; text-align: left; font-size: 8pt; }
+    th { background: #f5f5f5; font-weight: 600; text-transform: uppercase; font-size: 7.5pt; color: #555; }
+    .totals-row { font-weight: 700; background: #f0f9ff; }
+    .footer { margin-top: 0.5rem; font-size: 7pt; color: #999; text-align: center; }
+    .taxe-col { color: #b45309; }
+  </style>
+</head>
+<body>
+  <h1>Liste des clients</h1>
+  <p class="subtitle">${session?.user?.guestHouseName || "Établissement"} — ${dateRangeLabel} — ${exportBookings.length} réservation${exportBookings.length > 1 ? "s" : ""} — Imprimé le ${format(new Date(), "dd/MM/yyyy à HH:mm", { locale: fr })}</p>
+  <div class="stats">
+    <span>Total nuits : ${exportTotalNights}</span>
+    <span>Total taxe de séjour : ${exportTotalTaxe.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+    <span>CA séjours : ${exportBookings.reduce((s, b) => s + b.totalPrice, 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="text-center">#</th>
+        <th>Nom</th>
+        <th>Prénom</th>
+        <th>Nationalité</th>
+        <th class="text-center">Chambre</th>
+        <th class="text-center">Arrivée</th>
+        <th class="text-center">Départ</th>
+        <th class="text-center">Nuitées</th>
+        <th class="text-center">Adultes</th>
+        <th class="text-center">Enfants</th>
+        <th class="text-right">Total séjour</th>
+        <th class="text-right taxe-col">Taxe de séjour</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr class="totals-row">
+        <td colspan="7"></td>
+        <td class="text-center">${exportTotalNights}</td>
+        <td colspan="2"></td>
+        <td class="text-right">${exportBookings.reduce((s, b) => s + b.totalPrice, 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</td>
+        <td class="text-right taxe-col">${exportTotalTaxe.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="footer">Généré par PMS Guest House v2.9.1</p>
+</body>
+</html>`
+
+    const w = window.open("", "_blank")
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 250)
+  }
+
   // Get VIP badge
   const getVipBadge = (guest: Guest) => {
     if (!guest.isVip || !guest.vipLevel) return null
@@ -370,6 +590,147 @@ export default function GuestsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Export Section */}
+      <Card>
+        <CardHeader className="cursor-pointer select-none" onClick={() => setShowExportSection(!showExportSection)}>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="w-5 h-5 text-amber-600" />
+                Export liste des clients
+              </CardTitle>
+              <CardDescription>
+                Exporter par intervalle de dates : noms, arrivée, départ, chambre, taxe de séjour
+              </CardDescription>
+            </div>
+            {showExportSection ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+          </div>
+        </CardHeader>
+        {showExportSection && (
+          <CardContent className="space-y-4">
+            {/* Date range + export buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="exportDateFrom">Du</Label>
+                <Input
+                  id="exportDateFrom"
+                  type="date"
+                  value={exportDateFrom}
+                  onChange={(e) => setExportDateFrom(e.target.value)}
+                  className="w-full sm:w-40"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="exportDateTo">Au</Label>
+                <Input
+                  id="exportDateTo"
+                  type="date"
+                  value={exportDateTo}
+                  onChange={(e) => setExportDateTo(e.target.value)}
+                  className="w-full sm:w-40"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  disabled={exportBookings.length === 0}
+                  className="border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPrint}
+                  disabled={exportBookings.length === 0}
+                  className="border-sky-300 text-sky-700 hover:bg-sky-50"
+                >
+                  <FileText className="w-4 h-4 mr-1.5" />
+                  PDF / Imprimer
+                </Button>
+              </div>
+            </div>
+
+            {/* Results summary */}
+            {exportDateFrom && exportDateTo && (
+              <div className="flex flex-wrap gap-4 items-center">
+                {isExportLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                ) : (
+                  <>
+                    <div className="flex items-center gap-6 text-sm">
+                      <span className="text-gray-500">
+                        <strong className="text-gray-900">{exportBookings.length}</strong> réservation{exportBookings.length > 1 ? "s" : ""}
+                      </span>
+                      <span className="text-gray-500">
+                        <strong className="text-gray-900">{exportTotalNights}</strong> nuitées
+                      </span>
+                      <span className="text-amber-700 font-medium">
+                        Taxe séjour : <strong>{formatAmount(exportTotalTaxe)}</strong>
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Preview table */}
+            {exportBookings.length > 0 && !isExportLoading && (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-900">
+                      <th className="text-left px-3 py-2 font-medium text-gray-500">#</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-500">Nom</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-500">Prénom</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-500">Chambre</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-500">Arrivée</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-500">Départ</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-500">Nuitées</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-500">Occ.</th>
+                      <th className="text-right px-3 py-2 font-medium text-amber-700">Taxe séjour</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {exportBookings.map((b, i) => {
+                      const ci = new Date(b.checkIn)
+                      const co = new Date(b.checkOut)
+                      const nights = Math.max(1, Math.ceil((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24)))
+                      return (
+                        <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
+                          <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                          <td className="px-3 py-2 font-medium">{b.guest.lastName}</td>
+                          <td className="px-3 py-2">{b.guest.firstName}</td>
+                          <td className="px-3 py-2 text-center"><Badge variant="outline">{b.room.number}</Badge></td>
+                          <td className="px-3 py-2 text-center text-gray-600">{format(ci, "dd/MM", { locale: fr })}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{format(co, "dd/MM/yyyy", { locale: fr })}</td>
+                          <td className="px-3 py-2 text-center">{nights}</td>
+                          <td className="px-3 py-2 text-center text-xs text-gray-500">{b.adults}{b.children > 0 ? `+${b.children}` : ""}</td>
+                          <td className={cn("px-3 py-2 text-right font-medium", b.touristTaxApplied ? "text-amber-700" : "text-gray-300")}>
+                            {b.touristTaxApplied ? formatAmount(b.touristTaxAmount) : "—"}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-sky-50 dark:bg-sky-950/30 font-semibold">
+                      <td colSpan={6} className="px-3 py-2"></td>
+                      <td className="px-3 py-2 text-center">{exportTotalNights}</td>
+                      <td className="px-3 py-2 text-center text-xs text-gray-500"></td>
+                      <td className="px-3 py-2 text-right text-amber-700">{formatAmount(exportTotalTaxe)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Guests List */}
       <Card>
