@@ -69,7 +69,7 @@ const guideSections: GuideSection[] = [
     id: "introduction",
     icon: BookOpen,
     title: "Bienvenue",
-    description: "Découvrez PMS Guest House v2.7.1",
+    description: "Découvrez PMS Guest House v2.8.0",
     color: "text-sky-600",
     bgColor: "bg-sky-50 dark:bg-sky-950",
     content: [
@@ -97,7 +97,7 @@ const guideSections: GuideSection[] = [
       },
       {
         type: "info",
-        text: "Version 2.7.1 — Cette version apporte le statut réservé pour les chambres, le transfert de chambre entre réservations, le filtrage intelligent des chambres disponibles par dates, et la correction du défilement des notifications.",
+        text: "Version 2.8.0 — Cette version apporte le module Services supplémentaires : catalogue de services paramétrables avec vignettes (transferts aéroport, hammam, massages, excursions...), gestion des commandes de services avec suivi des statuts, et intégration complète dans la facturation.",
       },
       {
         type: "tip",
@@ -1069,7 +1069,7 @@ const guideSections: GuideSection[] = [
         items: [
           "Lien vers ce guide d'utilisation",
           "Contact du support technique",
-          "Numéro de version de l'application (actuellement v2.7.1)",
+          "Numéro de version de l'application (actuellement v2.8.0)",
         ],
       },
       {
@@ -1579,7 +1579,7 @@ export default function GuidePage() {
             Guide d&apos;utilisation
           </h1>
           <p className="text-muted-foreground">
-            Tout ce que vous devez savoir pour utiliser PMS Guest House v2.7.1
+            Tout ce que vous devez savoir pour utiliser PMS Guest House v2.8.0
           </p>
         </div>
       </div>
@@ -1588,7 +1588,7 @@ export default function GuidePage() {
       <div className="flex items-center justify-center gap-3">
         <Badge variant="outline" className="text-xs font-mono">
           <Sparkles className="w-3 h-3 mr-1" />
-          Version 2.7.1 — PMS Guest House
+          Version 2.8.0 — PMS Guest House
         </Badge>
       </div>
 
@@ -1672,7 +1672,7 @@ export default function GuidePage() {
           </Link>
         </p>
         <p className="text-xs text-muted-foreground mt-4 font-mono">
-          PMS Guest House v2.7.1
+          PMS Guest House v2.8.0
         </p>
       </div>
     </div>
