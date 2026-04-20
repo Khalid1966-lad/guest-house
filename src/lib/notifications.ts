@@ -12,6 +12,8 @@ export type NotificationType =
   | "invoice_paid"
   | "payment_received"
   | "new_restaurant_order"
+  | "new_service_booking"
+  | "service_booking_completed"
   | "system"
 
 interface CreateNotificationParams {
@@ -160,6 +162,22 @@ export async function notifyInvoicePaid(params: {
     message: `La facture ${invoiceNumber} de ${guestName} (${total.toFixed(2)} €) a été payée`,
     entityType: "invoice",
     entityId: invoiceId,
+  })
+}
+
+export async function notifyNewServiceBooking(params: {
+  guestHouseId: string
+  serviceName: string
+  guestName: string
+  serviceBookingId: string
+}) {
+  return createNotification({
+    guestHouseId: params.guestHouseId,
+    type: "new_service_booking",
+    title: "Nouvelle commande de service",
+    message: `${params.guestName} a commandé : ${params.serviceName}`,
+    entityType: "service_booking",
+    entityId: params.serviceBookingId,
   })
 }
 

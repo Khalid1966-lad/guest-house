@@ -80,6 +80,8 @@ export const DEPENDENCIES: Record<string, Set<string>> = {
   Notification: new Set(["GuestHouse", "User"]),
   AuditLog: new Set(["GuestHouse", "User"]),
   Subscription: new Set(["GuestHouse"]),
+  Service: new Set(["GuestHouse"]),
+  ServiceBooking: new Set(["GuestHouse", "Service", "Guest"]),
 }
 
 /**

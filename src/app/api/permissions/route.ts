@@ -12,6 +12,7 @@ const ALL_MENUS = [
   "guests",
   "invoices",
   "restaurant",
+  "services",
   "expenses",
   "statistics",
   "users",
@@ -27,6 +28,7 @@ const MENU_TO_PERMISSION: Record<string, string> = {
   guests: "canViewGuests",
   invoices: "canViewInvoices",
   restaurant: "canViewRestaurant",
+  services: "canManageServices",
   expenses: "canViewExpenses",
   statistics: "canViewStatistics",
   users: "canViewUsers",
@@ -88,6 +90,7 @@ export async function GET() {
       allPermissions.canManageExpenses = true
       allPermissions.canManageUsers = true
       allPermissions.canManageSettings = true
+      allPermissions.canManageServices = true
       allPermissions.canViewRevenue = true
       allPermissions.canApplyDiscounts = true
       allPermissions.canRefundPayments = true

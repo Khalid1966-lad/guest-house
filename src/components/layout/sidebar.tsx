@@ -51,6 +51,7 @@ import {
   Sparkles,
   Database,
   BookOpen,
+  ConciergeBell,
   Crown,
   type LucideIcon,
 } from "lucide-react"
@@ -166,6 +167,19 @@ const navigation: NavItem[] = [
     animClass: "icon-wiggle",
     glowColor: "rgba(249, 115, 22, 0.25)",
     hoverTextColor: "#ea580c",
+  },
+  {
+    name: "Services",
+    href: "/app/services",
+    icon: ConciergeBell,
+    permission: "canManageServices",
+    iconColor: "#06b6d4",
+    hoverBg: "hover:bg-cyan-500/10",
+    activeBg: "bg-cyan-500/10",
+    activeText: "text-cyan-600 dark:text-cyan-400",
+    animClass: "animate-glow-cyan",
+    glowColor: "rgba(6,182,212,0.3)",
+    hoverTextColor: "#06b6d4",
   },
   {
     name: "Dépenses",

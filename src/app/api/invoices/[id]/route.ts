@@ -269,6 +269,23 @@ export async function DELETE(
       })
     }
 
+    // Reset service bookings back to "pending" (they were marked "billed_to_room" when invoice was created)
+    const serviceItems = await db.invoiceItem.findMany({
+      where: {
+        invoiceId: id,
+        itemType: "service_booking",
+        referenceId: { not: null },
+      },
+      select: { referenceId: true },
+    })
+    const serviceBookingIds = [...new Set(serviceItems.map((item) => item.referenceId!))]
+    if (serviceBookingIds.length > 0) {
+      await db.serviceBooking.updateMany({
+        where: { id: { in: serviceBookingIds } },
+        data: { paymentStatus: "pending" },
+      })
+    }
+
     // Supprimer les items d'abord
     await db.invoiceItem.deleteMany({
       where: { invoiceId: id },

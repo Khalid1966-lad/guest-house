@@ -60,6 +60,8 @@ model GuestHouse {
   subscription   Subscription?
   housekeepingZones HousekeepingZone[]
   staffSchedules  StaffSchedule[]
+  services        Service[]
+  serviceBookings ServiceBooking[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -184,6 +186,7 @@ model Role {
   canManageUsers     Boolean @default(false)
   canManageSettings  Boolean @default(false)
   canManageHousekeeping Boolean @default(false)
+  canManageServices    Boolean @default(false)
   
   // Financial permissions
   canViewRevenue     Boolean @default(false)
@@ -345,6 +348,7 @@ model Guest {
   
   bookings      Booking[]
   invoices      Invoice[]
+  serviceBookings ServiceBooking[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -820,6 +824,57 @@ model StaffSchedule {
   isAvailable   Boolean @default(true)        // false = congé/absence exceptionnelle
 
   @@unique([userId, dayOfWeek])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// SERVICES SUPPLÉMENTAIRES
+// ============================================
+model Service {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  name          String
+  description   String?
+  category      String  @default("divers")  // transfert | bien_etre | activites | restauration | confort | divers
+  basePrice     Float
+  priceType     String  @default("fixed")    // fixed | per_person | per_unit
+  image         String?
+  duration      Int?                         // Durée en minutes
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+  
+  bookings      ServiceBooking[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServiceBooking {
+  id            String @id @default(cuid())
+  guestHouseId  String
+  guestHouse    GuestHouse @relation(fields: [guestHouseId], references: [id], onDelete: Cascade)
+  
+  serviceId     String
+  service       Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  
+  guestId       String
+  guest         Guest   @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  bookingId     String?
+  
+  quantity      Int     @default(1)
+  unitPrice     Float
+  totalPrice    Float
+  status        String  @default("pending")       // pending | confirmed | completed | cancelled
+  paymentStatus String  @default("pending")       // pending | billed | paid
+  
+  scheduledDate DateTime?
+  scheduledTime String?
+  notes         String?
+  createdBy     String
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

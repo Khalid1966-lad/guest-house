@@ -1,6 +1,28 @@
 # Worklog
 
 ---
+Task ID: services-api-routes
+Agent: Main
+Task: Create API routes for the Services module (5 files)
+
+Work Log:
+- Created /api/services/route.ts: GET (list services ordered by sortOrder, name) + POST (create service with validation)
+- Created /api/services/[id]/route.ts: GET (single service with serviceBookings count) + PUT (update all fields) + DELETE (with active bookings 409 check)
+- Created /api/services/[id]/images/route.ts: PATCH (set image to null)
+- Created /api/service-bookings/route.ts: GET (list with filters: status, guestId, serviceId, paymentStatus; includes service + guest relations) + POST (create with price calculation)
+- Created /api/service-bookings/[id]/route.ts: GET (full details with relations) + PATCH (update with quantity recalculation) + DELETE (only pending/cancelled allowed)
+- All routes follow existing patterns: auth via getServerSession(authOptions), guestHouseId ownership checks, French error messages
+- Uses Next.js 16 Promise-based params pattern: `{ params }: { params: Promise<{ id: string }> }`
+
+Stage Summary:
+- 5 API route files created for the Services module
+- Full CRUD for Service model and ServiceBooking model
+- Ownership checks ensure tenant isolation (guestHouseId matching)
+- DELETE on services checks for active bookings (409 Conflict if found)
+- DELETE on bookings only allows pending/cancelled status
+- Quantity change on booking PATCH triggers totalPrice recalculation
+
+---
 Task ID: fix-booking-creation
 Agent: Main
 Task: Debug and fix booking creation not showing — Fadwa Ragbane reservation missing
@@ -1189,3 +1211,47 @@ Work Log:
 Stage Summary:
 - All changes pushed successfully
 - Vercel deployment will use PostgreSQL (Neon) — confirmed
+
+---
+Task ID: services-module
+Agent: Main + full-stack-developer (3 parallel agents)
+Task: Implement complete Services module (catalogue + commandes + invoice integration)
+
+Work Log:
+- Added Service and ServiceBooking models to all 3 Prisma schemas (schema.prisma, schema.sqlite.prisma, schema.postgresql.prisma)
+- Service model: name, description, category (6 types), basePrice, priceType (fixed/per_person/per_unit), image, duration, isActive, sortOrder
+- ServiceBooking model: serviceId, guestId, bookingId?, quantity, unitPrice, totalPrice, status (4 states), paymentStatus (3 states), scheduledDate, scheduledTime, notes, createdBy
+- Added canManageServices Boolean to Role model across all 3 schemas
+- Added services/serviceBookings relations to GuestHouse model
+- Added serviceBookings relation to Guest model
+- Pushed SQLite schema to local database
+- Updated backup-models.ts dependencies for Service + ServiceBooking
+- Created 5 API route files:
+  - /api/services/route.ts: GET (list) + POST (create)
+  - /api/services/[id]/route.ts: GET + PUT + DELETE
+  - /api/services/[id]/images/route.ts: PATCH (remove image)
+  - /api/service-bookings/route.ts: GET (list with filters) + POST (create with price calc)
+  - /api/service-bookings/[id]/route.ts: GET + PATCH (with quantity recalc) + DELETE
+- Added "Services" sidebar entry with ConciergeBell icon, cyan/teal color scheme, canManageServices permission
+- Updated permissions API: added "services" to ALL_MENUS, canManageServices mapping, owner full permissions
+- Updated notifications.ts: added new_service_booking and service_booking_completed types + notifyNewServiceBooking helper
+- Built complete Services page with 2 tabs:
+  - Catalogue: grid/list views, search, category/status filters, CRUD dialog with image upload, delete confirmation
+  - Commandes: stats bar with clickable filters, booking cards, status change dropdown, create order dialog
+- Integrated service bookings into invoice dialog:
+  - ServiceBookingForInvoice interface
+  - availableServiceBookings computed (filtered by guest name)
+  - handleAddServiceBooking function (adds service items as invoice lines)
+  - Teal/cyan themed section "Services complétés non facturés"
+  - Post-save logic marks service bookings as billed_to_room
+  - Invoice DELETE resets service booking paymentStatus to pending
+  - Service items have locked prices (read-only) with cyan backgrounds
+- All lint checks pass, dev server compiles without errors
+
+Stage Summary:
+- Complete Services module with catalogue (CRUD) and commandes (order management)
+- 6 predefined categories: Transfert, Bien-être, Activités, Restauration, Confort, Divers
+- 4 booking statuses: En attente, Confirmée, Terminée, Annulée
+- Full invoice integration: unbilled services appear in teal section, prices locked, auto-marked billed
+- Sidebar entry with cyan ConciergeBell icon, visible based on canManageServices permission
+- Backup system automatically includes Service + ServiceBooking tables

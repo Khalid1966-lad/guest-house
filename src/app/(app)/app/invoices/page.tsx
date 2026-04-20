@@ -65,6 +65,7 @@ import {
   FileSpreadsheet,
   UtensilsCrossed,
   Lock,
+  ConciergeBell,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
@@ -134,6 +135,29 @@ interface RestaurantOrderForInvoice {
       category: string
     }
   }[]
+}
+
+interface ServiceBookingForInvoice {
+  id: string
+  serviceId: string
+  service: {
+    name: string
+    category: string | null
+    image: string | null
+  }
+  guestId: string
+  guest: {
+    firstName: string
+    lastName: string
+  }
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  scheduledDate: string
+  scheduledTime: string | null
+  notes: string | null
+  status: string
+  paymentStatus: string
 }
 
 interface Invoice {
@@ -223,6 +247,7 @@ export default function InvoicesPage() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [restaurantOrders, setRestaurantOrders] = useState<RestaurantOrderForInvoice[]>([])
+  const [serviceBookings, setServiceBookings] = useState<ServiceBookingForInvoice[]>([])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -271,6 +296,29 @@ export default function InvoicesPage() {
     if (!g) return ""
     return `${g.firstName} ${g.lastName}`.toLowerCase().trim()
   }, [guests, formData.guestId])
+
+  // Get unbilled service bookings for selected guest (matching by guest name)
+  // Also exclude bookings already present in the current invoice form items
+  const availableServiceBookings = useMemo(() => {
+    if (!formData.guestId || !serviceBookings || serviceBookings.length === 0) return []
+    if (!selectedGuestFullName) return []
+
+    // Collect booking IDs already added to form items
+    const alreadyAddedBookingIds = new Set(
+      formData.items
+        .filter((item: any) => item.referenceId && item.itemType === "service_booking")
+        .map((item: any) => item.referenceId)
+    )
+
+    return serviceBookings.filter(b => {
+      if (b.status !== "completed" || b.paymentStatus !== "pending") return false
+      if (alreadyAddedBookingIds.has(b.id)) return false
+      // Match by checking if booking guest name contains the selected guest's first or last name
+      const bookingGuestName = `${b.guest.firstName} ${b.guest.lastName}`.toLowerCase().trim()
+      const parts = selectedGuestFullName.split(" ")
+      return parts.some(part => part.length > 1 && bookingGuestName.includes(part))
+    })
+  }, [serviceBookings, formData.guestId, selectedGuestFullName, formData.items])
 
   // Get unbilled restaurant orders for selected guest (matching by guest name)
   // Also exclude orders already present in the current invoice form items
@@ -328,11 +376,12 @@ export default function InvoicesPage() {
 
     try {
       setError(null)
-      const [invoicesRes, guestsRes, bookingsRes, ordersRes] = await Promise.all([
+      const [invoicesRes, guestsRes, bookingsRes, ordersRes, servicesRes] = await Promise.all([
         fetch("/api/invoices"),
         fetch("/api/guests"),
         fetch("/api/bookings"),
         fetch("/api/restaurant-orders"),
+        fetch("/api/service-bookings?paymentStatus=pending&status=completed"),
       ])
 
       if (invoicesRes.ok) {
@@ -361,6 +410,13 @@ export default function InvoicesPage() {
         setRestaurantOrders(Array.isArray(data.orders) ? data.orders : [])
       } else {
         console.error("Failed to fetch restaurant orders:", ordersRes.status)
+      }
+
+      if (servicesRes.ok) {
+        const data = await servicesRes.json()
+        setServiceBookings(Array.isArray(data.bookings) ? data.bookings : [])
+      } else {
+        console.error("Failed to fetch service bookings:", servicesRes.status)
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -549,6 +605,58 @@ export default function InvoicesPage() {
     }))
   }
 
+  // Add service booking items to invoice
+  const handleAddServiceBooking = (booking: ServiceBookingForInvoice) => {
+    // Prevent duplicate: check if this booking is already in the form
+    const alreadyAdded = formData.items.some(
+      (item: any) => item.referenceId === booking.id && item.itemType === "service_booking"
+    )
+    if (alreadyAdded) return
+
+    const scheduledDateStr = booking.scheduledDate
+      ? format(parseISO(booking.scheduledDate), "d MMM yyyy", { locale: fr })
+      : ""
+    const scheduledTimeStr = booking.scheduledTime || ""
+
+    // Add a header line for the service booking
+    const headerItem = {
+      description: `svc: ${booking.service.name} (${booking.quantity} × ${formatAmount(booking.unitPrice)}) — ${booking.guest.firstName} ${booking.guest.lastName}${scheduledDateStr ? ` — ${scheduledDateStr}` : ""}${scheduledTimeStr ? ` ${scheduledTimeStr}` : ""}`,
+      quantity: "0",
+      unitPrice: "0",
+      taxRate: "0",
+      itemType: "service_booking" as string | null,
+      referenceId: booking.id as string | null,
+    }
+
+    // If quantity > 1, add individual lines for each unit
+    const newItems = booking.quantity > 1
+      ? Array.from({ length: booking.quantity }, (_, i) => ({
+          description: `${booking.service.name} — unité ${i + 1}${booking.notes ? ` (${booking.notes})` : ""}`,
+          quantity: "1",
+          unitPrice: booking.unitPrice.toString(),
+          taxRate: "0",
+          itemType: "service_booking" as string | null,
+          referenceId: booking.id as string | null,
+        }))
+      : [{
+          description: `${booking.service.name}${booking.notes ? ` (${booking.notes})` : ""}`,
+          quantity: booking.quantity.toString(),
+          unitPrice: booking.unitPrice.toString(),
+          taxRate: "0",
+          itemType: "service_booking" as string | null,
+          referenceId: booking.id as string | null,
+        }]
+
+    setFormData((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items.filter(i => i.description),
+        headerItem,
+        ...newItems,
+      ],
+    }))
+  }
+
   // Save invoice
   const handleSaveInvoice = async () => {
     setFormError("")
@@ -628,6 +736,25 @@ export default function InvoicesPage() {
         Promise.allSettled(
           uniqueOrderIds.map((id) =>
             fetch(`/api/restaurant-orders/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ paymentStatus: "billed_to_room" }),
+            })
+          )
+        )
+      }
+
+      // Mark service bookings as billed_to_room
+      const serviceBookingIds = formData.items
+        .map((item) => ({ refId: (item as any).referenceId, type: (item as any).itemType }))
+        .filter((entry) => entry.refId && entry.type === "service_booking")
+        .map((entry) => entry.refId)
+
+      const uniqueBookingIds = [...new Set(serviceBookingIds)]
+      if (uniqueBookingIds.length > 0) {
+        Promise.allSettled(
+          uniqueBookingIds.map((id) =>
+            fetch(`/api/service-bookings/${id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ paymentStatus: "billed_to_room" }),
@@ -1435,6 +1562,44 @@ export default function InvoicesPage() {
               </div>
             )}
 
+            {/* Import Service Bookings */}
+            {formData.guestId && availableServiceBookings.length > 0 && (
+              <div className="space-y-2 p-4 bg-cyan-50 dark:bg-cyan-950/30 rounded-lg border border-cyan-200 dark:border-cyan-800">
+                <div className="flex items-center gap-2 text-sm font-semibold text-cyan-800 dark:text-cyan-400">
+                  <ConciergeBell className="w-4 h-4" />
+                  Services complétés non facturés ({availableServiceBookings.length})
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {availableServiceBookings.map((booking) => (
+                    <button
+                      key={booking.id}
+                      type="button"
+                      onClick={() => handleAddServiceBooking(booking)}
+                      className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border hover:border-cyan-300 dark:hover:border-cyan-600 transition-colors text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          🔔 {booking.service.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {booking.guest.firstName} {booking.guest.lastName} • Qté: {booking.quantity}
+                        </p>
+                        {booking.scheduledDate && (
+                          <p className="text-xs text-gray-400">
+                            {format(parseISO(booking.scheduledDate), "d MMM yyyy", { locale: fr })}{booking.scheduledTime ? ` ${booking.scheduledTime}` : ""}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right ml-4 flex-shrink-0">
+                        <p className="font-semibold text-sm">{formatAmount(booking.totalPrice)}</p>
+                        <Plus className="w-4 h-4 mx-auto mt-1 text-gray-400" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Items */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1449,6 +1614,9 @@ export default function InvoicesPage() {
                 {formData.items.map((item, index) => {
                   const isRestaurantItem = (item as any).itemType === "restaurant_order" || (item as any).itemType === "restaurant_order_header"
                   const isHeaderItem = (item as any).itemType === "restaurant_order_header"
+                  const isServiceItem = (item as any).itemType === "service_booking"
+                  const isServiceHeaderItem = isServiceItem && (item as any).description?.startsWith("svc:")
+                  const isLockedItem = isRestaurantItem || isServiceItem
 
                   return (
                   <div key={index} className={cn(
@@ -1457,7 +1625,11 @@ export default function InvoicesPage() {
                       ? isHeaderItem
                         ? "bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50"
                         : "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/40"
-                      : "bg-gray-50 dark:bg-gray-900"
+                      : isServiceItem
+                        ? isServiceHeaderItem
+                          ? "bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/50"
+                          : "bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800/40"
+                        : "bg-gray-50 dark:bg-gray-900"
                   )}>
                     <div className="col-span-5 space-y-1">
                       <Label className="text-xs flex items-center gap-1">
@@ -1465,14 +1637,17 @@ export default function InvoicesPage() {
                         {isRestaurantItem && (
                           <Lock className="w-3 h-3 text-orange-500" />
                         )}
+                        {isServiceItem && (
+                          <Lock className="w-3 h-3 text-cyan-500" />
+                        )}
                       </Label>
                       <Input
                         value={item.description}
                         onChange={(e) => handleItemChange(index, "description", e.target.value)}
                         placeholder="Description de l'article"
-                        readOnly={isRestaurantItem}
+                        readOnly={isLockedItem}
                         className={cn(
-                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                          isLockedItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
                         )}
                       />
                     </div>
@@ -1483,9 +1658,9 @@ export default function InvoicesPage() {
                         min="1"
                         value={item.quantity}
                         onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                        readOnly={isRestaurantItem}
+                        readOnly={isLockedItem}
                         className={cn(
-                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                          isLockedItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
                         )}
                       />
                     </div>
@@ -1496,9 +1671,9 @@ export default function InvoicesPage() {
                         step="0.01"
                         value={item.unitPrice}
                         onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
-                        readOnly={isRestaurantItem}
+                        readOnly={isLockedItem}
                         className={cn(
-                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                          isLockedItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
                         )}
                       />
                     </div>
@@ -1509,9 +1684,9 @@ export default function InvoicesPage() {
                         step="0.1"
                         value={item.taxRate}
                         onChange={(e) => handleItemChange(index, "taxRate", e.target.value)}
-                        readOnly={isRestaurantItem}
+                        readOnly={isLockedItem}
                         className={cn(
-                          isRestaurantItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
+                          isLockedItem && "bg-white dark:bg-gray-800 cursor-not-allowed text-gray-600 dark:text-gray-300"
                         )}
                       />
                     </div>
@@ -1522,7 +1697,7 @@ export default function InvoicesPage() {
                           size="icon"
                           className="text-red-600 hover:text-red-700"
                           onClick={() => removeItem(index)}
-                          title={isRestaurantItem ? "Retirer cette commande" : "Supprimer l'article"}
+                          title={isLockedItem ? "Retirer cet élément" : "Supprimer l'article"}
                         >
                           <XCircle className="w-4 h-4" />
                         </Button>
