@@ -97,7 +97,7 @@ const guideSections: GuideSection[] = [
       },
       {
         type: "info",
-        text: "Version 2.8.0 — Cette version apporte le module Services supplémentaires : catalogue de services paramétrables avec vignettes (transferts aéroport, hammam, massages, excursions...), gestion des commandes de services avec suivi des statuts, et intégration complète dans la facturation.",
+        text: "Version 2.9.0 — Taxe de séjour configurable par occupant (adulte/enfant) et par nuitée depuis les paramètres de l'établissement. Nouvelles catégories de services : Hammam (bain marocain) et Cooking classe.",
       },
       {
         type: "tip",
@@ -1069,7 +1069,7 @@ const guideSections: GuideSection[] = [
         items: [
           "Lien vers ce guide d'utilisation",
           "Contact du support technique",
-          "Numéro de version de l'application (actuellement v2.8.0)",
+          "Numéro de version de l'application (actuellement v2.9.0)",
         ],
       },
       {
@@ -1588,7 +1588,7 @@ export default function GuidePage() {
       <div className="flex items-center justify-center gap-3">
         <Badge variant="outline" className="text-xs font-mono">
           <Sparkles className="w-3 h-3 mr-1" />
-          Version 2.8.0 — PMS Guest House
+          Version 2.9.0 — PMS Guest House
         </Badge>
       </div>
 

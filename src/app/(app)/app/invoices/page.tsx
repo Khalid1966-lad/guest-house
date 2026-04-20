@@ -259,8 +259,11 @@ export default function InvoicesPage() {
     paymentMethod: "",
     items: [{ ...defaultItemForm }],
     touristTax: false,
-    touristTaxPerNight: "0.60",
+    touristTaxPerAdult: "2.50",
+    touristTaxPerChild: "0",
     touristTaxNights: "0",
+    touristTaxAdults: "1",
+    touristTaxChildren: "0",
   })
 
   // Filter invoices
@@ -357,9 +360,11 @@ export default function InvoicesPage() {
       return sum + itemTotal * ((parseFloat(item.taxRate) || 0) / 100)
     }, 0)
     
-    // Calculate tourist tax
+    // Calculate tourist tax: (adults × perAdult + children × perChild) × nights
     const touristTaxAmount = formData.touristTax 
-      ? parseFloat(formData.touristTaxPerNight || "0") * parseInt(formData.touristTaxNights || "0")
+      ? ((parseInt(formData.touristTaxAdults || "1") * parseFloat(formData.touristTaxPerAdult || "0"))
+        + (parseInt(formData.touristTaxChildren || "0") * parseFloat(formData.touristTaxPerChild || "0")))
+        * parseInt(formData.touristTaxNights || "0")
       : 0
     
     const total = subtotal + taxes + touristTaxAmount
@@ -376,12 +381,13 @@ export default function InvoicesPage() {
 
     try {
       setError(null)
-      const [invoicesRes, guestsRes, bookingsRes, ordersRes, servicesRes] = await Promise.all([
+      const [invoicesRes, guestsRes, bookingsRes, ordersRes, servicesRes, settingsRes] = await Promise.all([
         fetch("/api/invoices"),
         fetch("/api/guests"),
         fetch("/api/bookings"),
         fetch("/api/restaurant-orders"),
         fetch("/api/service-bookings?paymentStatus=pending&status=completed"),
+        fetch("/api/settings/establishment"),
       ])
 
       if (invoicesRes.ok) {
@@ -417,6 +423,20 @@ export default function InvoicesPage() {
         setServiceBookings(Array.isArray(data.bookings) ? data.bookings : [])
       } else {
         console.error("Failed to fetch service bookings:", servicesRes.status)
+      }
+
+      // Fetch guest house settings for tourist tax config
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
+        const ghSettings = data.guestHouse?.settings
+        if (ghSettings) {
+          setFormData(prev => ({
+            ...prev,
+            touristTax: !!ghSettings.touristTaxEnabled,
+            touristTaxPerAdult: ghSettings.touristTaxPerAdult?.toString() || "2.50",
+            touristTaxPerChild: ghSettings.touristTaxPerChild?.toString() || "0",
+          }))
+        }
       }
     } catch (err) {
       console.error("Erreur chargement:", err)
@@ -497,7 +517,7 @@ export default function InvoicesPage() {
       setFormData(prev => ({ ...prev, bookingId }))
       
       if (!bookingId) {
-        setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }] }))
+        setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }], touristTaxNights: "0", touristTaxAdults: "1", touristTaxChildren: "0" }))
         return
       }
 
@@ -517,7 +537,7 @@ export default function InvoicesPage() {
         const accommodationTotal = booking.totalPrice || (nights * (booking.nightlyRate || 0))
         const unitPrice = Math.round((accommodationTotal / nights) * 100) / 100
         
-        // Auto-fill with booking details
+        // Auto-fill with booking details and tourist tax from booking
         setFormData(prev => ({
           ...prev,
           bookingId,
@@ -527,6 +547,10 @@ export default function InvoicesPage() {
             unitPrice: unitPrice.toString(),
             taxRate: "10", // Default tax rate
           }],
+          // Auto-fill tourist tax from booking data
+          touristTaxNights: nights.toString(),
+          touristTaxAdults: (booking.adults || 1).toString(),
+          touristTaxChildren: (booking.children || 0).toString(),
         }))
       }
     } catch (err) {
@@ -703,7 +727,10 @@ export default function InvoicesPage() {
           discount: 0,
           total,
           touristTaxApplied: formData.touristTax,
-          touristTaxPerNight: parseFloat(formData.touristTaxPerNight) || 0,
+          touristTaxPerNight: formData.touristTax
+            ? ((parseInt(formData.touristTaxAdults || "1") * parseFloat(formData.touristTaxPerAdult || "0"))
+              + (parseInt(formData.touristTaxChildren || "0") * parseFloat(formData.touristTaxPerChild || "0")))
+            : 0,
           touristTaxNights: parseInt(formData.touristTaxNights) || 0,
           touristTaxAmount,
           items: formData.items.map((item) => ({
@@ -1719,8 +1746,12 @@ export default function InvoicesPage() {
                   <span>{formatAmount(taxes)}</span>
                 </div>
                 {formData.touristTax && touristTaxAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Taxe de séjour ({formData.touristTaxNights} nuits × {formData.touristTaxPerNight}{symbol})</span>
+                  <div className="flex justify-between text-sm text-amber-700 dark:text-amber-400">
+                    <span>
+                      Taxe de séjour ({formData.touristTaxAdults} adulte{parseInt(formData.touristTaxAdults) > 1 ? "s" : ""}
+                      {parseInt(formData.touristTaxChildren) > 0 ? ` + ${formData.touristTaxChildren} enfant${parseInt(formData.touristTaxChildren) > 1 ? "s" : ""}` : ""}
+                      × {formData.touristTaxNights} nuit{parseInt(formData.touristTaxNights) > 1 ? "s" : ""})
+                    </span>
                     <span>{formatAmount(touristTaxAmount)}</span>
                   </div>
                 )}
@@ -1744,7 +1775,7 @@ export default function InvoicesPage() {
             </div>
 
             {/* Tourist Tax */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -1756,22 +1787,35 @@ export default function InvoicesPage() {
                 <Label htmlFor="touristTax" className="font-normal cursor-pointer">
                   Taxe de séjour
                 </Label>
+                {formData.touristTax && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 ml-auto">
+                    Auto-configuré depuis les paramètres
+                  </span>
+                )}
               </div>
               
               {formData.touristTax && (
-                <div className="grid grid-cols-3 gap-4 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
                   <div className="space-y-2">
-                    <Label className="text-xs">Tarif/nuit/personne ({symbol})</Label>
+                    <Label className="text-xs">Adultes</Label>
                     <Input
                       type="number"
-                      step="0.01"
                       min="0"
-                      value={formData.touristTaxPerNight}
-                      onChange={(e) => handleFormChange("touristTaxPerNight", e.target.value)}
+                      value={formData.touristTaxAdults}
+                      onChange={(e) => handleFormChange("touristTaxAdults", e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Nombre de nuits</Label>
+                    <Label className="text-xs">Enfants</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.touristTaxChildren}
+                      onChange={(e) => handleFormChange("touristTaxChildren", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Nuitées</Label>
                     <Input
                       type="number"
                       min="0"
@@ -1780,11 +1824,32 @@ export default function InvoicesPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Montant</Label>
-                    <div className="p-2 bg-white dark:bg-gray-800 rounded border text-sm font-medium text-sky-600">
-                      {formatAmount(touristTaxAmount)}
-                    </div>
+                    <Label className="text-xs">Tarif adulte/nuit ({symbol})</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.touristTaxPerAdult}
+                      onChange={(e) => handleFormChange("touristTaxPerAdult", e.target.value)}
+                    />
                   </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Tarif enfant/nuit ({symbol})</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.touristTaxPerChild}
+                      onChange={(e) => handleFormChange("touristTaxPerChild", e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.touristTax && touristTaxAmount > 0 && (
+                <div className="flex justify-between items-center pt-2 border-t border-amber-200 dark:border-amber-800">
+                  <span className="text-sm font-medium">Total taxe de séjour</span>
+                  <span className="text-lg font-bold text-amber-700 dark:text-amber-400">{formatAmount(touristTaxAmount)}</span>
                 </div>
               )}
             </div>

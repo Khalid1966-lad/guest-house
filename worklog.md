@@ -1255,3 +1255,59 @@ Stage Summary:
 - Full invoice integration: unbilled services appear in teal section, prices locked, auto-marked billed
 - Sidebar entry with cyan ConciergeBell icon, visible based on canManageServices permission
 - Backup system automatically includes Service + ServiceBooking tables
+---
+Task ID: 1
+Agent: Main
+Task: Update services categories, add Hammam & Cooking classe
+
+Work Log:
+- Removed "Restauration" category from SERVICE_CATEGORIES in services/page.tsx
+- Added "hammam" (Hammam bain marocain) with 🛁 emoji and amber styling
+- Added "cooking" (Cooking classe) with 👨‍🍳 emoji and red styling
+- Added corresponding gradients in CATEGORY_GRADIENTS
+- Kept "bien_etre" (Bien-être) as it was not requested to be removed
+
+Stage Summary:
+- 7 service categories: Transfert, Bien-être, Activités, Hammam, Cooking classe, Confort, Divers
+---
+Task ID: 2
+Agent: Main
+Task: Implement configurable tourist tax (taxe de séjour) per occupant per night
+
+Work Log:
+- Updated GuestHouseSettings interface to include touristTaxEnabled, touristTaxPerAdult, touristTaxPerChild, touristTaxFreeAge
+- Updated establishment settings page formData state with tourist tax fields (defaults: enabled=false, perAdult=2.50, perChild=0, freeAge=18)
+- Updated fetchSettings to load tourist tax fields from API
+- Updated handleSave to send tourist tax fields to API
+- Replaced old percentage-based tax card with proper fixed-price configuration (checkbox + 3 inputs: adult rate, child rate, free age)
+- Added info banner explaining the calculation
+- Updated settings API (establishment/route.ts) to save/load touristTaxEnabled, touristTaxPerAdult, touristTaxPerChild, touristTaxFreeAge in both update and create paths
+- Updated invoice page Booking interface to confirm adults/children fields
+- Updated invoice formData to include touristTaxAdults, touristTaxChildren, touristTaxPerAdult, touristTaxPerChild
+- Updated calculateTotals for per-occupant calculation: (adults × perAdult + children × perChild) × nights
+- Added fetch of /api/settings/establishment in invoice page fetchData to auto-load tourist tax config
+- Updated handleBookingSelect to auto-fill touristTaxNights, touristTaxAdults, touristTaxChildren from booking
+- Updated invoice save payload to calculate touristTaxPerNight from per-occupant rates
+- Replaced tourist tax form in invoice dialog with 5-field grid (adults, children, nights, adult rate, child rate) with amber styling
+- Updated totals display to show "X adultes + Y enfants × Z nuits" format
+
+Stage Summary:
+- Tourist tax is now configurable from Settings > Establishment > Facturation
+- Default: 2.50 € per adult per night, 0 per child, free under 18
+- Auto-applied in invoices when a booking is selected (nights/occupants from booking, rates from settings)
+- Version bumped to v2.9.0
+---
+Task ID: 3
+Agent: Main
+Task: Update version references to v2.9.0
+
+Work Log:
+- Updated src/lib/version.ts: v2.9.0, date 2026-04-19, new version name
+- Updated package.json version to 2.9.0
+- Updated guide/page.tsx: version info text, help section, version badge (3 references)
+- SQLite schema push confirmed in sync
+
+Stage Summary:
+- All version references updated to v2.9.0
+- Lint passed clean
+- Dev server compiles without errors

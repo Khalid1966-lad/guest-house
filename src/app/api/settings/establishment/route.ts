@@ -112,6 +112,11 @@ export async function PUT(request: NextRequest) {
           restaurantEnabled: data.settings.restaurantEnabled,
           restaurantOpenTime: data.settings.restaurantOpenTime,
           restaurantCloseTime: data.settings.restaurantCloseTime,
+          // Tourist tax settings
+          touristTaxEnabled: data.settings.touristTaxEnabled ?? false,
+          touristTaxPerAdult: parseFloat(data.settings.touristTaxPerAdult) || 2.50,
+          touristTaxPerChild: parseFloat(data.settings.touristTaxPerChild) || 0,
+          touristTaxFreeAge: parseInt(data.settings.touristTaxFreeAge) || 18,
           // Housekeeping auto-assignment settings
           autoAssignHousekeeping: data.settings.autoAssignHousekeeping,
           autoAssignMode: data.settings.autoAssignMode,
@@ -130,6 +135,11 @@ export async function PUT(request: NextRequest) {
           restaurantEnabled: data.settings.restaurantEnabled ?? true,
           restaurantOpenTime: data.settings.restaurantOpenTime || "07:00",
           restaurantCloseTime: data.settings.restaurantCloseTime || "22:00",
+          // Tourist tax defaults
+          touristTaxEnabled: data.settings.touristTaxEnabled ?? false,
+          touristTaxPerAdult: parseFloat(data.settings.touristTaxPerAdult) || 2.50,
+          touristTaxPerChild: parseFloat(data.settings.touristTaxPerChild) || 0,
+          touristTaxFreeAge: parseInt(data.settings.touristTaxFreeAge) || 18,
           // Housekeeping auto-assignment defaults
           autoAssignHousekeeping: data.settings.autoAssignHousekeeping ?? false,
           autoAssignMode: data.settings.autoAssignMode || "zone",

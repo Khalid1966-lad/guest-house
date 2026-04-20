@@ -127,7 +127,8 @@ const SERVICE_CATEGORIES = [
   { value: "transfert", label: "Transfert", emoji: "🚗", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
   { value: "bien_etre", label: "Bien-être", emoji: "💆", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
   { value: "activites", label: "Activités", emoji: "🎯", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  { value: "restauration", label: "Restauration", emoji: "🍽️", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+  { value: "hammam", label: "Hammam (bain marocain)", emoji: "🛁", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
+  { value: "cooking", label: "Cooking classe", emoji: "👨‍🍳", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
   { value: "confort", label: "Confort", emoji: "🧺", color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300" },
   { value: "divers", label: "Divers", emoji: "📦", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300" },
 ]
@@ -149,7 +150,8 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
   transfert: "from-blue-100 to-cyan-200 dark:from-blue-900/40 dark:to-cyan-900/30",
   bien_etre: "from-purple-100 to-fuchsia-200 dark:from-purple-900/40 dark:to-fuchsia-900/30",
   activites: "from-green-100 to-emerald-200 dark:from-green-900/40 dark:to-emerald-900/30",
-  restauration: "from-orange-100 to-amber-200 dark:from-orange-900/40 dark:to-amber-900/30",
+  hammam: "from-amber-100 to-orange-200 dark:from-amber-900/40 dark:to-orange-900/30",
+  cooking: "from-red-100 to-rose-200 dark:from-red-900/40 dark:to-rose-900/30",
   confort: "from-pink-100 to-rose-200 dark:from-pink-900/40 dark:to-rose-900/30",
   divers: "from-gray-100 to-slate-200 dark:from-gray-800/40 dark:to-slate-700/30",
 }

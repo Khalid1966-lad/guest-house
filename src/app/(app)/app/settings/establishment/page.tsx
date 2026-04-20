@@ -63,6 +63,10 @@ interface GuestHouseSettings {
     restaurantEnabled: boolean
     restaurantOpenTime: string
     restaurantCloseTime: string
+    touristTaxEnabled: boolean
+    touristTaxPerAdult: number
+    touristTaxPerChild: number
+    touristTaxFreeAge: number
   } | null
 }
 
@@ -124,6 +128,10 @@ export default function EstablishmentSettingsPage() {
     restaurantEnabled: true,
     restaurantOpenTime: "07:00",
     restaurantCloseTime: "22:00",
+    touristTaxEnabled: false,
+    touristTaxPerAdult: "2.50",
+    touristTaxPerChild: "0",
+    touristTaxFreeAge: "18",
   })
 
   useEffect(() => {
@@ -164,6 +172,10 @@ export default function EstablishmentSettingsPage() {
           restaurantEnabled: gh.settings?.restaurantEnabled ?? true,
           restaurantOpenTime: gh.settings?.restaurantOpenTime || "07:00",
           restaurantCloseTime: gh.settings?.restaurantCloseTime || "22:00",
+          touristTaxEnabled: gh.settings?.touristTaxEnabled ?? false,
+          touristTaxPerAdult: gh.settings?.touristTaxPerAdult?.toString() || "2.50",
+          touristTaxPerChild: gh.settings?.touristTaxPerChild?.toString() || "0",
+          touristTaxFreeAge: gh.settings?.touristTaxFreeAge?.toString() || "18",
         })
       }
     } catch (error) {
@@ -298,6 +310,10 @@ export default function EstablishmentSettingsPage() {
             restaurantEnabled: formData.restaurantEnabled,
             restaurantOpenTime: formData.restaurantOpenTime,
             restaurantCloseTime: formData.restaurantCloseTime,
+            touristTaxEnabled: formData.touristTaxEnabled,
+            touristTaxPerAdult: parseFloat(formData.touristTaxPerAdult) || 0,
+            touristTaxPerChild: parseFloat(formData.touristTaxPerChild) || 0,
+            touristTaxFreeAge: parseInt(formData.touristTaxFreeAge) || 18,
           },
         }),
       })
@@ -820,27 +836,87 @@ export default function EstablishmentSettingsPage() {
             <CardHeader>
               <CardTitle>Taxe de séjour</CardTitle>
               <CardDescription>
-                Configurez la taxe de séjour appliquée aux réservations
+                Configurez la taxe de séjour appliquée par occupant et par nuitée
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="taxRate">Taux de taxe de séjour (%)</Label>
-                <Input
-                  id="taxRate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={formData.taxRate}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="touristTaxEnabled"
+                  checked={formData.touristTaxEnabled}
                   onChange={(e) =>
-                    setFormData({ ...formData, taxRate: e.target.value })
+                    setFormData({ ...formData, touristTaxEnabled: e.target.checked })
                   }
+                  className="h-4 w-4 rounded border-gray-300"
                 />
-                <p className="text-xs text-gray-500">
-                  Pourcentage appliqué sur le montant total de la réservation
-                </p>
+                <Label htmlFor="touristTaxEnabled">Activer la taxe de séjour</Label>
               </div>
+
+              {formData.touristTaxEnabled && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="space-y-2">
+                    <Label htmlFor="touristTaxPerAdult">Tarif adulte / nuit</Label>
+                    <Input
+                      id="touristTaxPerAdult"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.touristTaxPerAdult}
+                      onChange={(e) =>
+                        setFormData({ ...formData, touristTaxPerAdult: e.target.value })
+                      }
+                      placeholder="2.50"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Prix par adulte par nuit (ex: 2.50 €)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="touristTaxPerChild">Tarif enfant / nuit</Label>
+                    <Input
+                      id="touristTaxPerChild"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.touristTaxPerChild}
+                      onChange={(e) =>
+                        setFormData({ ...formData, touristTaxPerChild: e.target.value })
+                      }
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Prix par enfant par nuit (0 = gratuit)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="touristTaxFreeAge">Âge gratuit (ans)</Label>
+                    <Input
+                      id="touristTaxFreeAge"
+                      type="number"
+                      min="0"
+                      max="21"
+                      value={formData.touristTaxFreeAge}
+                      onChange={(e) =>
+                        setFormData({ ...formData, touristTaxFreeAge: e.target.value })
+                      }
+                      placeholder="18"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Enfants en-dessous de cet âge sont gratuits
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {formData.touristTaxEnabled && (
+                <div className="p-3 bg-sky-50 dark:bg-sky-950/20 rounded-lg border border-sky-200 dark:border-sky-800">
+                  <p className="text-sm text-sky-700 dark:text-sky-300">
+                    <strong>Info :</strong> La taxe sera appliquée automatiquement à chaque occupant lors de la création de la facture.
+                    Calcul : adultes × tarif adulte × nuitées + enfants × tarif enfant × nuitées.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
