@@ -446,7 +446,7 @@ export default function GuestsPage() {
       </tr>
     </tbody>
   </table>
-  <p class="footer">Généré par PMS Guest House v2.9.1</p>
+  <p class="footer">Généré par PMS Guest House v2.8.1</p>
 </body>
 </html>`
 

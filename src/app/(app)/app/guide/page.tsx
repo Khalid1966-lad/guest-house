@@ -97,7 +97,7 @@ const guideSections: GuideSection[] = [
       },
       {
         type: "info",
-        text: "Version 2.9.1 — Export de la liste des clients par intervalle de dates (Excel, PDF, impression). La taxe de séjour est maintenant configurable par occupant (adulte/enfant) et par nuitée depuis les paramètres. Nouvelles catégories de services : Hammam (bain marocain) et Cooking classe.",
+        text: "Version 2.8.1 — Export de la liste des clients par intervalle de dates (Excel, PDF, impression). La taxe de séjour est maintenant configurable par occupant (adulte/enfant) et par nuitée depuis les paramètres. Nouvelles catégories de services : Hammam (bain marocain) et Cooking classe.",
       },
       {
         type: "tip",

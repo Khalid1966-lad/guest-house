@@ -1331,3 +1331,24 @@ Stage Summary:
 - 3 export modes: Excel (.xlsx), PDF (via print dialog), Print
 - Data columns: Name, first name, nationality, room, check-in, check-out, nights, adults, children, total stay, tourist tax
 - Lint clean, dev server compiles without errors
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix version numbering and push PostgreSQL schema
+
+Work Log:
+- Fixed version from v2.9.1 → v2.8.1 in src/lib/version.ts (per user's rule: increment third digit first up to 99, then second up to 9, then first)
+- Fixed version in package.json from 2.9.1 → 2.8.1
+- Fixed version reference in guide page (src/app/(app)/app/guide/page.tsx)
+- Fixed version in print template footer (src/app/(app)/app/guests/page.tsx)
+- Pushed PostgreSQL schema to Neon (already in sync)
+- Verified bookings API includes all required export data (touristTaxApplied, touristTaxPerNight, touristTaxAmount, occupants with details)
+- Confirmed export feature is fully implemented: date range picker, Excel export (xlsx), PDF/Print export, preview table
+- ESLint passes with no errors
+
+Stage Summary:
+- Version corrected to v2.8.1 per user's numbering convention
+- PostgreSQL schema confirmed in sync with Prisma schema
+- Client export feature already implemented and verified (Excel/PDF/Print)
+- All version references updated consistently across 4 files
