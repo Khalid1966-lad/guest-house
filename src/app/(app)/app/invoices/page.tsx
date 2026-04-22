@@ -642,7 +642,7 @@ export default function InvoicesPage() {
       description: `${orderLabel} - ${item.menuItem.name}${item.notes ? ` (${item.notes})` : ""}`,
       quantity: item.quantity.toString(),
       unitPrice: item.unitPrice.toString(),
-      taxRate: "0",
+      taxRate: defaultTvaRate.toString(),
       itemType: "restaurant_order" as string | null,
       referenceId: order.id as string | null,
     }))
@@ -687,7 +687,7 @@ export default function InvoicesPage() {
           description: `${booking.service.name} — unité ${i + 1}${booking.notes ? ` (${booking.notes})` : ""}`,
           quantity: "1",
           unitPrice: booking.unitPrice.toString(),
-          taxRate: "0",
+          taxRate: defaultTvaRate.toString(),
           itemType: "service_booking" as string | null,
           referenceId: booking.id as string | null,
         }))
@@ -695,7 +695,7 @@ export default function InvoicesPage() {
           description: `${booking.service.name}${booking.notes ? ` (${booking.notes})` : ""}`,
           quantity: booking.quantity.toString(),
           unitPrice: booking.unitPrice.toString(),
-          taxRate: "0",
+          taxRate: defaultTvaRate.toString(),
           itemType: "service_booking" as string | null,
           referenceId: booking.id as string | null,
         }]
