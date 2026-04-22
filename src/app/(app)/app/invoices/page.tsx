@@ -1851,10 +1851,6 @@ export default function InvoicesPage() {
             {/* Totals */}
             <div className="bg-sky-50 dark:bg-sky-950 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Taxe de séjour</span>
-                  <span className="text-amber-700 dark:text-amber-400">{touristTaxSettings.enabled ? formatAmount(touristTaxAmount) : "—"}</span>
-                </div>
-                <div className="flex justify-between text-sm">
                   <span>Sous-total</span>
                   <span>{formatAmount(subtotal)}</span>
                 </div>
@@ -1862,10 +1858,22 @@ export default function InvoicesPage() {
                   <span>TVA</span>
                   <span>{formatAmount(taxes)}</span>
                 </div>
-                <div className="flex justify-between font-semibold text-lg border-t pt-2">
-                  <span>Total</span>
-                  <span className="text-sky-600">{formatAmount(total)}</span>
+                <div className="flex justify-between font-semibold text-lg border-t border-sky-200 dark:border-sky-800 pt-2">
+                  <span>Total TTC</span>
+                  <span className="text-sky-600">{formatAmount(subtotal + taxes)}</span>
                 </div>
+                {touristTaxSettings.enabled && touristTaxAmount > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-amber-700 dark:text-amber-400 pt-1">
+                      <span>Taxe de séjour (non soumise à TVA)</span>
+                      <span>{formatAmount(touristTaxAmount)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-lg border-t border-amber-300 dark:border-amber-700 pt-2">
+                      <span>Total global</span>
+                      <span className="text-sky-600">{formatAmount(total)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

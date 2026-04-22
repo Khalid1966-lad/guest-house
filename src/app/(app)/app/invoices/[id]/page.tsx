@@ -67,6 +67,10 @@ interface Invoice {
   taxes: number
   discount: number
   total: number
+  touristTaxApplied: boolean
+  touristTaxPerNight: number
+  touristTaxNights: number
+  touristTaxAmount: number
   status: string
   notes: string | null
   paidAt: string | null
@@ -442,9 +446,19 @@ export default function InvoiceDetailPage() {
           </div>
           ` : ""}
           <div class="total-row main">
-            <span>Total</span>
+            <span>Total TTC</span>
+            <span class="amount">${(invoice.subtotal + invoice.taxes - (invoice.discount || 0)).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
+          </div>
+          ${invoice.touristTaxAmount > 0 ? `
+          <div class="total-row" style="margin-top:0.25rem;">
+            <span style="color: #b45309;">Taxe de séjour</span>
+            <span style="color: #b45309;">${invoice.touristTaxAmount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
+          </div>
+          <div class="total-row" style="font-size:1.1rem;font-weight:bold;border-top:2px solid #b45309;margin-top:0.25rem;padding-top:0.5rem;">
+            <span>Total global</span>
             <span class="amount">${invoice.total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} ${symbol}</span>
           </div>
+          ` : ""}
           ${invoice.paidAmount > 0 ? `
           <div class="total-row paid">
             <span>Payé</span>
@@ -730,9 +744,31 @@ export default function InvoiceDetailPage() {
               )}
               <Separator className="print:border-gray-300" />
               <div className="flex justify-between text-lg font-bold print:text-black">
-                <span>Total</span>
-                <span className="text-sky-600 print:text-sky-600">{formatAmount(invoice.total)}</span>
+                <span>Total TTC</span>
+                <span className="text-sky-600 print:text-sky-600">{formatAmount(invoice.subtotal + invoice.taxes - (invoice.discount || 0))}</span>
               </div>
+
+              {/* Tourist Tax — not subject to TVA, shown after Total TTC */}
+              {invoice.touristTaxAmount > 0 && (
+                <>
+                  <div className="flex justify-between text-amber-700 dark:text-amber-400 print:text-amber-700">
+                    <span className="text-sm">
+                      Taxe de séjour
+                      {invoice.touristTaxNights > 0 && (
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({invoice.touristTaxNights} nuitée{invoice.touristTaxNights > 1 ? "s" : ""} × {formatAmount(invoice.touristTaxPerNight)}/nuit)
+                        </span>
+                      )}
+                    </span>
+                    <span>{formatAmount(invoice.touristTaxAmount)}</span>
+                  </div>
+                  <Separator className="print:border-gray-300" />
+                  <div className="flex justify-between text-lg font-bold print:text-black">
+                    <span>Total global</span>
+                    <span className="text-sky-600 print:text-sky-600">{formatAmount(invoice.total)}</span>
+                  </div>
+                </>
+              )}
 
               {/* Payment Status */}
               {invoice.paidAmount > 0 && (
