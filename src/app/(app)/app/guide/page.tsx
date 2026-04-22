@@ -97,7 +97,7 @@ const guideSections: GuideSection[] = [
       },
       {
         type: "info",
-        text: "Version 2.8.2 — La taxe de séjour est maintenant obligatoire dans les factures lorsqu'elle est activée dans les paramètres. Les tarifs adulte/enfant par nuitée sont auto-remplis depuis les paramètres et modifiables si besoin.",
+        text: "Version 2.8.3 — Le taux de TVA par défaut est maintenant configurable depuis Paramètres > Établissement > Facturation (par défaut 10%). Ce taux s'applique automatiquement à chaque nouvelle ligne de facture et reste modifiable.",
       },
       {
         type: "tip",

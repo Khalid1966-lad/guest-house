@@ -211,14 +211,14 @@ const paymentMethodLabels: Record<string, string> = {
   other: "Autre",
 }
 
-const defaultItemForm = {
+const getDefaultItemForm = (taxRate: number = 0) => ({
   description: "",
   quantity: "1",
   unitPrice: "",
-  taxRate: "0",
+  taxRate: taxRate.toString(),
   itemType: null as string | null,
   referenceId: null as string | null,
-}
+})
 
 export default function InvoicesPage() {
   const { data: session, status } = useSession()
@@ -249,6 +249,9 @@ export default function InvoicesPage() {
   const [restaurantOrders, setRestaurantOrders] = useState<RestaurantOrderForInvoice[]>([])
   const [serviceBookings, setServiceBookings] = useState<ServiceBookingForInvoice[]>([])
 
+  // Default TVA rate from establishment config
+  const [defaultTvaRate, setDefaultTvaRate] = useState(10)
+
   // Tourist tax settings from establishment config (persisted)
   const [touristTaxSettings, setTouristTaxSettings] = useState({
     enabled: false,
@@ -264,7 +267,7 @@ export default function InvoicesPage() {
     notes: "",
     terms: "",
     paymentMethod: "",
-    items: [{ ...defaultItemForm }],
+    items: [getDefaultItemForm(defaultTvaRate)],
     touristTaxNights: "0",
     touristTaxAdults: "1",
     touristTaxChildren: "0",
@@ -433,16 +436,21 @@ export default function InvoicesPage() {
         console.error("Failed to fetch service bookings:", servicesRes.status)
       }
 
-      // Fetch guest house settings for tourist tax config
+      // Fetch guest house settings for tourist tax config and default TVA rate
       if (settingsRes.ok) {
         const data = await settingsRes.json()
-        const ghSettings = data.guestHouse?.settings
+        const gh = data.guestHouse
+        const ghSettings = gh?.settings
         if (ghSettings) {
           setTouristTaxSettings({
             enabled: !!ghSettings.touristTaxEnabled,
             perAdult: ghSettings.touristTaxPerAdult?.toString() || "2.50",
             perChild: ghSettings.touristTaxPerChild?.toString() || "0",
           })
+        }
+        // Read default TVA rate from GuestHouse model
+        if (gh?.taxRate !== undefined && gh?.taxRate !== null) {
+          setDefaultTvaRate(parseFloat(gh.taxRate) || 10)
         }
       }
     } catch (err) {
@@ -474,7 +482,7 @@ export default function InvoicesPage() {
       notes: "",
       terms: "",
       paymentMethod: "",
-      items: [{ ...defaultItemForm }],
+      items: [getDefaultItemForm(defaultTvaRate)],
       touristTaxNights: "0",
       touristTaxAdults: "1",
       touristTaxChildren: "0",
@@ -519,7 +527,7 @@ export default function InvoicesPage() {
     try {
       if (field === "guestId") {
         // Reset booking AND set new guestId in a single update
-        setFormData(prev => ({ ...prev, guestId: value, bookingId: "", items: [{ ...defaultItemForm }] }))
+        setFormData(prev => ({ ...prev, guestId: value, bookingId: "", items: [getDefaultItemForm(defaultTvaRate)] }))
       } else {
         setFormData((prev) => ({ ...prev, [field]: value }))
       }
@@ -534,7 +542,7 @@ export default function InvoicesPage() {
       setFormData(prev => ({ ...prev, bookingId }))
       
       if (!bookingId) {
-        setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }], touristTaxNights: "0", touristTaxAdults: "1", touristTaxChildren: "0" }))
+        setFormData(prev => ({ ...prev, items: [getDefaultItemForm(defaultTvaRate)], touristTaxNights: "0", touristTaxAdults: "1", touristTaxChildren: "0" }))
         return
       }
 
@@ -566,7 +574,7 @@ export default function InvoicesPage() {
             description: `Séjour chambre ${roomNumber} (${format(checkInDate, "d MMM", { locale: fr })} - ${format(checkOutDate, "d MMM yyyy", { locale: fr })}) - ${nights} nuit${nights > 1 ? 's' : ''}${isPerPerson ? ` - ${booking.adults} pers.` : ""}`,
             quantity: nights.toString(),
             unitPrice: unitPrice.toString(),
-            taxRate: "10", // Default tax rate
+            taxRate: defaultTvaRate.toString(),
           }],
           // Auto-fill tourist tax from booking data
           touristTaxNights: nights.toString(),
@@ -577,7 +585,7 @@ export default function InvoicesPage() {
     } catch (err) {
       console.error("Error in handleBookingSelect:", err)
       // Fallback to default items
-      setFormData(prev => ({ ...prev, items: [{ ...defaultItemForm }] }))
+      setFormData(prev => ({ ...prev, items: [getDefaultItemForm(defaultTvaRate)] }))
     }
   }
 
@@ -594,7 +602,7 @@ export default function InvoicesPage() {
   const addItem = () => {
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, { ...defaultItemForm }],
+      items: [...prev.items, getDefaultItemForm(defaultTvaRate)],
     }))
   }
 
@@ -1548,7 +1556,7 @@ export default function InvoicesPage() {
                         className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setFormData(prev => ({ ...prev, bookingId: "", items: [{ ...defaultItemForm }] }))
+                          setFormData(prev => ({ ...prev, bookingId: "", items: [getDefaultItemForm(defaultTvaRate)] }))
                         }}
                       >
                         <XCircle className="w-4 h-4 text-gray-400 hover:text-gray-600" />

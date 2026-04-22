@@ -814,6 +814,37 @@ export default function EstablishmentSettingsPage() {
         <TabsContent value="billing" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
+              <CardTitle>Taux de TVA par défaut</CardTitle>
+              <CardDescription>
+                Taux appliqué par défaut lors de la création de factures (modifiable ligne par ligne)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <div className="w-32">
+                  <Input
+                    id="taxRate"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={formData.taxRate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, taxRate: e.target.value })
+                    }
+                    placeholder="10"
+                  />
+                </div>
+                <span className="text-sm text-gray-500">%</span>
+                <p className="text-xs text-gray-500">
+                  Exemple : 10 pour 10%, 20 pour 20%. Ce taux sera pré-rempli sur chaque ligne d&apos;article de vos factures.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Identifiant de l&apos;établissement</CardTitle>
               <CardDescription>
                 Code unique utilisé dans la numérotation des factures
