@@ -1352,3 +1352,25 @@ Stage Summary:
 - PostgreSQL schema confirmed in sync with Prisma schema
 - Client export feature already implemented and verified (Excel/PDF/Print)
 - All version references updated consistently across 4 files
+
+---
+Task ID: 1
+Agent: main
+Task: Add configurable default TVA rate in establishment billing settings
+
+Work Log:
+- Analyzed current state: GuestHouse model already has `taxRate Float @default(10.0)` field
+- Establishment settings page already had `taxRate` in formData but NO UI input in billing tab
+- Invoice page had hardcoded `taxRate: "10"` when importing bookings
+- Added TVA rate input card in Settings > Establishment > Billing tab (before "Identifiant" card)
+- Updated invoice page to fetch `taxRate` from GuestHouse settings API response
+- Created `getDefaultItemForm(taxRate)` function replacing static `defaultItemForm`
+- All 8 references updated to use `getDefaultItemForm(defaultTvaRate)`
+- Booking import now uses `defaultTvaRate.toString()` instead of hardcoded "10"
+- Version bumped to 2.8.3
+
+Stage Summary:
+- No Prisma schema change needed - `taxRate` field already existed
+- No Neon PostgreSQL push needed - no schema modification
+- Commit 452e2a6 pushed to GitHub, Vercel deployment triggered
+- Files modified: invoices/page.tsx, settings/establishment/page.tsx, version.ts, package.json, guide/page.tsx
