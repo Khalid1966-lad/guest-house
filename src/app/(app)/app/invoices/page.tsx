@@ -364,7 +364,7 @@ export default function InvoicesPage() {
     const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
     const taxes = items.reduce((sum, item) => {
       const itemTotal = item.quantity * item.unitPrice
-      return sum + itemTotal * ((parseFloat(item.taxRate) || 0) / 100)
+      return sum + Math.round(itemTotal * ((parseFloat(item.taxRate) || 0) / 100) * 100) / 100
     }, 0)
     
     // Calculate tourist tax if enabled in settings: (adults × perAdult + children × perChild) × nights
